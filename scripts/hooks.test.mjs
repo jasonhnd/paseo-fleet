@@ -2,7 +2,7 @@
 // Personal-looking samples are assembled at run time so this file scans clean.
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, before, describe, test } from "node:test";
@@ -48,6 +48,14 @@ before(() => {
   execFileSync("git", ["init", "-q", "-b", "main", repo], { env });
   execFileSync("git", ["init", "-q", "--bare", remote], { env });
   for (const file of GATES) cpSync(join(ROOT, file), join(repo, file));
+  // pre-push runs `npm run verify`; here it is a stub that records the call and exits with VERIFY_STUB_EXIT.
+  writeFileSync(join(repo, "package.json"), JSON.stringify({ name: "demo", private: true, scripts: { verify: "node verify-stub.mjs" } }));
+  writeFileSync(join(repo, "verify-stub.mjs"), [
+    'import { appendFileSync } from "node:fs";',
+    'appendFileSync(process.env.VERIFY_STUB_LOG, "verify\\n");',
+    'process.exitCode = Number(process.env.VERIFY_STUB_EXIT ?? 0);',
+  ].join("\n"));
+  env.VERIFY_STUB_LOG = join(home, "verify-calls.log");
   ok(git(["config", "core.hooksPath", ".githooks"]));
   ok(git(["config", "user.name", "paseo-fleet contributors"]));
   ok(git(["config", "user.email", PLACEHOLDER]));
@@ -80,6 +88,21 @@ describe("pre-commit", () => {
     });
   }
 
+  test("CJK text in a nested locales/zh-CN.json is committed", () => {
+    const file = "packages/demo/shared/locales/zh-CN.json";
+    mkdirSync(join(repo, dirname(file)), { recursive: true });
+    writeFileSync(join(repo, file), j('{ "board.title": "', "\u770b\u677f", '" }\n'));
+    ok(git(["add", file]));
+    ok(git(["commit", "-q", "-m", "zh-CN locale"]));
+  });
+
+  test("CJK text in any other file under the same folder is refused", () => {
+    mkdirSync(join(repo, "packages/demo/shared/locales"), { recursive: true });
+    const result = tryCommit("packages/demo/shared/locales/en.json", j('{ "board.title": "', "\u770b\u677f", '" }\n'));
+    assert.notEqual(result.status, 0);
+    assert.match(result.stdout + result.stderr, /cjk-outside-locales/);
+  });
+
   test("a missing private denylist refuses every commit", () => {
     const result = tryCommit("fine.md", "fine\n", { FLEET_PRIVATE_DENYLIST: join(home, "missing.txt") });
     assert.notEqual(result.status, 0);
@@ -94,6 +117,23 @@ describe("pre-commit", () => {
 });
 
 describe("pre-push", () => {
+  const verifyCalls = () => (existsSync(env.VERIFY_STUB_LOG) ? readFileSync(env.VERIFY_STUB_LOG, "utf8").split("\n").filter(Boolean).length : 0);
+
+  test("running the hook by hand runs npm run verify", () => {
+    const before = verifyCalls();
+    const result = spawnSync("sh", [".githooks/pre-push"], { cwd: repo, input: "", encoding: "utf8", env });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.equal(verifyCalls(), before + 1);
+  });
+
+  test("a failing npm run verify refuses the push", () => {
+    const result = git(["push", "-q", "origin", "HEAD:refs/heads/verify-fails"], { VERIFY_STUB_EXIT: "1" });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /pre-push: refused/);
+    const pushed = spawnSync("git", ["-C", remote, "rev-parse", "--verify", "-q", "refs/heads/verify-fails"], { encoding: "utf8", env });
+    assert.notEqual(pushed.status, 0, "nothing may reach the remote");
+  });
+
   test("clean history is pushed", () => {
     ok(git(["push", "-q", "origin", "main"]));
   });

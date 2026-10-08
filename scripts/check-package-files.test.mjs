@@ -22,7 +22,7 @@ describe("rules", () => {
 
   test("whitelisted plugin files pass", () => {
     const files = [...BASE, "README.md", "index.client.tsx", "index.server.ts", "client/board.tsx", "server/rpc.ts", "shared/i18n.ts",
-      "locales/en.json", "locales/zh-CN.json", "bin/tool.mjs", "assets/icon.png", "examples/plans.example.json"];
+      "locales/en.json", "locales/zh-CN.json", "shared/locales/en.json", "shared/locales/zh-CN.json", "bin/tool.mjs", "assets/icon.png", "examples/plans.example.json"];
     assert.deepEqual(checkFiles(files, { icon: "assets/icon.png" }), []);
   });
 

@@ -52,6 +52,16 @@ describe("generic rules", () => {
     assert.deepEqual(rulesHit("README.md", text), ["cjk-outside-locales"]);
   });
 
+  test("CJK is allowed in a locales/zh-CN.json at any depth, and only there", () => {
+    const text = j("\u770b", "\u677f");
+    assert.deepEqual(rulesHit("packages/x/shared/locales/zh-CN.json", text), []);
+    assert.deepEqual(rulesHit("shared/locales/zh-CN.json", text), []);
+    assert.deepEqual(rulesHit("packages/x/shared/locales/en.json", text), ["cjk-outside-locales"]);
+    assert.deepEqual(rulesHit("packages/x/shared/locales/zh-CN.jsonc", text), ["cjk-outside-locales"]);
+    assert.deepEqual(rulesHit("packages/x/shared/zh-CN.json", text), ["cjk-outside-locales"]);
+    assert.deepEqual(rulesHit("packages/x/shared/i18n.ts", text), ["cjk-outside-locales"]);
+  });
+
   test("forbidden paths, with example and fixture exceptions", () => {
     assert.deepEqual(rulesHit("plans.json", "{}"), ["forbidden-path"]);
     assert.deepEqual(rulesHit("x/kanban.db", null), ["forbidden-path"]);

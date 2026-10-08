@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Roles, quota pacing across Claude, Codex and Grok subscriptions, and a decisions inbox for a team of coding agents in Paseo.",
   "license": "MIT",
-  "author": "paseo-fleet contributors",
+  "author": "jasonhnd",
   "homepage": "https://github.com/jasonhnd/paseo-fleet/tree/main/packages/fleet-cockpit#readme",
   "repository": {
     "type": "git",

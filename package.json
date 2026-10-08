@@ -17,7 +17,8 @@
     "pack:check": "node scripts/check-package-files.mjs",
     "contract:sync": "node scripts/sync-contract.mjs",
     "contract:check": "node scripts/sync-contract.mjs --check",
-    "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "node --test \"scripts/*.test.mjs\""
+    "typecheck": "node scripts/typecheck.mjs",
+    "test": "node --test \"scripts/*.test.mjs\"",
+    "verify": "node scripts/verify.mjs"
   }
 }

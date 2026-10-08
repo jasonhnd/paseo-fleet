@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "A cross-project kanban board for Paseo: cards are started by coding agents in role, reviewed by a different model family and accepted by a lead.",
   "license": "MIT",
-  "author": "paseo-fleet contributors",
+  "author": "jasonhnd",
   "homepage": "https://github.com/jasonhnd/paseo-fleet/tree/main/packages/kanban#readme",
   "repository": {
     "type": "git",
