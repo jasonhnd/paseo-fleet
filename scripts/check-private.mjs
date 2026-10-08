@@ -111,12 +111,13 @@ export function isForbiddenPath(path, compiled) {
 
 /** Hits for one file. `text` is null for binary files, which are judged by path only. */
 export function scanFile(path, text, compiled, privateRules = []) {
-  if (anyMatch(compiled.ignore, path)) return [];
   const hits = [];
-  if (isForbiddenPath(path, compiled)) hits.push({ path, line: 0, rule: "forbidden-path", snippet: path });
+  // A file name can leak as much as its content, so private terms are checked on every path, ignored ones too.
   for (const rule of privateRules) {
     for (const match of path.matchAll(rule.pattern)) hits.push({ path, line: 0, rule: rule.id, snippet: masked(path, match.index, match[0].length) });
   }
+  if (anyMatch(compiled.ignore, path)) return hits;
+  if (isForbiddenPath(path, compiled)) hits.push({ path, line: 0, rule: "forbidden-path", snippet: path });
   if (text === null) return hits;
   const rules = [...compiled.rules.filter((rule) => !rule.onlyPaths || anyMatch(rule.onlyPaths, path)), ...privateRules];
   text.split("\n").forEach((line, index) => {
