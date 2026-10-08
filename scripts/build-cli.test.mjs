@@ -65,3 +65,17 @@ test("a failed build writes no partial command bundles", async () => {
   await assert.rejects(buildCli(root));
   assert.equal(existsSync(join(root, "bin/cli.bundle.mjs")), false);
 });
+
+test("prepack builds the commands without contaminating npm's JSON output", () => {
+  const root = fixture();
+  for (const name of ENTRIES) writeFileSync(join(root, "server", `${name}.ts`), 'export {};\n');
+  writeFileSync(join(root, "package.json"), JSON.stringify({
+    name: "@demo/commands", version: "1.0.0", files: ["bin/"], scripts: { prepack: "node prepack.mjs" },
+  }));
+  writeFileSync(join(root, "prepack.mjs"), `import { buildCli } from ${JSON.stringify(new URL("./build-cli.mjs", import.meta.url).href)}; await buildCli(process.cwd());\n`);
+  const out = spawnSync("npm", ["pack", "--dry-run", "--json"], { cwd: root, encoding: "utf8" });
+  assert.equal(out.status, 0, out.stderr);
+  const parsed = JSON.parse(out.stdout);
+  const result = Array.isArray(parsed) ? parsed[0] : Object.values(parsed)[0];
+  assert.ok(result.files.some(file => file.path === "bin/cli.bundle.mjs"));
+});

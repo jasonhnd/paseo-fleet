@@ -13,7 +13,7 @@ export async function buildCli(root = ROOT) {
   root = realpathSync(root);
   const present = ENTRIES.filter(name => existsSync(join(root, "server", `${name}.ts`)));
   if (!present.includes("cli")) {
-    console.log("build:cli: no command sources yet, nothing to build");
+    console.error("build:cli: no command sources yet, nothing to build");
     return;
   }
   if (present.length !== ENTRIES.length) throw new Error("incomplete CLI source set");
@@ -38,7 +38,7 @@ export async function buildCli(root = ROOT) {
   })));
   mkdirSync(join(root, "bin"), { recursive: true });
   for (const result of results) for (const file of result.outputFiles) writeFileSync(file.path, file.contents);
-  console.log(`build:cli: ${results.length} standalone Node bundles`);
+  console.error(`build:cli: ${results.length} standalone Node bundles`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
