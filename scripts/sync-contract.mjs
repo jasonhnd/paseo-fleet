@@ -6,13 +6,13 @@
 //   contract.manifest.json   { "contract": "fleet-quota/v1", "files": { "<path>": "<sha256>" } }
 //
 // Usage: node scripts/sync-contract.mjs [--check] [--source <repository>] [--write-manifest] [--root <repository>]
-//   --check            the contract files must match this repository's manifest; with a source, the source
-//                      must carry the same contract version and identical files. Nothing is written.
-//   --source <repo>    the source repository (default $FLEET_CONTRACT_SOURCE). Without --check, its contract
-//                      folders and manifest are copied here: files are copied over, files only here are removed.
+//   (none), --check    read-only: the contract files must match this repository's manifest, and with a source
+//                      ($FLEET_CONTRACT_SOURCE, or --source together with --check) the source must carry the same
+//                      contract version and identical files. Nothing is written. An empty manifest passes.
+//   --source <repo>    copy: only a source given on the command line (without --check) is copied here. Its
+//                      contract folders and manifest are mirrored: files copied over, files only here removed.
 //   --write-manifest   rewrite this repository's manifest from its contract files, keeping the version
 //                      (run it in the source repository after changing the contract).
-// With no source only the manifest is checked; an empty contract with an empty manifest passes.
 // Exit: 0 in step, 1 differences, 2 setup problem.
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
@@ -31,7 +31,7 @@ const USAGE = "usage: node scripts/sync-contract.mjs [--check] [--source <reposi
 export class SetupError extends Error {}
 
 export function parseArgs(argv, env = process.env) {
-  const options = { root: DEFAULT_ROOT, check: false, writeManifest: false, source: env.FLEET_CONTRACT_SOURCE?.trim() || null };
+  const options = { root: DEFAULT_ROOT, check: false, writeManifest: false, copy: false, source: env.FLEET_CONTRACT_SOURCE?.trim() || null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--check") options.check = true;
@@ -39,9 +39,13 @@ export function parseArgs(argv, env = process.env) {
     else if (arg === "--root" || arg === "--source") {
       if (!argv[i + 1]) throw new SetupError(`${arg} needs a directory`);
       options[arg.slice(2)] = argv[(i += 1)];
+      if (arg === "--source") options.copy = true;
     } else throw new SetupError(`unknown argument ${arg}\n${USAGE}`);
   }
   if (options.writeManifest && options.check) throw new SetupError("--write-manifest and --check cannot be combined");
+  if (options.writeManifest && options.copy) throw new SetupError("--write-manifest and --source cannot be combined");
+  // Copying needs an explicit --source; the environment variable only widens the read-only check.
+  if (options.check) options.copy = false;
   options.root = resolve(options.root);
   if (options.source) options.source = resolve(options.source);
   return options;
@@ -155,8 +159,7 @@ async function main() {
       process.stdout.write(`manifest written (${result.contract}, ${result.count} file(s))\n`);
       return 0;
     }
-    if (!options.check) {
-      if (!options.source) throw new SetupError(`nothing to copy from: pass --source or set FLEET_CONTRACT_SOURCE\n${USAGE}`);
+    if (options.copy) {
       const result = await sync(options);
       process.stdout.write(`synced from the source (${result.contract}, ${result.count} file(s))${result.lines.length ? `:\n${result.lines.join("\n")}` : ", nothing changed"}\n`);
       return 0;

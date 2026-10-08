@@ -1,7 +1,7 @@
 // Tests for sync-contract.mjs on two throwaway repositories: a source and a vendored copy.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,6 +24,18 @@ delete env.FLEET_CONTRACT_SOURCE;
 const run = (root, ...args) => spawnSync(process.execPath, [SCRIPT, "--root", root, ...args], { encoding: "utf8", env });
 const manifestOf = async (root) => JSON.parse(await readFile(join(root, MANIFEST), "utf8"));
 
+/** Every file under a folder with its size, modification time and content: a check must leave it all as it was. */
+async function snapshot(root) {
+  const entries = await readdir(root, { recursive: true, withFileTypes: true });
+  const files = {};
+  for (const entry of entries.filter((item) => item.isFile())) {
+    const path = join(entry.parentPath, entry.name);
+    const info = await stat(path);
+    files[path.slice(root.length)] = `${info.size}:${info.mtimeMs}:${await readFile(path, "utf8")}`;
+  }
+  return files;
+}
+
 beforeEach(async () => {
   source = await mkdtemp(join(tmpdir(), "sync-contract-source-"));
   copy = await mkdtemp(join(tmpdir(), "sync-contract-copy-"));
@@ -38,6 +50,11 @@ after(async () => {
 
 test("arguments, with the source from the environment", () => {
   assert.equal(parseArgs(["--check"], {}).check, true);
+  assert.equal(parseArgs([], {}).copy, false, "no arguments only checks");
+  assert.equal(parseArgs([], { FLEET_CONTRACT_SOURCE: "/src" }).copy, false, "the environment never copies");
+  assert.equal(parseArgs(["--source", "/src"], {}).copy, true);
+  assert.equal(parseArgs(["--check", "--source", "/src"], {}).copy, false);
+  assert.throws(() => parseArgs(["--write-manifest", "--source", "/src"], {}), /cannot be combined/);
   assert.equal(parseArgs(["--root", "/x"], {}).root, "/x");
   assert.equal(parseArgs([], {}).source, null);
   assert.equal(parseArgs([], { FLEET_CONTRACT_SOURCE: "/src" }).source, "/src");
@@ -47,10 +64,39 @@ test("arguments, with the source from the environment", () => {
   assert.throws(() => parseArgs(["extra"], {}), /unknown argument/);
 });
 
-test("with no source, an empty contract and manifest pass (skeleton)", () => {
-  const out = run(copy, "--check");
-  assert.equal(out.status, 0, out.stdout + out.stderr);
-  assert.match(out.stdout, /contract in sync \(fleet-quota\/v1, 0 file\(s\), manifest only \(no source given\)\)/);
+test("with no arguments, an empty contract and manifest pass (skeleton)", () => {
+  for (const args of [[], ["--check"]]) {
+    const out = run(copy, ...args);
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.match(out.stdout, /contract in sync \(fleet-quota\/v1, 0 file\(s\), manifest only \(no source given\)\)/);
+  }
+});
+
+test("with no arguments, a file that does not match the manifest fails", async () => {
+  await put(copy, "shared/contract/schema.ts", "export const A = 1;\n");
+  assert.equal(run(copy, "--write-manifest").status, 0);
+  assert.equal(run(copy).status, 0);
+  await put(copy, "shared/contract/schema.ts", "export const A = 2;\n");
+  const out = run(copy);
+  assert.equal(out.status, 1);
+  assert.match(out.stdout, /changed {2}shared\/contract\/schema\.ts \(not as in contract\.manifest\.json\)/);
+});
+
+test("a check writes nothing, with or without a source, even when the copy differs", async () => {
+  await put(source, "shared/contract/schema.ts", "export const A = 1;\n");
+  await put(source, "server/contract/io.ts", "// io\n");
+  assert.equal(run(source, "--write-manifest").status, 0);
+  await put(copy, "shared/contract/schema.ts", "export const A = 0;\n");
+  await put(copy, "shared/contract/old.ts", "// stale\n");
+  const before = { source: await snapshot(source), copy: await snapshot(copy) };
+  assert.equal(run(copy).status, 1);
+  assert.equal(run(copy, "--check").status, 1);
+  assert.equal(run(copy, "--check", "--source", source).status, 1);
+  const viaEnv = spawnSync(process.execPath, [SCRIPT, "--root", copy], { encoding: "utf8", env: { ...env, FLEET_CONTRACT_SOURCE: source } });
+  assert.equal(viaEnv.status, 1, "FLEET_CONTRACT_SOURCE without --source only checks");
+  assert.match(viaEnv.stdout, /checked against the source/);
+  assert.deepEqual(await snapshot(copy), before.copy);
+  assert.deepEqual(await snapshot(source), before.source);
 });
 
 test("a missing or malformed manifest is a setup problem", async () => {
@@ -122,5 +168,4 @@ test("a sync refuses an inconsistent source and never empties a copy", async () 
   assert.equal(out.status, 2);
   assert.match(out.stderr, /refusing to delete/);
   assert.equal(await readFile(join(copy, "shared/contract/schema.ts"), "utf8"), "// copy\n");
-  assert.match(run(copy).stderr, /nothing to copy from/);
 });
