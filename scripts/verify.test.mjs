@@ -5,7 +5,7 @@ import { runSteps, steps } from "./verify.mjs";
 
 test("the gate set covers everything CI runs", () => {
   const names = steps().map((step) => step.name);
-  for (const gate of ["typecheck", "test (scripts)", "test (packages)", "scan (check-private --all)", "identity (next commit)", "identity (history)", "gitleaks (history)", "contract (sync-contract --check)", "pack:check"]) {
+  for (const gate of ["typecheck", "test (scripts)", "test (plugin)", "scan (check-private --all)", "identity (next commit)", "identity (history)", "gitleaks (history)", "contract (sync-contract --check)", "shared gates (compare-scripts)", "pack:check"]) {
     assert.ok(names.includes(gate), gate);
   }
   const testStep = steps().find((step) => step.name === "test (scripts)");

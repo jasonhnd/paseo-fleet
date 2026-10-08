@@ -16,4 +16,4 @@ All data lives in `$PASEO_HOME/plugin-data/agent-fleet-cockpit/` (default `~/.pa
 
 ## Source
 
-<https://github.com/jasonhnd/paseo-fleet/tree/main/packages/fleet-cockpit>
+<https://github.com/jasonhnd/paseo-fleet>

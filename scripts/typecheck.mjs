@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Type-check every workspace package that has TypeScript sources: `tsc --noEmit -p <package>`.
-// A package with no .ts/.tsx files yet passes with a note (tsc itself would fail with TS18003).
-// A package with sources but no tsconfig.json fails.
+// Type-check the plugin: `tsc --noEmit -p <repository>`. The repository root is the plugin package.
+// With no .ts/.tsx files yet it passes with a note (tsc itself would fail with TS18003).
+// Sources without a tsconfig.json fail.
 //
 // Usage: node scripts/typecheck.mjs [--root <repository>]
 // Exit: 0 clean, 1 type errors or a missing tsconfig.json, 2 setup problem.
@@ -10,7 +10,6 @@ import { existsSync, readdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { workspaceDirs } from "./check-package-files.mjs";
 
 const DEFAULT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SKIP_DIRS = new Set(["node_modules", ".git"]);
@@ -24,7 +23,7 @@ export function parseArgs(argv) {
   return options;
 }
 
-/** TypeScript source files under a package (declaration files included), skipping node_modules. */
+/** TypeScript source files under a folder (declaration files included), skipping node_modules and .git. */
 export function typeScriptFiles(dir) {
   return readdirSync(dir, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile() && /\.(ts|tsx|mts|cts)$/.test(entry.name))
@@ -41,37 +40,24 @@ function tscPath(root) {
 }
 
 export function run({ root }) {
-  const results = [];
-  for (const rel of workspaceDirs(root)) {
-    const dir = join(root, rel);
-    const files = typeScriptFiles(dir);
-    if (files.length === 0) {
-      results.push({ dir: rel, ok: true, note: "no TypeScript sources yet, nothing to check" });
-      continue;
-    }
-    if (!existsSync(join(dir, "tsconfig.json"))) {
-      results.push({ dir: rel, ok: false, note: `${files.length} TypeScript file(s) but no tsconfig.json` });
-      continue;
-    }
-    const out = spawnSync(process.execPath, [tscPath(root), "--noEmit", "-p", dir], { cwd: dir, encoding: "utf8" });
-    results.push({ dir: rel, ok: out.status === 0, note: `${files.length} file(s)`, output: `${out.stdout ?? ""}${out.stderr ?? ""}`.trim() });
-  }
-  return results;
+  const files = typeScriptFiles(root);
+  if (files.length === 0) return { ok: true, note: "no TypeScript sources yet, nothing to check" };
+  if (!existsSync(join(root, "tsconfig.json"))) return { ok: false, note: `${files.length} TypeScript file(s) but no tsconfig.json` };
+  const out = spawnSync(process.execPath, [tscPath(root), "--noEmit", "-p", root], { cwd: root, encoding: "utf8" });
+  return { ok: out.status === 0, note: `${files.length} file(s)`, output: `${out.stdout ?? ""}${out.stderr ?? ""}`.trim() };
 }
 
 function main() {
-  let results;
+  let result;
   try {
-    results = run(parseArgs(process.argv.slice(2)));
+    result = run(parseArgs(process.argv.slice(2)));
   } catch (error) {
     console.error(`typecheck: ${error.message}`);
     return 2;
   }
-  for (const result of results) {
-    console.log(`typecheck: ${result.dir}: ${result.ok ? "ok" : "FAILED"} (${result.note})`);
-    if (result.output) console.log(result.output);
-  }
-  return results.every((result) => result.ok) ? 0 : 1;
+  console.log(`typecheck: ${result.ok ? "ok" : "FAILED"} (${result.note})`);
+  if (result.output) console.log(result.output);
+  return result.ok ? 0 : 1;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) process.exitCode = main();

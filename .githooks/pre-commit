@@ -1,5 +1,5 @@
 #!/bin/sh
-# paseo-fleet: refuse to commit anything personal. Run from the repository root.
+# Refuse to commit anything personal. Run from the repository root.
 set -e
 cd "$(git rev-parse --show-toplevel)"
 node scripts/check-private.mjs            # staged files, generic rules + private denylist (required locally)
@@ -11,5 +11,5 @@ if command -v gitleaks >/dev/null 2>&1; then
     gitleaks protect --staged --redact --no-banner
   fi
 else
-  echo "pre-commit: gitleaks is not installed (brew install gitleaks); CI will run it" >&2
+  echo "pre-commit: gitleaks is not installed (brew install gitleaks); npm run verify, which pre-push runs, needs it" >&2
 fi

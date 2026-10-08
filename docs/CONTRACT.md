@@ -27,7 +27,7 @@ Every file carries:
 | `generatedAt` | ISO 8601 date-time |
 | `ttlSeconds` | positive integer |
 
-The zod definitions of the envelope and each payload are in `packages/contract/src/shared/`.
+The zod definitions of the envelope and each payload are in `shared/contract/`; paths, atomic writes and the read state machine are in `server/contract/`.
 
 ## Reading
 
@@ -43,3 +43,22 @@ Writers always write a temporary file and rename it into place.
 ## Versioning
 
 Inside v1, fields are only added, never removed or redefined. A breaking change starts `fleet-quota/v2` with a `.v2` file name, and the producer writes both versions for one release.
+
+## Source and copy
+
+Fleet Cockpit's repository (`jasonhnd/paseo-fleet`) is the source. Kanban's repository keeps a vendored copy of `shared/contract/` and `server/contract/`; both plugins keep zero runtime dependencies, so the contract is never an npm package.
+
+| File | Holds |
+|---|---|
+| `shared/contract/` | zod schemas only. Paseo bundles `shared/` into the client, so nothing here may import a Node built-in. |
+| `server/contract/` | Data directory paths, atomic writes and the read state machine (absent, invalid, stale, fresh). |
+| `contract.manifest.json` | `contract` (the version, `fleet-quota/v1`) and the sha256 of every file in the two folders. |
+
+```sh
+npm run contract:check       # files must match contract.manifest.json; no source needed, an empty contract passes
+npm run contract:manifest    # in the source, after changing the contract: rewrite the hashes
+FLEET_CONTRACT_SOURCE=<paseo-fleet checkout> npm run contract:check         # in paseo-kanban: same version, identical files
+node scripts/sync-contract.mjs --source <paseo-fleet checkout>              # in paseo-kanban: copy the source over
+```
+
+Change the contract in the source, never in the copy.

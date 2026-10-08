@@ -1,8 +1,0 @@
-{
-  "name": "paseo-fleet-contract",
-  "private": true,
-  "version": "0.0.0",
-  "description": "The fleet-quota/v1 file contract shared by the two plugins. Not published; copied into each plugin by scripts/sync-contract.mjs.",
-  "license": "MIT",
-  "type": "module"
-}

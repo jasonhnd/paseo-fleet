@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 // `npm run verify`: the whole CI gate set, run on this machine. GitHub Actions is not the only entry point
 // (and may be switched off), so this is gate 2; .githooks/pre-push runs it and refuses the push on failure.
+// paseo-fleet and paseo-kanban carry this file byte for byte (scripts/compare-scripts.mjs checks that).
 //
 // Every step runs, even after a failure, so one run lists everything that is wrong. Steps that have
 // nothing to check yet (no plugin code) pass with a note; they never skip an error.
+// Optional, from the environment: FLEET_CONTRACT_SOURCE (the contract's source repository, checked against
+// the vendored copy) and PASEO_FLEET_SIBLING (the other plugin repository, whose gates must be identical).
 // Exit: 0 when every step passed, 1 otherwise.
 import { spawnSync } from "node:child_process";
 import { readdirSync } from "node:fs";
@@ -19,12 +22,13 @@ export function steps() {
   return [
     { name: "typecheck", command: node("scripts/typecheck.mjs") },
     { name: "test (scripts)", command: node("--test", ...scriptTests()) },
-    { name: "test (packages)", command: ["npm", "test", "--workspaces", "--if-present"] },
+    { name: "test (plugin)", command: node("scripts/test-plugin.mjs") },
     { name: "scan (check-private --all)", command: node("scripts/check-private.mjs", "--all", "--quiet") },
     { name: "identity (next commit)", command: node("scripts/check-identity.mjs") },
     { name: "identity (history)", command: node("scripts/check-identity.mjs", "--history") },
     { name: "gitleaks (history)", command: ["gitleaks", "git", "--redact", "--no-banner", "."], missing: "gitleaks is not installed (brew install gitleaks); it is required here because no CI runs it" },
     { name: "contract (sync-contract --check)", command: node("scripts/sync-contract.mjs", "--check") },
+    { name: "shared gates (compare-scripts)", command: node("scripts/compare-scripts.mjs") },
     { name: "pack:check", command: node("scripts/check-package-files.mjs") },
   ];
 }

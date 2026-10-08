@@ -1,24 +1,77 @@
 {
-  "name": "paseo-fleet",
-  "private": true,
-  "description": "Fleet Cockpit and Kanban: two Paseo plugins for running a team of coding agents.",
+  "name": "@jasonhnd/paseo-fleet-cockpit",
+  "version": "0.1.0",
+  "description": "Roles, quota pacing across Claude, Codex and Grok subscriptions, and a decisions inbox for a team of coding agents in Paseo.",
   "license": "MIT",
-  "type": "module",
-  "workspaces": [
-    "packages/*"
+  "author": "jasonhnd",
+  "homepage": "https://github.com/jasonhnd/paseo-fleet#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jasonhnd/paseo-fleet.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jasonhnd/paseo-fleet/issues"
+  },
+  "keywords": [
+    "paseo",
+    "paseo-plugin",
+    "agents",
+    "quota",
+    "dispatch",
+    "kanban"
   ],
+  "type": "module",
+  "files": [
+    "paseo-plugin.json",
+    "OVERVIEW.md",
+    "LICENSE",
+    "index.client.tsx",
+    "index.server.ts",
+    "client/",
+    "server/",
+    "shared/",
+    "locales/",
+    "bin/",
+    "assets/",
+    "examples/",
+    "!**/*.test.ts",
+    "!**/*.test.tsx",
+    "!**/__fixtures__/",
+    "!**/*.map"
+  ],
+  "bin": {
+    "afc": "bin/afc.mjs"
+  },
   "engines": {
     "node": ">=22.5"
   },
   "scripts": {
-    "prepare": "git config core.hooksPath .githooks",
+    "hooks": "git config core.hooksPath .githooks",
     "scan": "node scripts/check-private.mjs --all",
     "identity": "node scripts/check-identity.mjs --history",
     "pack:check": "node scripts/check-package-files.mjs",
-    "contract:sync": "node scripts/sync-contract.mjs",
     "contract:check": "node scripts/sync-contract.mjs --check",
+    "contract:manifest": "node scripts/sync-contract.mjs --write-manifest",
+    "shared:check": "node scripts/compare-scripts.mjs",
     "typecheck": "node scripts/typecheck.mjs",
     "test": "node --test \"scripts/*.test.mjs\"",
+    "test:plugin": "node scripts/test-plugin.mjs",
     "verify": "node scripts/verify.mjs"
+  },
+  "devDependencies": {
+    "@getpaseo/client": "0.11.0",
+    "@getpaseo/plugin": "0.11.0",
+    "@getpaseo/protocol": "0.11.0",
+    "@tanstack/react-query": "^5.90.11",
+    "@types/node": "^24",
+    "@types/react": "~19.2.0",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "typescript": "^5.9.3",
+    "zod": "^4.4.3"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   }
 }

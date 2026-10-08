@@ -1,9 +1,0 @@
-{
-  "id": "paseo-kanban",
-  "name": "Kanban for Paseo",
-  "description": "A cross-project board where coding agents pick up cards by role, with cross-family review.",
-  "author": "jasonhnd",
-  "requirements": {
-    "paseo": ">=0.11.0 <0.12.0"
-  }
-}

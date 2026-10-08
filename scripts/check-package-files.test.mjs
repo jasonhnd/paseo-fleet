@@ -1,4 +1,4 @@
-// Tests for check-package-files.mjs: the whitelist rules, and a real npm pack on a throwaway workspace.
+// Tests for check-package-files.mjs: the whitelist rules, and a real npm pack on a throwaway plugin repository.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { checkFiles, packResultFiles, workspaceDirs } from "./check-package-files.mjs";
+import { checkFiles, packResultFiles } from "./check-package-files.mjs";
 
 const SCRIPT = join(dirname(fileURLToPath(import.meta.url)), "check-package-files.mjs");
 const BASE = ["LICENSE", "OVERVIEW.md", "package.json", "paseo-plugin.json"];
@@ -55,18 +55,17 @@ describe("rules", () => {
 });
 
 describe("command line", () => {
-  function workspace(extra = {}) {
+  function plugin(extra = {}) {
     const root = mkdtempSync(join(tmpdir(), "check-package-files-"));
     temps.push(root);
     const files = {
-      "package.json": JSON.stringify({ name: "demo-root", private: true, workspaces: ["packages/*"] }),
-      "packages/internal/package.json": JSON.stringify({ name: "demo-internal", private: true, version: "0.0.0" }),
-      "packages/plugin/package.json": JSON.stringify({ name: "@demo/plugin", version: "0.1.0", license: "MIT", files: ["paseo-plugin.json", "OVERVIEW.md", "LICENSE", "server/", "!**/*.test.ts"] }),
-      "packages/plugin/paseo-plugin.json": JSON.stringify({ id: "demo-plugin" }),
-      "packages/plugin/OVERVIEW.md": "# Demo\n",
-      "packages/plugin/LICENSE": "MIT\n",
-      "packages/plugin/server/a.ts": "export {};\n",
-      "packages/plugin/server/a.test.ts": "// excluded by files\n",
+      "package.json": JSON.stringify({ name: "@demo/plugin", version: "0.1.0", license: "MIT", files: ["paseo-plugin.json", "OVERVIEW.md", "LICENSE", "server/", "!**/*.test.ts"] }),
+      "paseo-plugin.json": JSON.stringify({ id: "demo-plugin" }),
+      "OVERVIEW.md": "# Demo\n",
+      "LICENSE": "MIT\n",
+      "server/a.ts": "export {};\n",
+      "server/a.test.ts": "// excluded by files\n",
+      "scripts/gate.mjs": "// not published\n",
       ...extra,
     };
     for (const [path, body] of Object.entries(files)) {
@@ -77,23 +76,23 @@ describe("command line", () => {
   }
   const cli = (root, ...args) => spawnSync(process.execPath, [SCRIPT, "--root", root, ...args], { encoding: "utf8" });
 
-  test("workspace folders come from the root package.json", () => {
-    assert.deepEqual(workspaceDirs(workspace()), ["packages/internal", "packages/plugin"]);
-  });
-
-  test("a clean package passes and --print lists its files", () => {
-    const out = cli(workspace(), "--print");
+  test("a clean root package passes and --print lists its files", () => {
+    const out = cli(plugin(), "--print");
     assert.equal(out.status, 0, out.stdout + out.stderr);
-    assert.match(out.stdout, /packages\/internal: private, not published/);
-    assert.match(out.stdout, /packages\/plugin \(@demo\/plugin\): 5 file\(s\), 0 problem\(s\)/);
+    assert.match(out.stdout, /@demo\/plugin: 5 file\(s\), 0 problem\(s\)/);
     assert.match(out.stdout, /^ {2}server\/a\.ts$/m);
-    assert.doesNotMatch(out.stdout, /a\.test\.ts/);
+    assert.doesNotMatch(out.stdout, /a\.test\.ts|scripts\//);
   });
 
   test("a file the whitelist does not know fails the check", () => {
-    const root = workspace({ "packages/plugin/server/state.json": "{}\n" });
-    const out = cli(root);
+    const out = cli(plugin({ "server/state.json": "{}\n" }));
     assert.equal(out.status, 1);
     assert.match(out.stdout, /refused: server\/state\.json: JSON data files/);
+  });
+
+  test("a private root package is a setup problem", () => {
+    const out = cli(plugin({ "package.json": JSON.stringify({ name: "demo-root", private: true }) }));
+    assert.equal(out.status, 2);
+    assert.match(out.stderr, /package\.json is private/);
   });
 });

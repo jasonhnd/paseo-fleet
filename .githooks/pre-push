@@ -1,5 +1,5 @@
 #!/bin/sh
-# paseo-fleet: refuse to push a personal identity, a tree with personal data, or a tree that fails the gates.
+# Refuse to push a personal identity, a tree with personal data, or a tree that fails the gates.
 # Git passes one line per ref on stdin: <local ref> <local sha> <remote ref> <remote sha>.
 # Run it by hand (sh .githooks/pre-push </dev/null) to get the same checks without pushing.
 set -e
