@@ -1,0 +1,24 @@
+name: ci
+on: [push, pull_request]
+permissions: { contents: read }
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+      # Gate 2: generic rules only; the private denylist never leaves the author's machine.
+      - run: node scripts/check-private.mjs --all --no-private-list
+      # Every commit's author and committer must be the placeholder or a GitHub noreply address.
+      - run: node scripts/check-identity.mjs --history --no-private-list
+      - uses: gitleaks/gitleaks-action@v2
+        env: { GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm test --workspaces --if-present
+      - run: node scripts/sync-contract.mjs --check
+      # Gate 3: npm pack --dry-run per package; every file must match the whitelist.
+      - run: node scripts/check-package-files.mjs --print

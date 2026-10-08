@@ -1,0 +1,8 @@
+{
+  "id": "agent-fleet-cockpit",
+  "name": "Fleet Cockpit",
+  "description": "Roles, quota pacing and a decisions inbox for a team of coding agents.",
+  "requirements": {
+    "paseo": ">=0.11.0 <0.12.0"
+  }
+}

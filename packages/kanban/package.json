@@ -1,0 +1,69 @@
+{
+  "name": "@jasonhnd/paseo-kanban",
+  "version": "0.1.0",
+  "description": "A cross-project kanban board for Paseo: cards are started by coding agents in role, reviewed by a different model family and accepted by a lead.",
+  "license": "MIT",
+  "author": "paseo-fleet contributors",
+  "homepage": "https://github.com/jasonhnd/paseo-fleet/tree/main/packages/kanban#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jasonhnd/paseo-fleet.git",
+    "directory": "packages/kanban"
+  },
+  "bugs": {
+    "url": "https://github.com/jasonhnd/paseo-fleet/issues"
+  },
+  "keywords": [
+    "paseo",
+    "paseo-plugin",
+    "agents",
+    "kanban",
+    "review",
+    "dispatch"
+  ],
+  "type": "module",
+  "files": [
+    "paseo-plugin.json",
+    "OVERVIEW.md",
+    "LICENSE",
+    "index.client.tsx",
+    "index.server.ts",
+    "client/",
+    "server/",
+    "shared/",
+    "locales/",
+    "bin/",
+    "assets/",
+    "examples/",
+    "!**/*.test.ts",
+    "!**/*.test.tsx",
+    "!**/__fixtures__/",
+    "!**/*.map"
+  ],
+  "bin": {
+    "paseo-kanban": "bin/paseo-kanban.mjs"
+  },
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test 'test/**/*.test.ts' 'server/**/*.test.ts' 'shared/**/*.test.ts'"
+  },
+  "devDependencies": {
+    "@getpaseo/client": "0.11.0",
+    "@getpaseo/plugin": "0.11.0",
+    "@getpaseo/protocol": "0.11.0",
+    "@tanstack/react-query": "^5.90.11",
+    "@types/node": "^24",
+    "@types/react": "~19.2.0",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "typescript": "^5.9.3",
+    "zod": "^4.4.3"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

@@ -1,0 +1,19 @@
+#!/bin/sh
+# paseo-fleet: refuse to push a personal identity or a tree with personal data.
+# Git passes one line per ref on stdin: <local ref> <local sha> <remote ref> <remote sha>.
+set -e
+cd "$(git rev-parse --show-toplevel)"
+status=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$local_sha" in *[!0]*) ;; *) continue ;; esac          # deleting a remote ref: nothing leaves
+  case "$remote_sha" in
+    *[!0]*) range="$remote_sha..$local_sha" ;;                 # existing remote ref: the new commits
+    *) range="$local_sha" ;;                                    # new remote ref: everything it carries
+  esac
+  node scripts/check-identity.mjs --range "$range" </dev/null || status=1
+  node scripts/check-private.mjs --tree "$local_sha" </dev/null || status=1
+done
+if [ "$status" -ne 0 ]; then
+  echo "pre-push: refused; nothing was pushed" >&2
+fi
+exit "$status"

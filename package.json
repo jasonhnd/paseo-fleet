@@ -1,0 +1,23 @@
+{
+  "name": "paseo-fleet",
+  "private": true,
+  "description": "Fleet Cockpit and Kanban: two Paseo plugins for running a team of coding agents.",
+  "license": "MIT",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "prepare": "git config core.hooksPath .githooks",
+    "scan": "node scripts/check-private.mjs --all",
+    "identity": "node scripts/check-identity.mjs --history",
+    "pack:check": "node scripts/check-package-files.mjs",
+    "contract:sync": "node scripts/sync-contract.mjs",
+    "contract:check": "node scripts/sync-contract.mjs --check",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "node --test \"scripts/*.test.mjs\""
+  }
+}
