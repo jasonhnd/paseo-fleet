@@ -32,6 +32,6 @@
     { "id": "url-with-token", "pattern": "https?://[^\\s\"']*[?&](token|key|secret|sig)=[^\\s\"'&]{8,}" },
     { "id": "cjk-outside-locales", "why": "all user- and agent-facing text goes through i18n",
       "pattern": "[\\u3040-\\u30ff\\u3400-\\u4dbf\\u4e00-\\u9fff\\uac00-\\ud7af\\uff01-\\uff5e]",
-      "onlyPaths": ["^(?!packages/[^/]+/(locales/|server/protocol/zh-CN/)|docs/zh-CN/|(.*/)?locales/zh-CN\\.json$)"] }
+      "onlyPaths": ["^(?!(packages/[^/]+/|[^/]+/)?((shared/)?locales/zh-CN(\\.json$|/)|server/protocol/zh-CN/)|docs/zh-CN/)"] }
   ]
 }

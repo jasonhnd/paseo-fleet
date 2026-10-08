@@ -43,24 +43,45 @@ describe("generic rules", () => {
     });
   }
 
-  test("CJK is allowed only in locale, protocol and zh-CN doc paths", () => {
-    const text = j("\u770b", "\u677f");
-    assert.deepEqual(rulesHit("packages/kanban/locales/zh-CN.json", text), []);
-    assert.deepEqual(rulesHit("packages/kanban/server/protocol/zh-CN/lead.md", text), []);
-    assert.deepEqual(rulesHit("docs/zh-CN/guide.md", text), []);
-    assert.deepEqual(rulesHit("packages/kanban/server/protocol/en/lead.md", text), ["cjk-outside-locales"]);
-    assert.deepEqual(rulesHit("README.md", text), ["cjk-outside-locales"]);
-  });
-
-  test("CJK is allowed in a locales/zh-CN.json at any depth, and only there", () => {
-    const text = j("\u770b", "\u677f");
-    assert.deepEqual(rulesHit("packages/x/shared/locales/zh-CN.json", text), []);
-    assert.deepEqual(rulesHit("shared/locales/zh-CN.json", text), []);
-    assert.deepEqual(rulesHit("packages/x/shared/locales/en.json", text), ["cjk-outside-locales"]);
-    assert.deepEqual(rulesHit("packages/x/shared/locales/zh-CN.jsonc", text), ["cjk-outside-locales"]);
-    assert.deepEqual(rulesHit("packages/x/shared/zh-CN.json", text), ["cjk-outside-locales"]);
-    assert.deepEqual(rulesHit("packages/x/shared/i18n.ts", text), ["cjk-outside-locales"]);
-  });
+  // The same table in paseo-fleet, AFC and Kanban, whose rules files carry the same CJK rule.
+  const cjkAllowed = [
+    "locales/zh-CN.json",
+    "shared/locales/zh-CN.json",
+    "packages/x/locales/zh-CN.json",
+    "packages/x/shared/locales/zh-CN.json",
+    "cockpit/shared/locales/zh-CN.json",
+    "shared/locales/zh-CN/tools.json",
+    "packages/x/locales/zh-CN/tools.json",
+    "packages/x/shared/locales/zh-CN/tools.json",
+    "server/protocol/zh-CN/lead.md",
+    "packages/x/server/protocol/zh-CN/lead.md",
+    "docs/zh-CN/guide.md",
+  ];
+  const cjkRefused = [
+    "shared/locales/en.json",
+    "packages/x/locales/en.json",
+    "packages/x/shared/locales/en.json",
+    "cockpit/shared/locales/en.json",
+    "packages/x/locales/en/tools.json",
+    "packages/x/shared/locales/zh-CN.jsonc",
+    "packages/x/shared/zh-CN.json",
+    "packages/x/server/foo.ts",
+    "packages/x/server/protocol/en/lead.md",
+    "packages/x/shared/i18n.ts",
+    "a/b/c/locales/zh-CN.json",
+    "docs/guide.md",
+    "README.md",
+  ];
+  for (const path of cjkAllowed) {
+    test(`CJK is allowed in ${path}`, () => {
+      assert.deepEqual(rulesHit(path, j("\u770b", "\u677f")), []);
+    });
+  }
+  for (const path of cjkRefused) {
+    test(`CJK is refused in ${path}`, () => {
+      assert.ok(rulesHit(path, j("\u770b", "\u677f")).includes("cjk-outside-locales"));
+    });
+  }
 
   test("forbidden paths, with example and fixture exceptions", () => {
     assert.deepEqual(rulesHit("plans.json", "{}"), ["forbidden-path"]);
