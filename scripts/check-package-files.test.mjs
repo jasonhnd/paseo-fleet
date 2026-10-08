@@ -28,6 +28,8 @@ describe("rules", () => {
 
   test("anything else is refused", () => {
     const refused = (file) => checkFiles([...BASE, file], {});
+    assert.match(refused("bin/test.mjs")[0], /tests, fixtures/);
+    assert.match(refused("bin/coverage.mjs")[0], /tests, fixtures/);
     assert.match(refused("tsconfig.json")[0], /not in the whitelist/);
     assert.match(refused("test/a.test.ts")[0], /not in the whitelist/);
     assert.match(refused("server/a.test.ts")[0], /tests, fixtures/);

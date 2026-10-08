@@ -56,7 +56,8 @@
     "typecheck": "node scripts/typecheck.mjs",
     "test": "node --test \"scripts/*.test.mjs\"",
     "test:plugin": "node scripts/test-plugin.mjs",
-    "verify": "node scripts/verify.mjs"
+    "verify": "node scripts/verify.mjs",
+    "build:check": "node scripts/paseo-build-check.mjs --strict"
   },
   "devDependencies": {
     "@getpaseo/client": "0.11.0",
@@ -68,7 +69,11 @@
     "react": "19.1.0",
     "react-native": "0.81.5",
     "typescript": "^5.9.3",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "tsx": "^4.23.15",
+    "react-test-renderer": "19.1.0",
+    "esbuild": "^0.28.2",
+    "c8": "^12.0.0"
   },
   "publishConfig": {
     "access": "public",

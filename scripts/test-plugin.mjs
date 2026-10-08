@@ -6,6 +6,7 @@
 // Exit: the node --test exit code, 0 when there is nothing to run, 2 setup problem.
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -36,7 +37,7 @@ export function pluginTests(root) {
   return files.sort();
 }
 
-function main() {
+async function main() {
   let options;
   try {
     options = parseArgs(process.argv.slice(2));
@@ -50,10 +51,23 @@ function main() {
     return 0;
   }
   console.log(`test-plugin: ${files.length} test file(s)`);
+  const phasesHelper = join(options.root, "test/helpers/test-phases.mjs");
+  const tmpHelper = join(options.root, "test/helpers/test-tmp.mjs");
+  // Preserve the imported suite's required performance files, preload, signal handling,
+  // and private temporary/data directories. Include tests from every public source directory.
+  if (existsSync(phasesHelper) && existsSync(tmpHelper)) {
+    const { testPhases } = await import(pathToFileURL(phasesHelper).href);
+    const { runPhasesInPrivateTmp } = await import(pathToFileURL(tmpHelper).href);
+    const phases = testPhases();
+    const included = new Set(phases.flatMap(([, ...paths]) => paths.map(path => resolve(options.root, path))));
+    phases[0].push(...files.map(path => resolve(options.root, path)).filter(path => !included.has(path)));
+    delete process.env.NODE_TEST_CONTEXT;
+    return runPhasesInPrivateTmp(phases, { cwd: options.root, logPrefix: "test-plugin" });
+  }
   // A parent node --test (this script's own tests) sets NODE_TEST_CONTEXT; the child must report on its own.
   const { NODE_TEST_CONTEXT: _parent, ...env } = process.env;
-  const out = spawnSync(process.execPath, ["--test", ...files], { cwd: options.root, env, stdio: ["ignore", "inherit", "inherit"] });
+  const out = spawnSync(process.execPath, ["--import", createRequire(join(DEFAULT_ROOT, "package.json")).resolve("tsx"), "--test", ...files], { cwd: options.root, env, stdio: ["ignore", "inherit", "inherit"] });
   return out.status ?? 1;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) process.exitCode = main();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) process.exitCode = await main();

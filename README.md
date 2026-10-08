@@ -65,6 +65,7 @@ The private denylist lists everything that identifies you (login name, real name
 ```sh
 npm run verify        # everything below plus gitleaks; exit 0 means the push gate will pass
 sh .githooks/pre-push </dev/null   # the push gate itself, without pushing anything
+npm run build:check   # compile actual plugin entries with the installed Paseo compiler (required)
 npm run typecheck     # tsc on the plugin; with no TypeScript yet it passes with a note
 npm test              # tests of the scripts themselves
 npm run test:plugin   # the plugin's own tests

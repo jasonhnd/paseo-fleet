@@ -16,7 +16,7 @@ import { EXIT, isForbiddenPath, loadRules } from "./check-private.mjs";
 
 const DEFAULT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const ALLOWED = /^(paseo-plugin\.json|OVERVIEW\.md|LICENSE|README\.md|package\.json|index\.(client\.tsx|server\.ts)|(client|server|shared|locales|bin|assets|examples)\/.+)$/;
-export const BLOCKED = /(\.test\.|(^|\/)__fixtures__\/|\.map$)/;
+export const BLOCKED = /(\.test\.|(^|\/)__fixtures__\/|\.map$|^bin\/(test|coverage)\.mjs$)/;
 const JSON_ALLOWED = /^(package\.json|paseo-plugin\.json|(.+\/)?locales\/.+\.json|(.+\/)?[^/]+\.example\.json)$/;
 export const REQUIRED = ["package.json", "paseo-plugin.json", "OVERVIEW.md", "LICENSE"];
 

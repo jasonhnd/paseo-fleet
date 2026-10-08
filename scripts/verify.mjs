@@ -22,6 +22,8 @@ export function steps() {
   return [
     { name: "typecheck", command: node("scripts/typecheck.mjs") },
     { name: "test (scripts)", command: node("--test", ...scriptTests()) },
+    { name: "build (CLI)", command: node("scripts/build-cli.mjs") },
+    { name: "build (Paseo)", command: node("scripts/paseo-build-check.mjs", "--strict") },
     { name: "test (plugin)", command: node("scripts/test-plugin.mjs") },
     { name: "scan (check-private --all)", command: node("scripts/check-private.mjs", "--all", "--quiet") },
     { name: "identity (next commit)", command: node("scripts/check-identity.mjs") },
