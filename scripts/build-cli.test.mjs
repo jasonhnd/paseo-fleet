@@ -26,7 +26,12 @@ test("an empty skeleton is allowed; a partial command set fails", async () => {
 
 test("all routes run bundled TypeScript under Node with no node_modules", async () => {
   const root = fixture();
-  writeFileSync(join(root, "server/helper.ts"), 'export const word: string = "ready";\n');
+  writeFileSync(join(root, "server/helper.ts"), `
+import { pathToFileURL } from "node:url";
+export const word: string = "ready";
+const invoked = process.argv[1] ? pathToFileURL(process.argv[1]).href : "";
+if (import.meta.url === invoked) { console.error("unintended-main"); process.exitCode = 19; }
+`);
   for (const name of ENTRIES) writeFileSync(join(root, "server", `${name}.ts`), `
 import { pathToFileURL } from "node:url";
 import { word } from "./helper";
