@@ -198,7 +198,7 @@ describe("writing files", () => {
     const envelope = envelopeFor("boardSummary", "1.2.3", NOW);
     assert.deepEqual(envelope, {
       schema: "fleet-quota/v1",
-      contractVersion: "1.1.0",
+      contractVersion: "1.2.0",
       producer: "paseo-kanban",
       producerVersion: "1.2.3",
       generatedAt: NOW.toISOString(),

@@ -5,7 +5,7 @@
 import { z } from "zod";
 
 export const CONTRACT_SCHEMA = "fleet-quota/v1";
-export const CONTRACT_VERSION = "1.1.0";
+export const CONTRACT_VERSION = "1.2.0";
 
 export const PLUGIN_IDS = {
   cockpit: "agent-fleet-cockpit",
@@ -64,6 +64,8 @@ export const MatrixEntry = z.object({
   profile: z.string(),
   effort: z.string().nullable(),
   paused: z.boolean().optional(),
+  /** Explicit candidate order, ahead of quota-sorted candidates without this field. */
+  order: z.number().int().min(1).max(1000).optional(),
 });
 
 /** Tier name (L1..L4) to an ordered candidate list. */
