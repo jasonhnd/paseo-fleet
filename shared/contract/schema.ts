@@ -40,6 +40,8 @@ export const CockpitInfo = Envelope.extend({ ...byCockpit, ...infoFields });
 export const KanbanInfo = Envelope.extend({ ...byKanban, ...infoFields });
 
 export const PoolState = z.object({
+  quotaProtection: z.enum(["pause", "none"]).optional(),
+  readingExpiresAt: isoDateTime.nullable().optional(),
   dispatchable: z.boolean(),
   deprioritize: z.boolean(),
   prefer: z.boolean(),
@@ -50,6 +52,7 @@ export const PoolState = z.object({
 });
 
 export const PoolStatus = Envelope.extend({
+  quotaConfigured: z.boolean().optional(),
   ...byCockpit,
   pools: z.record(z.string(), PoolState),
   priority: z
