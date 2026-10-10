@@ -10,7 +10,6 @@ import { readKanbanSupervisors } from "./upgrade-check";
 import { isLeaderTitle, readAgentRecords } from "./records";
 import { BIN, DECISIONS, type Json, readJson, run, sendToAgent } from "./util";
 
-export { AFC_PROJECT } from "../shared/decisions";
 export const ROLES_BIN = rolesBin();
 
 export interface DecideAgent {

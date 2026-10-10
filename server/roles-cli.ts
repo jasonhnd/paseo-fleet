@@ -8,7 +8,7 @@ import { parseArgs } from "node:util";
 import { currentRoleLines } from "./dispatch";
 import { initLanguage } from "./language";
 import { dataDir, kanbanConfigPath, paseoConfigPath } from "./paths";
-import { readBannedProviders } from "./adapters/config";
+import { readBannedProviders, readOpsProject } from "./adapters/config";
 import { providerBanned } from "../shared/provider-policy";
 import { swapRefusal } from "../shared/roles-policy";
 import { t, tIn, type MessageKey } from "../shared/i18n";
@@ -136,7 +136,8 @@ async function decide(action: string, id: string | undefined, v: Row) {
     return;
   }
   if (action === "add" || action === "decided") {
-    required(v.project, action === "add" ? "cli.roles.addRequired" : "cli.roles.decidedRequired");
+    // Only new records use this default; existing records keep their stored project.
+    v.project ??= readOpsProject(STATE);
     required(v.title, action === "add" ? "cli.roles.addRequired" : "cli.roles.decidedRequired");
     if (action === "decided") required(v.note?.trim(), "cli.roles.decidedNoteRequired");
     if (action === "add" && !v["force-open"] && !validDetail(v.detail || "")) fail("cli.roles.detailNeedsOptions");

@@ -9,9 +9,10 @@ import { build } from "esbuild";
 import { applyDispatchMatrix, type DispatchMatrix } from "../../shared/dispatch";
 import { dispatchSettingRows } from "../../shared/dispatch-overrides";
 import { initializeSettings, readSettings, writeSettings } from "../settings";
+import { tIn } from "../../shared/i18n";
 const { JSDOM } = createRequire(import.meta.url)("jsdom");
 
-test("mounted dispatch settings persist depth and order, refresh, conflict, clear and translate", async () => {
+test("mounted settings persist dispatch and operations project, refresh, conflict, clear and translate", async () => {
   const dir = await mkdtemp(join(tmpdir(), "dispatch-settings-mount-"));
   const data = join(dir, "data");
   const plugin = resolve(import.meta.dirname, "../..");
@@ -83,12 +84,16 @@ test("mounted dispatch settings persist depth and order, refresh, conflict, clea
       input.dispatchEvent(new dom.window.Event("input", { bubbles: true })); await tick();
     };
     assert.match(mounted.container.textContent, /Dispatch depth/);
+    assert.equal(mounted.container.querySelector('input[aria-label="AFC operations project"]').value, "paseo-fleet");
+    await fill("AFC operations project", "Demo operations");
     assert.equal(mounted.container.querySelector('[aria-label="Set Executor · GPT-6.1-Sol / L1 depth to ultra"]'), null);
     await click("Set Executor · GPT-6.1-Sol / L1 depth to medium");
     await fill("Position for Executor · Sonnet (Claude) / L1", "1");
     await click("Save"); await click("Refresh");
     const saved = await snapshot();
     assert.deepEqual(saved.document.extension, { demo: true });
+    assert.equal(saved.document.opsProject, "Demo operations");
+    assert.equal(mounted.container.querySelector('input[aria-label="AFC operations project"]').value, "Demo operations");
     assert.deepEqual(saved.document.dispatchOverrides, { executor: { L1: { "executor.gpt-6.1-sol": { effort: "medium" }, "executor.sonnet": { order: 1 } } } });
     const matrix = applyDispatchMatrix(base, { profiles, knownNames: new Set(profiles.map(profile => profile.name)), pools: null, generatedAt: "2030-01-01", dispatchOverrides: saved.document.dispatchOverrides, thinkingCatalog: catalog });
     assert.deepEqual((matrix.roles.executor as any).L1, [{ profile: "Demo Sonnet", effort: "low", order: 1 }, { profile: "Demo GPT", effort: "medium" }]);
@@ -106,8 +111,16 @@ test("mounted dispatch settings persist depth and order, refresh, conflict, clea
     assert.deepEqual((await snapshot()).document.dispatchOverrides, {});
     await click("Simplified Chinese"); await click("Save");
     assert.match(mounted.container.textContent, /\u6d3e\u6d3b\u6df1\u5ea6/);
+    await fill(tIn("zh-CN", "settings.opsProject"), "Demo changed");
+    await click(tIn("zh-CN", "settings.save"));
+    assert.equal((await snapshot()).document.opsProject, "Demo changed");
     mounted.unmount(); mounted = mount(); await tick(); await tick();
     assert.match(mounted.container.textContent, /\u6d3e\u6d3b\u6df1\u5ea6/);
+    assert.equal(mounted.container.querySelector(`input[aria-label="${tIn("zh-CN", "settings.opsProject")}"]`).value, "Demo changed");
+    await fill(tIn("zh-CN", "settings.opsProject"), "");
+    await click(tIn("zh-CN", "settings.save"));
+    assert.equal((await snapshot()).document.opsProject, undefined);
+    assert.equal(mounted.container.querySelector(`input[aria-label="${tIn("zh-CN", "settings.opsProject")}"]`).value, "paseo-fleet");
     assert.deepEqual(JSON.parse(await readFile(join(data, "afc.config.json"), "utf8")).dispatchOverrides, {});
   } finally {
     mounted?.unmount(); dom.window.close(); delete g.__dispatchRead; delete g.__dispatchWrite;

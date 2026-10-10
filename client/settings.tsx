@@ -11,6 +11,7 @@ import { adoptSettingsLanguage } from "./settings-language";
 import { useStyles, type Styles } from "./ui";
 import { RoleOnboarding } from "./onboarding";
 import { DispatchSettings } from "./dispatch-settings";
+import { DEFAULT_OPS_PROJECT } from "../shared/ops-project";
 
 type Read = (input: { file: SettingsFile }) => Promise<SettingsSnapshot>;
 type Write = (input: { file: SettingsFile; document: Record<string, unknown>; revision: string }) => Promise<{ status: "saved" | "conflict"; snapshot: SettingsSnapshot }>;
@@ -81,6 +82,8 @@ export function SettingsEditor({ s, file, read, write, onLanguage }: { s: Styles
   return <View style={s.card}>
     <Text style={s.h2}>{t(file === "config" ? "settings.general" : "settings.plans")}</Text>
     {!snapshot ? <Text style={s.muted}>{t("settings.loading")}</Text> : file === "config" ? <>
+      <Field s={s} label={t("settings.opsProject")} value={typeof draft.opsProject === "string" ? draft.opsProject : DEFAULT_OPS_PROJECT} onChange={value => patch("opsProject", value.trim() ? value : undefined)} />
+      <Text style={s.muted}>{t("settings.opsProjectHint")}</Text>
       <Text style={s.h2}>{t("settings.leaderUsage")}</Text>
       <Text style={s.muted}>{t("settings.leaderUsageHint")}</Text>
       <View style={s.row}>{(["reminderTokens", "warningTokens"] as const).map(key => <Field key={key} s={s} label={t(`settings.leaderUsage.${key}`)} value={String(object(draft.leaderUsage)[key] ?? DEFAULT_LEADER_THRESHOLDS[key])} onChange={value => patch("leaderUsage", { ...DEFAULT_LEADER_THRESHOLDS, ...object(draft.leaderUsage), [key]: value.trim() ? Number(value) : 0 })} />)}</View>

@@ -65,7 +65,11 @@ node "$BOARD_INSTALL/bin/paseo-kanban.mjs" doctor
 
 Fleet 的 shared/default-dispatch.example.json 是安装模板，不是生成的状态。模型与可选集成可配；见 [导入证据](../IMPORT.md)。
 
+安装准备会在构建后检查 Node shebang，把已有命令入口设为 0755；权限设置失败则拒绝激活。Git 也保存入口的执行位，可直接运行 `./bin/afc.mjs --help`。
+
 数据默认位于 $PASEO_HOME/plugin-data/agent-fleet-cockpit；AFC_DATA_DIR 覆盖 Fleet 数据目录，ROLES_STATE_DIR 只覆盖角色命令状态。旧目录默认 ~/.config/fleet-roles，可用 AFC_LEGACY_DATA_DIR 或迁移 --from 显式指定。可选只读 sidebar 用 AFC_SANDBOX_ROSTER_DIR 指定状态目录，不默认探测个人应用目录。模型选择遵循 host 目录及用户配置的供应商排除，安装不施加个人模型限制。
+
+Fleet 设置页的「AFC 运行通知项目」把可选字符串 `opsProject` 保存到 `afc.config.json`，例如 `{ "opsProject": "demo-operations" }`。这个看板项目登记的 `<leader>` 接收 AFC 提前重置和每日体检通知；新建 `afc decide add`／`afc decide decided` 未指定 `--project` 时，也归属这个项目，显式指定仍优先。缺省或非法值回退 `paseo-fleet`；名称会去除两端空白，不能为空或包含控制字符。非法设置写入会被拒绝，原文件不变；清空字段恢复默认。已有 `decisions.json` 记录保留原 `project`，回复、提醒、推翻仍查原项目登记，不迁移或重新归类历史记录。接收通知前，先在看板登记所选项目的 `<leader>`。
 
 ## Leader 上下文提醒与换会话
 

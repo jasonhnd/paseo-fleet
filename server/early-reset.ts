@@ -20,9 +20,10 @@ import type { PoolStatus } from "./pools-types";
 import { QUOTA_HISTORY_FILE } from "./quota-history";
 import { KANBAN_CONFIG, PLANS, RESET_COUPON_STATE } from "./reset-coupons-types";
 import { type Json, readJson, STATE_DIR, writeJson } from "./util";
+import { readOpsProject } from "./adapters/config";
+import { readSupervisorTable, supervisorIdFor } from "../shared/decisions";
 
 export const EARLY_RESET_FILE = join(STATE_DIR, "early-resets.json");
-const AFC_PROJECT = "paseo-fleet";
 
 type Notify = (agentId: string, text: string) => Promise<void>;
 let notifyRef: Notify | null = null;
@@ -113,8 +114,7 @@ export async function readEarlyResetLines(now: number): Promise<Record<string, s
 
 async function afcLeader(): Promise<string | null> {
   const raw = await readJson<Json>(KANBAN_CONFIG, {});
-  const supervisors = raw.supervisors as Record<string, unknown> | undefined;
-  const id = supervisors?.[AFC_PROJECT];
+  const id = supervisorIdFor(readOpsProject(), readSupervisorTable(raw));
   return typeof id === "string" && id.length >= 8 ? id : null;
 }
 

@@ -6,6 +6,7 @@ import { dispatchOverridesSchema, dispatchSettingRowSchema } from "./dispatch-ov
 import { copiedQuotaSchema, quotaCycleSchema } from "./quota-cycle";
 
 import { leaderThresholdsSchema } from "./leader-usage";
+import { opsProjectSchema } from "./ops-project";
 
 const strings = z.array(z.string().trim().min(1));
 export const planSchema = z.object({
@@ -30,6 +31,7 @@ export const plansSchema = z.object({
 });
 // Unknown keys survive edits alongside the validated settings.
 export const afcSettingsSchema = z.object({
+  opsProject: opsProjectSchema.optional(),
   language: z.enum(["system", "en", "zh-CN"]).optional(), hiddenPlans: z.array(z.string().refine(value => value.trim().length > 0, "Empty hidden pool term")).optional(),
   bannedProviders: z.array(z.string()).transform(values => [...new Set(values.map(value => value.trim()).filter(Boolean))]).optional(),
   adapters: z.object({ "cursor-api": z.boolean().optional(), keychain: z.boolean().optional() }).passthrough().optional(),

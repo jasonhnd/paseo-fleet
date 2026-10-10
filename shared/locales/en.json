@@ -2074,5 +2074,7 @@
   "decisions.reply.userDismissNote": "Closed by the user on the panel",
   "decisions.card.processed": "{count} handled",
   "leader.ui.handled": "Handled",
-  "leader.attention.undoClose": "Undo close"
+  "leader.attention.undoClose": "Undo close",
+  "settings.opsProject": "AFC operations project",
+  "settings.opsProjectHint": "Board project whose registered leader receives AFC early-reset and daily health notices. New AFC decisions without --project use it; existing decisions keep their projects. Clear to use paseo-fleet."
 }

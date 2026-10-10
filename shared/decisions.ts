@@ -25,7 +25,6 @@ export const MAINT_INTERVAL_MS = 24 * 60 * 60 * 1000;
 export function autoShelveNote(): string {
   return t("decisions.maint.autoShelveNote");
 }
-export const AFC_PROJECT = "paseo-fleet";
 
 export interface OpenDecision {
   id: string;
@@ -206,7 +205,7 @@ export function readSupervisorTable(config: unknown): Record<string, string> | n
 
 export function supervisorIdFor(project: string, table: Record<string, string> | null): string | null {
   if (!table) return null;
-  if (table[project]) return table[project];
+  if (Object.hasOwn(table, project) && table[project]) return table[project];
   const low = project.toLowerCase();
   for (const [key, value] of Object.entries(table)) {
     if (key.toLowerCase() === low && value) return value;

@@ -9,6 +9,8 @@ import { afcSettingsSchema, plansSchema } from "../../shared/settings";
 import { adapterOn, IN_USE_MARKERS } from "../adapters/config";
 import { chooseDataDir, legacyStateDir } from "../paths";
 import { initializeSettings, readSettings, writeSettings } from "../settings";
+import { opsProject, DEFAULT_OPS_PROJECT } from "../../shared/ops-project";
+import { readOpsProject } from "../adapters/config";
 async function fixture(run: (dir: string) => Promise<void>) {
   const dir = await mkdtemp(join(tmpdir(), "settings-"));
   try { initializeSettings(dir, fileURLToPath(new URL("../../examples/", import.meta.url))); await run(dir); } finally { await rm(dir, { recursive: true, force: true }); }
@@ -20,6 +22,30 @@ test("first run creates examples and never replaces existing files", async () =>
   await writeFile(join(dir, "plans.json"), "invalid demo configuration");
   initializeSettings(dir, fileURLToPath(new URL("../../examples/", import.meta.url)));
   assert.equal(await readFile(join(dir, "plans.json"), "utf8"), "invalid demo configuration");
+}));
+
+test("operations project defaults, validates names and refuses invalid writes without changing bytes", async () => fixture(async dir => {
+  await writeFile(join(dir, "afc.config.json"), "{}");
+  assert.equal(afcSettingsSchema.parse({}).opsProject, undefined);
+  assert.equal(readOpsProject(dir), DEFAULT_OPS_PROJECT);
+  const before = await readSettings("config", dir);
+  const saved = await writeSettings({ file: "config", revision: before.revision, document: { opsProject: " Demo operations ", extension: { keep: true } } }, dir);
+  assert.equal(saved.status, "saved");
+  assert.equal(saved.snapshot.document.opsProject, "Demo operations");
+  assert.equal(readOpsProject(dir), "Demo operations");
+  const bytes = await readFile(join(dir, "afc.config.json"), "utf8");
+  for (const invalid of [null, 42, false, {}, [], "", "   ", "Demo\noperations", "Demo\u0000", "\nDemo"]) {
+    assert.equal(opsProject({ opsProject: invalid }), DEFAULT_OPS_PROJECT);
+    await assert.rejects(writeSettings({ file: "config", revision: saved.snapshot.revision, document: { opsProject: invalid } }, dir));
+    assert.equal(await readFile(join(dir, "afc.config.json"), "utf8"), bytes);
+    await writeFile(join(dir, "afc.config.json"), JSON.stringify({ opsProject: invalid }));
+    assert.equal(readOpsProject(dir), DEFAULT_OPS_PROJECT);
+    await writeFile(join(dir, "afc.config.json"), bytes);
+  }
+  await writeFile(join(dir, "afc.config.json"), "invalid demo configuration");
+  assert.equal(readOpsProject(dir), DEFAULT_OPS_PROJECT);
+  assert.equal(opsProject(null), DEFAULT_OPS_PROJECT);
+  assert.equal(opsProject([]), DEFAULT_OPS_PROJECT);
 }));
 test("concurrent writes conflict and preserve the winning document", async () => fixture(async dir => {
   const first = await readSettings("config", dir);

@@ -1,7 +1,7 @@
 // Exercise CLI language behavior with demo state only; protocol tokens stay language independent.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
@@ -63,6 +63,29 @@ function idFrom(text: string, token: string) {
   assert.ok(id, text);
   return id;
 }
+
+test("new AFC decisions use the configured default without relabeling explicit or historical projects", () => {
+  const d = demo("en");
+  try {
+    const original = { id: "demo-historical", project: "paseo-fleet", title: "Demo historical decision", status: "open" };
+    d.write("decisions.json", [original]);
+    const add = (args: string[] = []) => idFrom(d.run(["decide", "add", "--title", "Demo choice", "--detail", "A: proceed; B: wait. Recommend: A", ...args]), "added");
+    const defaultId = add();
+    d.write("afc.config.json", { language: "en", opsProject: " Demo operations " });
+    const configuredId = add();
+    const explicitId = add(["--project", "demo"]);
+    const decidedId = idFrom(d.run(["decide", "decided", "--title", "Demo", "--note", "Proceed"]), "decided");
+    d.write("afc.config.json", { language: "en", opsProject: false });
+    const fallbackId = add();
+    const rows = JSON.parse(readFileSync(join(d.state, "decisions.json"), "utf8"));
+    assert.deepEqual(rows.find((row: any) => row.id === original.id), original);
+    for (const [id, project] of [[defaultId, "paseo-fleet"], [configuredId, "Demo operations"], [explicitId, "demo"], [decidedId, "Demo operations"], [fallbackId, "paseo-fleet"]]) {
+      assert.equal(rows.find((row: any) => row.id === id).project, project);
+    }
+    d.run(["decide", "done", original.id, "--note", "Demo resolved"]);
+    assert.equal(JSON.parse(readFileSync(join(d.state, "decisions.json"), "utf8")).find((row: any) => row.id === original.id).project, "paseo-fleet");
+  } finally { rmSync(d.dir, { recursive: true, force: true }); }
+});
 
 for (const lang of ["zh-CN", "en"] as const) {
   test(`roles set preserves host model features and configured exclusions in ${lang}`, () => {

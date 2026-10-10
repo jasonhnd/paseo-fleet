@@ -67,6 +67,9 @@ the locked production protocol, relay and Zod packages. Generated third-party
 bundles are ignored by Git and built at installation time. npm artifacts include
 prepacked bundles; preparation uses `npm install` when no lockfile is present and
 checks these bundles without calling repository-only builders.
+Preparation also verifies the Node shebangs and sets existing command entrypoints
+to mode 0755 after the build; a permission failure refuses activation. Git tracks
+these entrypoints as executable, so `./bin/afc.mjs --help` works directly.
 
 For an existing daily daemon, use the backup, switch and rollback checklist in
 [Git installation](docs/GIT-INSTALL.md).
@@ -110,6 +113,19 @@ read-only sidebar adapter requires `AFC_SANDBOX_ROSTER_DIR` to select its persis
 directory; it does not probe an owner's application directory by default. An access
 map plugin-listing check uses its explicit `pluginId` field; an unspecified id is
 reported as unknown.
+
+In Fleet Settings, **AFC operations project** saves the optional `opsProject`
+string in `afc.config.json`, for example `{ "opsProject": "demo-operations" }`.
+It names the Kanban project whose registered `<leader>` receives AFC's early-reset
+and daily health notices. New `afc decide add` and `afc decide decided` records
+without `--project` use this project; an explicit `--project` still wins. Missing
+or invalid values fall back to `paseo-fleet`. Names are trimmed, must be nonempty
+and cannot contain control characters; invalid settings writes are rejected
+without changing the file. Clear the field to restore the default. Existing
+`decisions.json` records keep their stored `project`: replies, reminders and
+overturns still use that original project's registration. Changing this setting
+does not migrate or relabel historical decisions. Register the chosen project's
+leader in Kanban before expecting notifications.
 
 `npm run compat` is an offline compiler, type-check and regression gate. It does
 not contact a daemon or prove desktop mounting, provider authentication, migration

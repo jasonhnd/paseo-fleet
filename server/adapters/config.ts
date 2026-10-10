@@ -11,6 +11,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { leaderThresholds, type LeaderThresholds } from "../../shared/leader-usage";
 import { hiddenPlanTerms } from "../../shared/hidden-plans";
+import { opsProject } from "../../shared/ops-project";
 import { ADAPTERS_OFF, type AdapterSwitches, CURSOR_API, KEYCHAIN, OPTIONAL_ADAPTERS, type OptionalAdapter } from "../../shared/quota-adapters";
 import { STATE_DIR } from "../util";
 
@@ -64,4 +65,9 @@ export function readBannedProviders(dir: string = STATE_DIR): string[] {
 /** Context thresholds for homepage rows and read-only inspections. */
 export function readLeaderThresholds(dir: string = STATE_DIR): LeaderThresholds {
   return leaderThresholds(readConfig(dir));
+}
+
+/** The board project receiving AFC's own notices and newly created default decisions. */
+export function readOpsProject(dir: string = STATE_DIR): string {
+  return opsProject(readConfig(dir));
 }

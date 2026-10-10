@@ -11,25 +11,24 @@ import type { BoardSummary } from "./contract";
 import { kanbanSource } from "./kanban-source";
 import { kanbanConfigPath } from "./paths";
 import { readJson, sendToAgent, STATE_DIR, writeJson } from "./util";
+import { readOpsProject } from "./adapters/config";
+import { readSupervisorTable, supervisorIdFor } from "../shared/decisions";
 
 export const DOCTOR_STATE_PATH = join(STATE_DIR, "doctor-state.json");
 export const DOCTOR_HISTORY_PATH = join(STATE_DIR, "doctor-history.jsonl");
 const KANBAN_CONFIG = kanbanConfigPath();
-const AFC_PROJECT = "paseo-fleet";
 const TICK_MS = 60_000;
 const FIRST_TICK_MS = 45_000;
 
 /** The AFC leader as the board summary lists it; undefined when the summary has no such project. */
-export function summaryLeaderId(summary: BoardSummary | null): string | null | undefined {
-  const row = summary?.projects.find((project) => project.name === AFC_PROJECT);
+export function summaryLeaderId(summary: BoardSummary | null, opsProject = readOpsProject()): string | null | undefined {
+  const row = summary?.projects.find((project) => project.name.toLowerCase() === opsProject.toLowerCase());
   if (!row) return undefined;
   return row.leaderAgentId?.trim() || null;
 }
 
-export function afcLeaderId(config: unknown): string | null {
-  const table = typeof config === "object" && config !== null ? (config as { supervisors?: unknown }).supervisors : null;
-  const id = typeof table === "object" && table !== null ? (table as Record<string, unknown>)[AFC_PROJECT] : null;
-  return typeof id === "string" && id.trim() ? id.trim() : null;
+export function afcLeaderId(config: unknown, opsProject = readOpsProject()): string | null {
+  return supervisorIdFor(opsProject, readSupervisorTable(config));
 }
 
 export interface DailyDeps {
@@ -55,8 +54,9 @@ export function productionDailyDeps(): DailyDeps {
     leaderId: async () => {
       const source = kanbanSource();
       if (source.presence === "absent") return null;
-      const fromSummary = summaryLeaderId(source.summary);
-      return fromSummary !== undefined ? fromSummary : afcLeaderId(await readJson<unknown>(KANBAN_CONFIG, null));
+      const project = readOpsProject();
+      const fromSummary = summaryLeaderId(source.summary, project);
+      return fromSummary !== undefined ? fromSummary : afcLeaderId(await readJson<unknown>(KANBAN_CONFIG, null), project);
     },
     notify: (agentId, text) => sendToAgent(agentId, text),
   };
