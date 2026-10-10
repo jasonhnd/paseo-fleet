@@ -50,7 +50,8 @@ test("the generated client loads after a host compiler clears import.meta.url", 
   const module = { exports: {} as { createPaseoClient: typeof createPaseoClient } };
   const evaluate = new Function("require", "module", "exports", result.outputFiles[0].text);
   evaluate(createRequire(import.meta.url), module, module.exports);
-  const client = module.exports.createPaseoClient({ url: "ws://127.0.0.1:0/ws", clientId: "wrapper-test", reconnect: { enabled: false } });
+  const client = module.exports.createPaseoClient({ url: "ws://127.0.0.1:0/ws", clientId: "wrapper-test",
+    connectTimeoutMs: 100, reconnect: { enabled: false } });
   assert.equal(typeof client.providers.listUsage, "function");
   await client.close();
 });
