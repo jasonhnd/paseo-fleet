@@ -25,6 +25,9 @@ PATH. The SDK and UI libraries stay in development dependencies; Paseo supplies 
 host modules and Zod. The background client uses the locked production protocol, relay and Zod packages. npm publication must omit the Git-only preparation command
 from its release artifact, because an npm install already resolves production dependencies.
 
+For an existing daily daemon, use the backup, switch and rollback checklist in
+[Git installation](docs/GIT-INSTALL.md).
+
 Each plugin works alone; together they share quota and board data through files (`docs/CONTRACT.md`):
 
 | Installed | Dispatch | Decisions | Board panel | Quota panel |
