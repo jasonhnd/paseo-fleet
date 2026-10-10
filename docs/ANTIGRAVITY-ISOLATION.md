@@ -65,6 +65,22 @@ page, plugin settings, adapter switch, bucket selection, protection switch and
 dispatch switch. Record whether CLI rows are live, replayed, synthetic or absent.
 Save the pool export too. Do not replace a missing host mount with a DOM simulation.
 
+## Official quota surfaces
+
+Keep these observations separate. None of them is a substitute for another:
+
+- The host `provider.usage.list` response is the official Paseo usage surface.
+- An ACP `initialize` or `session/new` result is session-startup evidence.
+- A model catalog lists model ids. It does not select an authorized model, and it does not report quota.
+- A tier id names a subscription label. It is not a remaining-percent reading and it is not a quota-source key.
+- The local `agy /usage` table is the CLI display. A credits balance is a further, separate meter.
+
+If `provider.usage.list` has no row for the ACP provider, or the official diagnostic does not include both a specific quota-source key and a weekly or five-hour percent for that ACP channel, record the missing field as a capability gap. Leave the ACP observation empty. Do not copy the CLI percent into the ACP row. Do not treat a product name, a catalog, a successful session, a tier id, one email address, or two similar percentages as `samePoolProven`. Unknown, expired, unreadable, and provider-exhausted ACP quota stay non-dispatchable under `quotaProtection: "pause"`. `quotaProtection: "none"`, a hand-written zero, and a synthetic known fixture do not unlock a real task.
+
+High, medium, and low variants are different model ids. There is no separate thinking parameter. The catalog's default id may differ from the only id a demonstration is allowed to run, so the task must name that id explicitly. Permission modes that auto-approve edits or every tool are not a denial test. A demonstration that must show a refusal stays on the default prompt mode, with auto-accept off.
+
+A pure routing or permission fixture can reject a path, but it is not an ACP permission event and it is not a finished card. A real demonstration is created by a normally registered leader after the ACP quota source is actually dispatchable under pause protection.
+
 ## Dispatch and permission boundaries
 
 Test each gate separately: paused profiles, `dispatch: false`, unknown ACP quota,
