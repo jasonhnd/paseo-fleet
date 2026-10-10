@@ -185,11 +185,28 @@ describe("command result", () => {
     assert.equal(readingFromRun(runOf("Pool\tWindow\tRemaining\tReset"), NOW).error, "bad-output");
     assert.equal(readingFromRun(runOf("Please sign in to continue", { code: 1 }), NOW).error, "not-logged-in");
     assert.equal(readingFromRun(runOf("", { code: 2 }), NOW).error, "failed");
-    assert.equal(readingFromRun(runOf(TABLE, { code: 2 }), NOW).error, null);
+    assert.equal(readingFromRun(runOf(TABLE, { code: 2 }), NOW).error, "failed");
     for (const item of [readingFromRun(runOf(TABLE, { missing: true }), NOW), readingFromRun(runOf(""), NOW)]) {
       assert.equal(item.samples.length, 0);
       assert.ok(item.samples.every((row) => row.usedPct !== 0));
     }
+  });
+
+  test("only code zero accepts valid stdout; failure, signal and timeout discard even complete or partial tables", () => {
+    const ok = readingFromRun(runOf(TABLE), NOW);
+    assert.equal(ok.error, null);
+    assert.equal(ok.samples.length, 4);
+    for (const stdout of [TABLE, TABLE.split("\n")[0], ""]) {
+      for (const outcome of [{ code: 2 }, { code: null }, { code: 0, timedOut: true }]) {
+        const result = readingFromRun(runOf(stdout, outcome), NOW);
+        assert.notEqual(result.error, null);
+        assert.deepEqual(result.samples, []);
+        assert.equal(result.acp, null);
+      }
+    }
+    const partial = readingFromRun(runOf(TABLE.split("\n")[0]), NOW);
+    assert.equal(partial.error, null);
+    assert.equal(partial.samples.length, 1);
   });
 
   test("parallel calls share one run, a fresh cache skips, and force runs again", async () => {

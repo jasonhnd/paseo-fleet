@@ -151,11 +151,11 @@ export function readingFromRun(run: UsageRunResult, now: number): AntigravityRea
   const base = { readAt, stale: false, cli: cliObservation(now), acp: null, samples: [] as AntigravitySample[] };
   if (run.missing) return { ...base, error: "missing-cli" };
   if (run.timedOut) return { ...base, error: "timeout" };
-  const samples = parseAntigravityUsage(run.stdout);
-  if (samples.length > 0) return { ...base, error: null, samples };
   const blob = `${run.stdout}\n${run.stderr}`;
   if (LOGIN.test(blob)) return { ...base, error: "not-logged-in" };
-  if (run.code !== 0 && run.code !== null) return { ...base, error: "failed" };
+  if (run.code !== 0) return { ...base, error: "failed" };
+  const samples = parseAntigravityUsage(run.stdout);
+  if (samples.length > 0) return { ...base, error: null, samples };
   return { ...base, error: "bad-output" };
 }
 
@@ -297,6 +297,24 @@ export interface AntigravityWindowPlan {
   id: string;
   antigravityBucket?: AntigravityBucket | null;
   priceUsdMonthly?: number | null;
+}
+
+/** Both CLI buckets from one run, for display only. Kept outside the dispatch windows and contract snapshot. */
+export function antigravityDisplayWindows(reading: AntigravityReading | null, now: number): UsageWindow[] {
+  return (["gemini", "claude-gpt"] as const).flatMap((bucket) => (["five-hour", "week"] as const).map((window) => {
+    const sample = reading?.error === null ? reading.samples.find((row) => row.bucket === bucket && row.window === window) : undefined;
+    const live = !!sample && !!reading && !reading.stale && fresh(reading.readAt, now)
+      && (sample.resetsAt === null || Date.parse(sample.resetsAt) > now);
+    return blankWindow({
+      id: `${bucket}-${window === "week" ? ANTIGRAVITY_WEEK_WINDOW : ANTIGRAVITY_FIVE_HOUR_WINDOW}`,
+      label: cliLabel(bucket, window), primary: false,
+      usedPct: sample?.usedPct ?? null, resetsAt: sample?.resetsAt ?? null,
+      source: sample ? "screen" : "none", readingState: sample ? live ? "live" : "stale" : "unknown",
+      cycleKind: "unknown", readError: sample ? null : readErrorText(reading?.error ?? null),
+      sampledAt: sample ? reading?.readAt : null, staleUsedPct: sample && !live ? sample.usedPct : null,
+      apiUsd: 0, planUsd: null,
+    });
+  }));
 }
 
 /**

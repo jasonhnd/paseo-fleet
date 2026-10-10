@@ -8,6 +8,7 @@ import { activeDispatchPriority, type DispatchPriority, poolStatusPriority, reso
 import {
   type AdapterSwitches,
   adapterOf,
+  ANTIGRAVITY_CLI,
   CLAUDE_CLI,
   CODEX_CLI,
   CURSOR_API,
@@ -26,7 +27,7 @@ import { publishDispatch } from "./dispatch";
 import { deliverEarlyResetNotices, readEarlyResetLines } from "./early-reset";
 import { ledgerBuckets } from "./ledger";
 import { readCursorUsageFile, type CursorUsageReading } from "./cursor-usage";
-import { antigravityUsageRequested, readAntigravityUsage, unavailableAntigravityReading, type AntigravityReading } from "./quota/antigravity-usage";
+import { antigravityDisplayWindows, antigravityUsageRequested, readAntigravityUsage, unavailableAntigravityReading, type AntigravityReading } from "./quota/antigravity-usage";
 import { settleSuperGrokChoice, type SuperGrokChoice } from "./grok-usage";
 import { configuredStopPct, type CursorReadMeta, MANUAL_STOP, oneMonthBefore, poolStatus, type PoolStatus, type SuperGrokReadMeta, writePoolStatus } from "./pools";
 import { textHidden } from "../shared/hidden-plans";
@@ -295,6 +296,7 @@ function planOf(cfg: PlanConfig, planConfigs: PlanConfig[], ctx: PlanContext): U
     note: cfg.note ?? "",
     providers: cfg.providers,
     windows,
+    ...(adapter === ANTIGRAVITY_CLI ? { antigravityDisplay: antigravityDisplayWindows(ctx.antigravityReading, Date.now()) } : {}),
     api30dUsd,
     ...(cfg.overageBilling !== undefined ? { overageBilling: cfg.overageBilling } : {}),
     roi30d: cfg.priceUsdMonthly ? api30dUsd / cfg.priceUsdMonthly : null,

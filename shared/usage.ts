@@ -113,6 +113,8 @@ const planSchema = z.object({
   note: z.string(),
   providers: z.array(z.string()),
   windows: z.array(windowSchema),
+  /** Display-only agy buckets. Never used by poolStatus or the fleet-quota contract. */
+  antigravityDisplay: z.array(windowSchema).optional(),
   api30dUsd: z.number(),
   /** Whether pay-per-use is on (cursor-api). Display only, never decides dispatch. */
   overageBilling: z.boolean().optional(),
