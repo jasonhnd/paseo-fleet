@@ -17,7 +17,7 @@ after(() => fs.rm(root, { recursive: true, force: true }));
 
 const now = Date.parse("2030-06-01T00:00:00Z");
 const plans: UsagePlan[] = [
-  { id: "demo-acp", name: "Antigravity", adapter: "antigravity-cli", antigravityBucket: "gemini", quotaProtection: "pause",
+  { id: "demo-acp", name: "Antigravity", adapter: "antigravity-cli", quotaProtection: "pause",
     dispatch: false, providers: ["antigravity"], windows: [], priceUsdMonthly: null, note: "", api30dUsd: 0, roi30d: null, coverage: "" },
   { id: "demo-muse", name: "Muse", adapter: "muse-msp", dispatch: true, pacePause: false, providers: ["muse"],
     windows: [{ label: "Weekly", usedPct: 25, resetsAt: "2030-06-08T00:00:00Z", startsAt: "2030-06-01T00:00:00Z",
