@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import type { PaseoApi } from "@getpaseo/client";
+import type { PaseoApi } from "./paseo-api";
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { type BoardSnapshot, ROLE_ORDER } from "../shared/board";

@@ -50,7 +50,9 @@
     "node": ">=22.13.0"
   },
   "dependencies": {
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "@getpaseo/protocol": "0.11.0",
+    "@getpaseo/relay": "0.11.0"
   },
   "scripts": {
     "hooks": "git config core.hooksPath .githooks",
@@ -65,8 +67,8 @@
     "test:plugin": "node scripts/test-plugin.mjs",
     "verify": "node scripts/verify.mjs",
     "build:check": "node scripts/paseo-build-check.mjs --strict",
-    "build": "node scripts/build-cli.mjs",
-    "build:cli": "node scripts/build-cli.mjs",
+    "build": "node bin/build-daemon-client.mjs && node scripts/build-cli.mjs",
+    "build:cli": "npm run build",
     "prepack": "npm run build",
     "pretest:plugin": "npm run build",
     "preverify": "npm run build",
@@ -75,7 +77,6 @@
   "devDependencies": {
     "@getpaseo/client": "0.11.0",
     "@getpaseo/plugin": "0.11.0",
-    "@getpaseo/protocol": "0.11.0",
     "@tanstack/react-query": "^5.90.11",
     "@types/node": "^24",
     "@types/react": "~19.2.0",

@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import type { PaseoApi } from "@getpaseo/client";
+import type { PaseoApi } from "./paseo-api";
 import { selfWorkSignal, unregisteredQuestion, type LeaderAction, type LeaderDetail, type LeaderReply, type RegisteredDecision } from "../shared/leader-panel";
 import { t } from "../shared/i18n";
 import { isBusyStatusText, type SupervisorRow } from "../shared/supervisor-shift";

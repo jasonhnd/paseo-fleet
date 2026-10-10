@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { providerBanned } from "../shared/provider-policy";
 import { readBannedProviders } from "./adapters/config";
-import type { PaseoApi } from "@getpaseo/client";
+import type { PaseoApi } from "./paseo-api";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { BoardInsights, BoardPr } from "../shared/board";

@@ -4,7 +4,7 @@ import { readBannedProviders } from "./adapters/config";
 // Manual <leader> shift. The RPC calls requestSupervisorShift after the user confirms,
 // continues, or cancels. A queue saved on disk resumes from the next homepage snapshot.
 import { markProxies } from "../shared/leader-proxy";
-import type { PaseoApi } from "@getpaseo/client";
+import type { PaseoApi } from "./paseo-api";
 import { appendFile, mkdir, readFile, unlink } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { DatabaseSync } from "node:sqlite";

@@ -5,5 +5,13 @@
   "author": "jasonhnd",
   "requirements": {
     "paseo": ">=0.11.0 <0.12.0"
-  }
+  },
+  "build": [
+    [
+      "npm",
+      "ci",
+      "--omit=dev",
+      "--ignore-scripts"
+    ]
+  ]
 }
