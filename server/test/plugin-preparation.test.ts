@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, test } from "node:test";
 // @ts-expect-error Preparation is plain Node code without a TypeScript loader.
-import { preparePlugin } from "../prepare.mjs";
+import { NODE_ENTRYPOINTS, preparePlugin } from "../prepare.mjs";
 
 const roots: string[] = [];
 const bundles = ["bin/roles.bundle.mjs", "bin/doctor.bundle.mjs", "bin/migrate.bundle.mjs", "bin/coupon.bundle.mjs", "bin/leader.bundle.mjs", "server/paseo-client.bundle.mjs"];
@@ -21,7 +22,7 @@ test("Git preparation installs locked development tools and generates every bund
   const root = fixture(false);
   writeFileSync(join(root, "package-lock.json"), "{}");
   mkdirSync(join(root, "scripts"));
-  for (const file of ["bin/build-daemon-client.mjs", "bin/build-commands.mjs", "scripts/build-cli.mjs"]) writeFileSync(join(root, file), "");
+  for (const file of ["bin/build-daemon-client.mjs", "bin/build-commands.mjs", "scripts/build-cli.mjs"]) writeFileSync(join(root, file), "#!/usr/bin/env node\n");
   const calls: string[][] = [];
   preparePlugin(root, (command: string, args: string[], cwd: string) => {
     assert.equal(cwd, root); calls.push([command, ...args]);
@@ -72,4 +73,50 @@ test("the plain Node preparation entry runs through a symlink", () => {
   });
   assert.equal(result.status, 0, result.stderr);
   assert.ok(existsSync(join(root, "prepared")));
+});
+
+test("preparation repairs executable modes after building and for prepacked artifacts", () => {
+  for (const source of [false, true]) {
+    const root = fixture();
+    const files = source ? NODE_ENTRYPOINTS : NODE_ENTRYPOINTS.slice(0, 2);
+    for (const file of files) writeFileSync(join(root, file), "#!/usr/bin/env node\n", { mode: 0o644 });
+    if (source) {
+      mkdirSync(join(root, "scripts"));
+      writeFileSync(join(root, "scripts/build-cli.mjs"), "");
+    }
+    let built = !source;
+    preparePlugin(root, (_command: string, args: string[]) => { if (args[0] === "run") built = true; }, (path: string, mode: number) => {
+      assert.ok(built, "Modes must be repaired after the build");
+      assert.equal(mode, 0o755);
+      chmodSync(path, mode);
+    });
+    for (const file of files) {
+      assert.equal(statSync(join(root, file)).mode & 0o777, 0o755);
+      assert.equal(spawnSync(join(root, file)).status, 0);
+    }
+  }
+});
+
+test("invalid shebangs and chmod failures refuse activation", () => {
+  const root = fixture();
+  const entry = join(root, "bin/afc.mjs");
+  writeFileSync(entry, "console.log('demo');\n");
+  assert.throws(() => preparePlugin(root, () => {}), /Invalid Node entrypoint shebang/);
+  writeFileSync(entry, "#!/usr/bin/env node\n");
+  assert.throws(() => preparePlugin(root, () => {}, () => { throw new Error("demo chmod failure"); }), /Cannot make Node entrypoint executable/);
+});
+
+test("every direct Node entrypoint has its shebang and an executable Git index mode", () => {
+  const root = fileURLToPath(new URL("../../", import.meta.url));
+  const entries = readdirSync(join(root, "bin")).filter(file => file.endsWith(".mjs") && !file.endsWith(".bundle.mjs")
+    && readFileSync(join(root, "bin", file), "utf8").startsWith("#!")).map(file => `bin/${file}`).sort();
+  assert.deepEqual(entries, [...NODE_ENTRYPOINTS].sort());
+  const result = spawnSync("git", ["ls-files", "-s", "--", ...entries], { cwd: root, encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr);
+  const indexed = result.stdout.trim().split("\n");
+  assert.equal(indexed.length, entries.length);
+  for (const entry of entries) {
+    assert.equal(readFileSync(join(root, entry), "utf8").split(/\r?\n/, 1)[0], "#!/usr/bin/env node");
+    assert.ok(indexed.some(row => row.startsWith("100755 ") && row.endsWith(`\t${entry}`)), `${entry} must be executable in Git`);
+  }
 });

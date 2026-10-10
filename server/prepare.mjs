@@ -1,12 +1,13 @@
 // Paseo runs this before compiling a newly acquired Git or npm candidate.
 import { spawnSync } from "node:child_process";
-import { existsSync, realpathSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
 const BUNDLES = ["roles", "doctor", "migrate", "coupon", "leader"].map(name => `bin/${name}.bundle.mjs`);
 BUNDLES.push("server/paseo-client.bundle.mjs");
+export const NODE_ENTRYPOINTS = ["bin/afc.mjs", "bin/roles.mjs", "bin/build-commands.mjs", "bin/build-daemon-client.mjs"];
 
 function run(command, args, cwd) {
   const result = spawnSync(command, args, { cwd, stdio: "inherit" });
@@ -14,7 +15,7 @@ function run(command, args, cwd) {
   if (result.status !== 0) throw new Error(`Plugin preparation failed: ${command} exited ${result.status ?? result.signal}`);
 }
 
-export function preparePlugin(root = ROOT, execute = run) {
+export function preparePlugin(root = ROOT, execute = run, chmod = chmodSync) {
   // Source builds need the locked SDK and compiler tools even under NODE_ENV=production.
   execute("npm", [existsSync(join(root, "package-lock.json")) ? "ci" : "install", "--include=dev", "--ignore-scripts", "--no-audit", "--no-fund"], root);
   const builders = ["bin/build-daemon-client.mjs", "bin/build-commands.mjs", "scripts/build-cli.mjs"].map(file => existsSync(join(root, file)));
@@ -25,6 +26,15 @@ export function preparePlugin(root = ROOT, execute = run) {
   // npm artifacts omit repository build tools and already contain prepacked bundles.
   for (const file of BUNDLES) {
     if (!existsSync(join(root, file))) throw new Error(`Missing prepared bundle: ${file}`);
+  }
+  for (const file of NODE_ENTRYPOINTS) {
+    const path = join(root, file);
+    if (!existsSync(path)) continue;
+    if (readFileSync(path, "utf8").split(/\r?\n/, 1)[0] !== "#!/usr/bin/env node") {
+      throw new Error(`Invalid Node entrypoint shebang: ${file}`);
+    }
+    try { chmod(path, 0o755); }
+    catch (error) { throw new Error(`Cannot make Node entrypoint executable: ${file}`, { cause: error }); }
   }
 }
 
