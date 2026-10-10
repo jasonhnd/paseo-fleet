@@ -16,11 +16,34 @@ plans.json 存用户池/adapter/周期时区/手填/阈值优先序；afc.config
 | manual | 用户百分比/时间来源/重置周期；过期未知不是 0，quotaProtection=none 是关护栏，不证明可用额度。 |
 | cursor-api（可选） | Fleet 自身可选 token store 的官方用量、CLI 屏幕回退、登录诊断和私有状态；新 config adapters.cursor-api=false，显式 false 也覆盖旧标记，可手填；不复制其它工具凭证。 |
 | macOS 钥匙串探针（可选） | 存在性/状态元数据，不取秘密值；新 config adapters.keychain=false，显式 false 关闭，旧未设开关可能按状态标记继续。 |
+| antigravity-cli（可选） | 只展示本机 agy /usage 表，不是 Paseo provider 读数，也不是执行通道。 | 默认关。只有 adapters.antigravity-cli 为 true 才读。见下文。 |
 | Kanban | 契约 board-summary/info，兼容路径也读 board/config/doctor；没装降级隐藏，见 server/paths.ts/契约。 |
 | 可选 sidebar | AFC_SANDBOX_ROSTER_DIR 显式选状态目录，不探个人应用目录。 |
 | CLI 决定/角色 | 私有决定、映射、项目 pause 状态；显式操作，当前安装命令和选择目录。 |
 
 隐藏池只改显示，不停派活。用 dispatch/protection 配路由，可选开关停 reader；停 Fleet 插件可停全部后台。transport 不报告时不保证额度。
+
+## Antigravity CLI 展示
+
+antigravity-cli 可选，默认关闭。没有“已在用”标记，数据目录里的文件不会把它打开，也没有命令时不会去跑 agy。开关为 true 时，在空的临时目录里执行 `agy -p "/usage"`，并有超时。表可以有 Gemini 桶和 Claude/GPT 桶，各用一个计划。行是该表的每周和 5 小时剩余，并标明来自 agy CLI。
+
+这些行不是 Paseo ACP 派活池。ACP 行保持未知，因此不派活，除非 CLI 观察和 ACP 观察的版本、档位、额度来源键相同，且两边都有观察时间。产品名不算这个键。随附的读取只记录 CLI 表，ACP 观察留空，所以安全停派保持有效。手填百分比不能替换这条 ACP 行。quotaProtection 设为 none 会故意关掉这道护栏。
+
+示例形状不含真实百分比：
+
+```json
+{
+  "id": "example-antigravity-gemini",
+  "name": "Example Antigravity Gemini",
+  "adapter": "antigravity-cli",
+  "antigravityBucket": "gemini",
+  "providers": ["antigravity"],
+  "dispatch": false,
+  "quotaProtection": "pause"
+}
+```
+
+Claude/GPT 展示计划把 antigravityBucket 设为 claude-gpt，providers 仍是 antigravity。不要写成 claude 或 codex，也不要因此新建 Claude ACP 档案。表里有 5 小时重置就显示它。派活不猜测窗口起点，所以这行较短的窗口本身不会把池判为用尽。
 
 ## 备份、迁移、移除与隔离
 

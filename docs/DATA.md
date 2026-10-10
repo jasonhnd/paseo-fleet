@@ -26,11 +26,34 @@ Current source: `server/paths.ts`, `server/settings.ts`. Fresh plans start empty
 | `manual` | User-supplied percentage, recording time/source and reset/cycle boundaries. | Explicit entry; unknown/expired readings are not zero. `quotaProtection=none` disables the guard, not a claim of available quota. |
 | Optional `cursor-api` | Official usage with Fleet's own optional token store, CLI screen fallback and login-state diagnostics; stores private usage/login state. | Fresh config: `adapters.cursor-api=false`. Explicit false disables it, including previously active legacy markers; choose manual readings instead. Never copy another tool's credentials. |
 | Optional macOS keychain probe | Presence/status metadata and probe state, not secret values. | Fresh config: `adapters.keychain=false`; macOS-only. Explicit false disables it. An unset legacy switch can follow an existing state marker. |
+| Optional `antigravity-cli` | Display-only local `agy /usage` table. Not a Paseo provider read and not an execution channel. | Off unless `adapters.antigravity-cli` is true. See below. |
 | Kanban companion | Contract board summary/information; compatibility paths also inspect board/config/doctor state. | Optional companion; absence hides/degrades board integration. See `server/paths.ts` and [CONTRACT](CONTRACT.md). |
 | Optional sidebar roster | Explicitly selected roster persistence directory. | Requires `AFC_SANDBOX_ROSTER_DIR`; no implicit personal application directory. |
 | Decisions/roles CLI | Private decisions, role mapping and project pause state. | Explicit command/user action, using current installed commands and selected data directories. |
 
 Hiding a pool is a display setting, not a dispatch stop. Use pool dispatch/protection settings for routing, and explicit adapter switches to disable optional readers. To stop all Fleet background activity, disable the plugin. No adapter promises remaining subscription quota when its transport cannot report it.
+
+## Antigravity CLI display
+
+`antigravity-cli` is optional and off by default. There is no in-use marker: a file in the data directory does not start it, and a missing `agy` command is not launched. Turning the switch on reads `agy -p "/usage"` in an empty temporary directory, with a timeout. The table can show a Gemini bucket and a Claude/GPT bucket. Each bucket is its own plan. The rows are the weekly and five-hour values from that table, labeled as the agy CLI.
+
+Those rows are not the Paseo ACP dispatch pool. The ACP row stays unknown, so the pool is not dispatched, unless the CLI observation and the ACP observation carry the same version, the same tier, and the same quota-source key, each with an observation time. A product name is not that key. The shipped reader records the CLI table only and leaves the ACP observation empty, so the hold stays in place. A hand-copied percent does not replace that ACP row. `quotaProtection` set to `none` turns this guard off on purpose.
+
+Suggested shape, with no live percentages:
+
+```json
+{
+  "id": "example-antigravity-gemini",
+  "name": "Example Antigravity Gemini",
+  "adapter": "antigravity-cli",
+  "antigravityBucket": "gemini",
+  "providers": ["antigravity"],
+  "dispatch": false,
+  "quotaProtection": "pause"
+}
+```
+
+A Claude/GPT display plan uses `"antigravityBucket": "claude-gpt"` and the same provider id `antigravity`. It does not use `claude` or `codex`, and it does not create a Claude ACP profile. The five-hour reset is shown when the table includes one. Dispatch does not invent a window start, so that shorter row does not by itself exhaust the pool.
 
 ## Backup, migration and removal
 

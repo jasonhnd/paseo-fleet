@@ -5,7 +5,8 @@
   "bannedProviders": [],
   "adapters": {
     "cursor-api": false,
-    "keychain": false
+    "keychain": false,
+    "antigravity-cli": false
   },
   "leaderUsage": {
     "reminderTokens": 500000,

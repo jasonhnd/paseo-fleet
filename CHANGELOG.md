@@ -7,6 +7,7 @@ No public release is declared by this document.
 
 ### Added
 
+- Optional `antigravity-cli` shows the local agy `/usage` table. It stays off until switched on, and it does not dispatch the Paseo ACP channel unless that channel is shown to be the same pool. The shipped reader does not establish that.
 - Experimental plugin sources, standalone Node commands and English/Simplified Chinese interfaces.
 - Public setup, workflow, data, compatibility and manual release documentation.
 - Bug, feature and compatibility report templates and private disclosure guidance.
