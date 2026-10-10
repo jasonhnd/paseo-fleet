@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, renameSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runSupervisorShift, handoverDoneReply, takenOverReply, PARENT_LABEL, type ShiftAgent, type ShiftPorts, type ShiftCreateInput } from "../../shared/supervisor-shift";
@@ -60,7 +60,10 @@ function fixture() {
     archive: async id => {
       calls.push("archive"); if (fail === "archive") throw new Error("demo archive error");
       assert.equal(id, "old"); assert.notEqual(registered, "old"); archiveCount++;
-      writeFileSync(config, JSON.stringify({ supervisors: { demo: registered }, projects: { demo: { code: "DEMO" } } }));
+      // Match the real registry's atomic updates while inspections read concurrently.
+      const replacement = `${config}.tmp`;
+      writeFileSync(replacement, JSON.stringify({ supervisors: { demo: registered }, projects: { demo: { code: "DEMO" } } }));
+      renameSync(replacement, config);
     },
     sleep: async ms => { clock += ms; if (clock > 2000000) throw new Error("demo queue timeout"); },
   };
