@@ -35,7 +35,7 @@ export function DispatchSettings({ s, rows, value, onChange }: { s: Styles; rows
       const saved = object(object(object(overrides[row.role])[row.tier])[row.slot]);
       const slot = dispatchSlotLabel(row.slot) ?? row.slot;
       const target = t("settings.dispatch.target", { slot, tier: row.tier });
-      return <View key={row.slot} testID={`dispatch-row-${row.slot}`} style={{ gap: 6, paddingVertical: 8, borderBottomWidth: 1, borderColor: "#888" }}>
+      return <View key={row.slot} testID={`dispatch-row-${row.slot}`} style={{ gap: 6, paddingVertical: 8, borderBottomWidth: 1, borderColor: s.p.border }}>
         <Text style={s.text}>{t("settings.dispatch.profile", { slot, profile: row.profile ?? t("settings.dispatch.missing") })}</Text>
         <Text style={s.muted}>{t("settings.dispatch.defaults", { values: row.defaults.map(item => t("settings.dispatch.defaultValue", {
           context: item.context ? item.context.split("/").at(-1) ?? "" : t("settings.dispatch.all"), effort: item.effort ?? t("settings.dispatch.inherit"), order: item.order,
@@ -48,7 +48,7 @@ export function DispatchSettings({ s, rows, value, onChange }: { s: Styles; rows
           {row.supportedEfforts.map(effort => action(t("settings.dispatch.effort", { effort }), () => patch(row, "effort", effort), saved.effort === effort, !row.profile, t("settings.dispatch.effortAction", { target, effort })))}
         </View>
         <Text style={s.muted}>{t("settings.dispatch.order")}</Text>
-        <TextInput accessibilityLabel={t("settings.dispatch.orderAction", { target })} keyboardType="numeric" value={String(saved.order ?? "")} onChangeText={text => patch(row, "order", text.trim() === "" ? undefined : Number(text))} style={[s.text, { padding: 8, borderWidth: 1, borderColor: "#888", borderRadius: 6 }]} />
+        <TextInput placeholderTextColor={s.p.hint} selectionColor={s.p.blue} cursorColor={s.p.text} accessibilityLabel={t("settings.dispatch.orderAction", { target })} keyboardType="numeric" value={String(saved.order ?? "")} onChangeText={text => patch(row, "order", text.trim() === "" ? undefined : Number(text))} style={[s.text, { padding: 8, borderWidth: 1, borderColor: s.p.border, borderRadius: 6 }]} />
         {action(t("settings.dispatch.clearRow"), () => patch(row), false, false, t("settings.dispatch.clearAction", { target }))}
       </View>;
     })}

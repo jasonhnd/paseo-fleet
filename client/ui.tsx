@@ -4,7 +4,7 @@ import { Pressable, type StyleProp, Text, type TextStyle, View, type ViewStyle }
 import { t } from "../shared/i18n";
 import { DEFAULT_PANEL_PREFS, fontSizes, type PanelPrefs } from "../shared/panel-prefs";
 import { breakpointForWidth, columnsForWidth, GRID_GAP, gridCellWidth, gridColumns, PANEL_MAX_WIDTH, type Breakpoint } from "../shared/responsive";
-import { MONO, type Palette, paletteForMode, SANS } from "./theme";
+import { MONO, type ThemeColors, themeColors, SANS } from "./theme";
 
 export type Theme = PluginSurfaceProps["theme"];
 export type Layout = PluginSurfaceProps["layout"];
@@ -15,12 +15,12 @@ export function useStyles(theme: Theme, layout: Layout, prefs: PanelPrefs = DEFA
   const breakpoint = breakpointForWidth(width);
   const compact = breakpoint === "phone";
   const columns = columnsForWidth(width);
-  const p = paletteForMode(prefs.colorMode, theme.colors.surface0);
+  const p = useMemo(() => themeColors(theme), [theme]);
   const f = fontSizes(prefs.fontStep, compact);
   return useMemo(() => buildStyles(p, f, breakpoint, columns), [p, f, breakpoint, columns]);
 }
 
-function buildStyles(p: Palette, f: ReturnType<typeof fontSizes>, breakpoint: Breakpoint, columns: 1 | 2 | 3) {
+function buildStyles(p: ThemeColors, f: ReturnType<typeof fontSizes>, breakpoint: Breakpoint, columns: 1 | 2 | 3) {
   const compact = breakpoint === "phone";
   const bodyLine = Math.round(f.body * 1.45);
   const sans = { fontFamily: SANS };
@@ -63,13 +63,13 @@ function buildStyles(p: Palette, f: ReturnType<typeof fontSizes>, breakpoint: Br
     metricLabel: { ...sans, color: p.textTertiary, fontSize: f.small, lineHeight: Math.round(f.small * 1.4) },
     item: { borderTopWidth: 1, borderTopColor: p.border, paddingTop: 12, paddingBottom: 12, gap: 6 },
     tabBar: { flexDirection: "row" as const, flexWrap: "nowrap" as const, borderBottomWidth: 1, borderBottomColor: p.border },
-    tab: { minHeight: 44, paddingHorizontal: compact ? 12 : 6, paddingVertical: 10, justifyContent: "center" as const, alignItems: "center" as const, borderBottomWidth: 2, borderBottomColor: "transparent" },
+    tab: { minHeight: 44, paddingHorizontal: compact ? 12 : 6, paddingVertical: 10, justifyContent: "center" as const, alignItems: "center" as const, borderBottomWidth: 2, borderBottomColor: p.transparent },
     tabActive: { minHeight: 44, paddingHorizontal: compact ? 12 : 6, paddingVertical: 10, justifyContent: "center" as const, alignItems: "center" as const, borderBottomWidth: 2, borderBottomColor: p.blue, backgroundColor: p.raised },
     tabText: { ...sans, color: p.textSecondary, fontSize: f.tab, lineHeight: Math.round(f.tab * 1.3) },
     tabTextActive: { ...sans, ...nums, color: p.blue, fontSize: f.tab, lineHeight: Math.round(f.tab * 1.3), fontWeight: "600" as const },
     button: { minHeight: 44, justifyContent: "center" as const, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, backgroundColor: p.primaryBg },
     buttonText: { ...sans, color: p.primaryFg, fontSize: f.body, lineHeight: bodyLine, fontWeight: "600" as const },
-    ghost: { minHeight: 44, justifyContent: "center" as const, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: p.border, backgroundColor: "transparent" },
+    ghost: { minHeight: 44, justifyContent: "center" as const, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: p.border, backgroundColor: p.transparent },
     ghostText: { ...sans, color: p.text, fontSize: f.small, lineHeight: Math.round(f.small * 1.4) },
     badgeText: { ...sans, fontSize: f.small, lineHeight: Math.round(f.small * 1.4), fontWeight: "600" as const },
     segment: {
@@ -86,7 +86,7 @@ function buildStyles(p: Palette, f: ReturnType<typeof fontSizes>, breakpoint: Br
       justifyContent: "center" as const,
       paddingHorizontal: compact ? 8 : 10,
       paddingVertical: 6,
-      backgroundColor: "transparent",
+      backgroundColor: p.transparent,
       borderLeftWidth: 1,
       borderLeftColor: p.border,
     },

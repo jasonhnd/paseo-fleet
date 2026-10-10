@@ -50,8 +50,8 @@ test("mounted settings persist dispatch and operations project, refresh, conflic
     });
     const outfile = join(dir, "entry.mjs");
     await build({
-      stdin: { contents: `import {createRoot} from 'react-dom/client'; import {SettingsEditor} from './client/settings'; import {useStyles} from './client/ui';
-        function Entry(){const s=useStyles({colors:{surface0:'#ffffff'}},{compact:false,platform:'web'});return <SettingsEditor s={s} file="config" read={globalThis.__dispatchRead} write={globalThis.__dispatchWrite}/>;}
+      stdin: { contents: `import {createRoot} from 'react-dom/client'; import {SettingsEditor} from './client/settings'; import {useStyles} from './client/ui'; import {LIGHT_THEME} from './server/test/fixtures/themes';
+        function Entry(){const s=useStyles(LIGHT_THEME,{compact:false,platform:'web'});return <SettingsEditor s={s} file="config" read={globalThis.__dispatchRead} write={globalThis.__dispatchWrite}/>;}
         export function mount(){const container=document.createElement('div');document.body.appendChild(container);const root=createRoot(container);root.render(<Entry/>);return {container,unmount:()=>{root.unmount();container.remove();}};}`,
         resolveDir: plugin, sourcefile: "entry.tsx", loader: "tsx" },
       bundle: true, platform: "node", format: "esm", outfile, jsx: "automatic", logLevel: "error",

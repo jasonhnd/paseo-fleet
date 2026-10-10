@@ -12,6 +12,7 @@ export type ColorMode = (typeof COLOR_MODES)[number];
 
 export interface PanelPrefs {
   fontStep: FontStep;
+  /** Legacy persistence/RPC field; appearance always follows the host theme. */
   colorMode: ColorMode;
   tab: PanelTab;
 }

@@ -1,4 +1,4 @@
-import type { ColorMode, FontStep, PanelPrefs } from "./panel-prefs";
+import type { FontStep, PanelPrefs } from "./panel-prefs";
 import type { PanelTab } from "./panel-tabs";
 import { t } from "./i18n";
 
@@ -37,12 +37,6 @@ export const FONT_OPTIONS: ReadonlyArray<{ value: FontStep; readonly label: stri
   { value: "sm", get label() { return t("board.font.sm"); } },
   { value: "md", get label() { return t("board.font.md"); } },
   { value: "lg", get label() { return t("board.font.lg"); } },
-];
-
-export const COLOR_OPTIONS: ReadonlyArray<{ value: ColorMode; readonly label: string }> = [
-  { value: "paseo", get label() { return t("board.color.paseo"); } },
-  { value: "light", get label() { return t("board.color.light"); } },
-  { value: "dark", get label() { return t("board.color.dark"); } },
 ];
 
 export function prefsSaveFailed(): string {

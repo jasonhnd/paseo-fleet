@@ -270,7 +270,7 @@ function PriceForm({ s, plan, value, error, onChange, onSave }: {
 }) {
   return (
     <View style={s.row}>
-      <TextInput accessibilityLabel={t("quota.plansUi.priceInputA11y", { name: plan.name })} style={[s.ghost, s.text, { minWidth: 70 }]} value={value} onChangeText={onChange} keyboardType="decimal-pad" placeholder={t("quota.plansUi.pricePlaceholder")} placeholderTextColor={s.p.hint} />
+      <TextInput selectionColor={s.p.blue} cursorColor={s.p.text} accessibilityLabel={t("quota.plansUi.priceInputA11y", { name: plan.name })} style={[s.ghost, s.text, { minWidth: 70 }]} value={value} onChangeText={onChange} keyboardType="decimal-pad" placeholder={t("quota.plansUi.pricePlaceholder")} placeholderTextColor={s.p.hint} />
       <Pressable accessibilityRole="button" accessibilityLabel={t("quota.plansUi.savePriceA11y")} style={pressed(s.button)} onPress={onSave}>
         <Text style={s.buttonText}>{t("quota.plansUi.save")}</Text>
       </Pressable>
@@ -304,7 +304,7 @@ function ManualPctEditor({ s, plan, usageWindow }: { s: Styles; plan: UsagePlan;
     <View style={[s.row, { marginTop: 2 }]}>
       <Text style={s.muted}>{manualContext(plan, usageWindow)}</Text>
       <Text style={s.muted}>{t("quota.plansUi.manualPrompt")}</Text>
-      <TextInput accessibilityLabel={t("quota.plansUi.pctInputA11y", { name: plan.name })} style={[s.ghost, s.text, { minWidth: 56 }]} value={value} onChangeText={setValue} keyboardType="decimal-pad" placeholder="%" placeholderTextColor={s.p.hint} />
+      <TextInput selectionColor={s.p.blue} cursorColor={s.p.text} accessibilityLabel={t("quota.plansUi.pctInputA11y", { name: plan.name })} style={[s.ghost, s.text, { minWidth: 56 }]} value={value} onChangeText={setValue} keyboardType="decimal-pad" placeholder="%" placeholderTextColor={s.p.hint} />
       {preview ? <Text style={s.muted}>{preview}</Text> : null}
       <Pressable accessibilityRole="button" accessibilityLabel={t("quota.plansUi.savePctA11y")} style={pressed(s.ghost)} onPress={() => saveManual(value, plan.id, save, setValue)}>
         <Text style={s.ghostText}>{t("quota.plansUi.save")}</Text>

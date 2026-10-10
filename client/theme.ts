@@ -1,7 +1,7 @@
 import { Platform } from "react-native";
 
-export type { Palette } from "../shared/palette";
-export { DARK, isDarkSurface, LIGHT, paletteFor, paletteForMode } from "../shared/palette";
+export type { ThemeColors } from "../shared/theme-colors";
+export { mix, themeColors, withAlpha } from "../shared/theme-colors";
 export type { ColorMode, FontSizes, FontStep } from "../shared/panel-prefs";
 export { FONT_SCALE, fontSizes } from "../shared/panel-prefs";
 

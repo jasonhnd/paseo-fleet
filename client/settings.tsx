@@ -32,7 +32,7 @@ function Action({ s, label, onPress, disabled = false }: { s: Styles; label: str
   return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled} accessibilityState={{ disabled }} onPress={onPress} style={[s.ghost, { opacity: disabled ? 0.5 : 1 }]}><Text style={s.ghostText}>{label}</Text></Pressable>;
 }
 function Field({ s, label, value, onChange }: { s: Styles; label: string; value: string; onChange: (value: string) => void }) {
-  return <View style={{ gap: 4, minWidth: 130, flexGrow: 1 }}><Text style={s.muted}>{label}</Text><TextInput accessibilityLabel={label} value={value} onChangeText={onChange} style={[s.text, { borderWidth: 1, borderColor: "#888", borderRadius: 6, padding: 8 }]} /></View>;
+  return <View style={{ gap: 4, minWidth: 130, flexGrow: 1 }}><Text style={s.muted}>{label}</Text><TextInput placeholderTextColor={s.p.hint} selectionColor={s.p.blue} cursorColor={s.p.text} accessibilityLabel={label} value={value} onChangeText={onChange} style={[s.text, { borderWidth: 1, borderColor: s.p.border, borderRadius: 6, padding: 8 }]} /></View>;
 }
 function Toggle({ s, label, value, onChange }: { s: Styles; label: string; value: boolean; onChange: (value: boolean) => void }) {
   return <Pressable accessibilityRole="switch" accessibilityLabel={label} aria-checked={value} accessibilityState={{ checked: value }} onPress={() => onChange(!value)} style={s.ghost}><Text style={s.ghostText}>{label}: {value ? t("settings.on") : t("settings.off")}</Text></Pressable>;
@@ -105,7 +105,7 @@ export function SettingsEditor({ s, file, read, write, onLanguage }: { s: Styles
       <DispatchSettings s={s} rows={snapshot.dispatchRows ?? []} value={draft.dispatchOverrides} onChange={value => patch("dispatchOverrides", value)} />
     </> : <>
       {plans.length === 0 ? <Text style={s.muted}>{t("settings.emptyPools")}</Text> : null}
-      {plans.map((row, index) => <View key={index} style={{ gap: 8, paddingVertical: 12, borderBottomWidth: 1, borderColor: "#888" }}>
+      {plans.map((row, index) => <View key={index} style={{ gap: 8, paddingVertical: 12, borderBottomWidth: 1, borderColor: s.p.border }}>
         <View style={[s.row, { flexWrap: "wrap" }]}>{(["id", "name", "providers", "priceUsdMonthly", "stopPct", "cycleDay"] as const).map(key => <Field key={key} s={s} label={t(`settings.plan.${key}`)} value={key === "providers" ? list(row[key]) : String(row[key] ?? "")} onChange={value => planPatch(index, key, key === "providers" ? terms(value) : ["priceUsdMonthly", "stopPct", "cycleDay"].includes(key) ? value === "" ? undefined : Number(value) : value)} />)}</View>
         <Text style={s.muted}>{t("settings.plan.adapter")}</Text>
         <View style={[s.row, { flexWrap: "wrap" }]}>{ADAPTER_IDS.map(id => <Action key={id} s={s} label={t("settings.adapterId", { id })} disabled={row.adapter === id} onPress={() => planUpdate(index, { adapter: id, ...(id !== "manual" && !row.usageProvider ? { usageProvider: providerOf(id) } : {}) })} />)}</View>

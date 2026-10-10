@@ -63,7 +63,7 @@ export function LeaderQuickReply({ s, project, cards, unresponsive }: { s: Style
     <View style={{ gap: 6 }}>
       <View style={s.row}>
         <View style={[s.row, { flexWrap: "nowrap", flexGrow: 1, flexBasis: 212, minWidth: 0 }]}>
-          <TextInput
+          <TextInput selectionColor={s.p.blue} cursorColor={s.p.text}
             accessibilityLabel={`${project} · ${t("leader.ui.writeToLeader")}`}
             editable={!sender.busy}
             value={text}
@@ -108,7 +108,7 @@ export function LeaderReplyBox({ s, project, label = t("leader.ui.writeToLeader"
           </Pressable>
         </View>
       ) : null}
-      <TextInput accessibilityLabel={`${project} · ${label}`} multiline editable={!sender.busy} value={text} onChangeText={setText} placeholder={label} placeholderTextColor={s.p.hint} style={[s.ghost, s.text, { minHeight: 72, textAlignVertical: "top" }]} />
+      <TextInput selectionColor={s.p.blue} cursorColor={s.p.text} accessibilityLabel={`${project} · ${label}`} multiline editable={!sender.busy} value={text} onChangeText={setText} placeholder={label} placeholderTextColor={s.p.hint} style={[s.ghost, s.text, { minHeight: 72, textAlignVertical: "top" }]} />
       <View style={s.between}>
         <Text style={text.length > LEADER_REPLY_LIMIT ? s.red : s.muted}>{t("leader.ui.count", { count: text.length, limit: LEADER_REPLY_LIMIT })}</Text>
         <Pressable accessibilityRole="button" accessibilityLabel={t("leader.ui.sendToA11y", { project })} disabled={sender.busy} style={pressed(s.button)} onPress={() => sender.send(text, () => setText(""))}>

@@ -8,7 +8,6 @@ import { agentLinkRpc, boardInsightsRpc, boardSnapshotRpc, openAgentRpc } from "
 import {
   appearanceDirty,
   boardWarnings,
-  COLOR_OPTIONS,
   FONT_OPTIONS,
   INSIGHTS_MS,
   openChannel,
@@ -192,7 +191,6 @@ function BoardTools({ s, prefs, generatedAt, onSave, onRefresh }: {
     <View style={{ gap: 8, maxWidth: "100%", flexShrink: 0, alignItems: s.compact ? "flex-start" : "flex-end" }}>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, maxWidth: "100%" }}>
         <Segmented s={s} label={t("board.fontSize")} value={prefs.fontStep} options={FONT_OPTIONS} onChange={(fontStep) => onSave({ fontStep })} />
-        <Segmented s={s} label={t("board.colorMode")} value={prefs.colorMode} options={COLOR_OPTIONS} onChange={(colorMode) => onSave({ colorMode })} />
       </View>
       <RefreshRow s={s} generatedAt={generatedAt} onRefresh={onRefresh} />
     </View>

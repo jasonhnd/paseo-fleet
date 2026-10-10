@@ -197,7 +197,7 @@ function OptionButton({ s, option, recommended, active, busy, onPress }: {
       onPress={onPress}
     >
       <View style={{ width: LETTER_BOX, height: LETTER_BOX, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: recommended ? s.p.blue : s.p.card, borderWidth: recommended ? 0 : 1, borderColor: s.p.border }}>
-        <Text style={[s.h2, { color: recommended ? "#ffffff" : s.p.text }]}>{option.letter}</Text>
+        <Text style={[s.h2, { color: recommended ? s.p.primaryFg : s.p.text }]}>{option.letter}</Text>
       </View>
       <Text style={[s.text, { flex: 1, minWidth: 0 }]}>{option.text || t("decisions.actions.noText")}</Text>
       {recommended ? <RecommendTag s={s} /> : null}
@@ -208,7 +208,7 @@ function OptionButton({ s, option, recommended, active, busy, onPress }: {
 function RecommendTag({ s }: { s: Styles }) {
   return (
     <View style={{ backgroundColor: s.p.blue, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 2, alignSelf: "flex-start", flexShrink: 0 }}>
-      <Text style={[s.badgeText, { color: "#ffffff" }]}>{t("decisions.actions.recommended")}</Text>
+      <Text style={[s.badgeText, { color: s.p.primaryFg }]}>{t("decisions.actions.recommended")}</Text>
     </View>
   );
 }
@@ -273,7 +273,7 @@ function CommentBox({ s, reply, hasOptions }: { s: Styles; reply: Reply; hasOpti
   const empty = reply.text.trim().length === 0;
   return (
     <View style={{ gap: 8 }}>
-      <TextInput accessibilityLabel={t("decisions.actions.addNote")} style={[s.ghost, s.text, { width: "100%" }]} value={reply.text} onChangeText={reply.setText} placeholder={t("decisions.actions.addNote")} placeholderTextColor={s.p.hint} editable={!reply.busy} />
+      <TextInput selectionColor={s.p.blue} cursorColor={s.p.text} accessibilityLabel={t("decisions.actions.addNote")} style={[s.ghost, s.text, { width: "100%" }]} value={reply.text} onChangeText={reply.setText} placeholder={t("decisions.actions.addNote")} placeholderTextColor={s.p.hint} editable={!reply.busy} />
       <Text style={s.muted}>{hasOptions ? t("decisions.actions.noteHintWithOptions") : t("decisions.actions.noteHint")}</Text>
       <Pressable accessibilityRole="button" accessibilityLabel={t("decisions.actions.sendNote")} disabled={reply.busy || empty} style={pressed([s.button, { alignSelf: "flex-start", opacity: empty ? 0.5 : 1 }])} onPress={() => reply.send(REPLY_CHOICE.comment, reply.text)}>
         <Text style={s.buttonText}>{t("decisions.actions.send")}</Text>

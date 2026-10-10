@@ -40,8 +40,8 @@ test("mounted onboarding generates selectable JSON, retries, and rejects stale r
   try {
     const outfile = join(dir, "entry.mjs");
     await build({
-      stdin: { contents: `import {createRoot} from 'react-dom/client'; import {RoleOnboarding} from './client/onboarding'; import {useStyles} from './client/ui'; import {setLanguage} from './shared/i18n';
-        function Entry(){const s=useStyles({colors:{surface0:'#ffffff'}},{compact:false,platform:'web'});return <RoleOnboarding s={s}/>;}
+      stdin: { contents: `import {createRoot} from 'react-dom/client'; import {RoleOnboarding} from './client/onboarding'; import {useStyles} from './client/ui'; import {LIGHT_THEME} from './server/test/fixtures/themes'; import {setLanguage} from './shared/i18n';
+        function Entry(){const s=useStyles(LIGHT_THEME,{compact:false,platform:'web'});return <RoleOnboarding s={s}/>;}
         export function mount(lang){setLanguage(lang);const container=document.createElement('div');document.body.appendChild(container);const root=createRoot(container);root.render(<Entry/>);return {container,unmount:()=>root.unmount()};}`,
         resolveDir: plugin, sourcefile: "entry.tsx", loader: "tsx" },
       bundle: true, platform: "node", format: "esm", outfile, jsx: "automatic", logLevel: "error",

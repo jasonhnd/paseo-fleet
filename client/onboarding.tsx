@@ -23,7 +23,7 @@ function Choice({ s, title, discovery, draft, setDraft }: { s: Styles; title: st
     </View>)}
     {model ? <>
       <Text style={s.muted}>{t("onboarding.familyHint")}</Text>
-      <TextInput style={s.text} accessibilityLabel={t("onboarding.family", { role: title })} value={draft.family} onChangeText={family => setDraft({ ...draft, family, confirmedFamily: false })} />
+      <TextInput placeholderTextColor={s.p.hint} selectionColor={s.p.blue} cursorColor={s.p.text} style={s.text} accessibilityLabel={t("onboarding.family", { role: title })} value={draft.family} onChangeText={family => setDraft({ ...draft, family, confirmedFamily: false })} />
       <Action s={s} label={t(draft.confirmedFamily ? "onboarding.confirmed" : "onboarding.confirm", { role: title })} disabled={!draft.family.trim()} onPress={() => setDraft({ ...draft, confirmedFamily: !draft.confirmedFamily })} />
       <Text style={s.muted}>{t("onboarding.options")}</Text>
       <View style={[s.row, { flexWrap: "wrap" }]}><Action s={s} label={t("onboarding.defaults", { role: title })} onPress={() => setDraft({ ...draft, modeId: undefined, thinkingOptionId: undefined })} />

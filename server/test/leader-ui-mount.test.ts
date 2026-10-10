@@ -34,8 +34,8 @@ test("mounted settings save thresholds with revisions and homepage renders the c
   };
   try {
     const outfile = join(dir, "entry.mjs");
-    await build({ stdin: { contents: `import {createRoot} from 'react-dom/client'; import {QueryClient, QueryClientProvider} from '@tanstack/react-query'; import {SettingsEditor} from './client/settings'; import {LeaderBlock} from './client/home-leaders'; import {useStyles} from './client/ui'; import {setLanguage} from './shared/i18n';
-      function Entry({data}){const s=useStyles({colors:{surface0:'#ffffff'}},{compact:false,platform:'web'});return data?<LeaderBlock s={s} data={data} openAgent={null}/>:<SettingsEditor s={s} file="config" read={globalThis.__leaderRead} write={globalThis.__leaderWrite}/>;}
+    await build({ stdin: { contents: `import {createRoot} from 'react-dom/client'; import {QueryClient, QueryClientProvider} from '@tanstack/react-query'; import {SettingsEditor} from './client/settings'; import {LeaderBlock} from './client/home-leaders'; import {useStyles} from './client/ui'; import {LIGHT_THEME} from './server/test/fixtures/themes'; import {setLanguage} from './shared/i18n';
+      function Entry({data}){const s=useStyles(LIGHT_THEME,{compact:false,platform:'web'});return data?<LeaderBlock s={s} data={data} openAgent={null}/>:<SettingsEditor s={s} file="config" read={globalThis.__leaderRead} write={globalThis.__leaderWrite}/>;}
       export function mount(lang,data){setLanguage(lang);const container=document.createElement('div');document.body.appendChild(container);const root=createRoot(container);const query=new QueryClient();root.render(<QueryClientProvider client={query}><Entry data={data}/></QueryClientProvider>);return {container,unmount:()=>{root.unmount();query.clear();container.remove();}};}`,
       resolveDir: resolve(import.meta.dirname, "../.."), sourcefile: "entry.tsx", loader: "tsx" }, bundle: true, platform: "node", format: "esm", outfile, jsx: "automatic", logLevel: "error",
       define: { "process.env.NODE_ENV": '"production"', __DEV__: "false" }, alias: { "react-native": "react-native-web" },
@@ -84,9 +84,9 @@ test("mounted settings save thresholds with revisions and homepage renders the c
       const backgrounds = [...mounted.container.querySelectorAll("div")].filter((node: any) => dom.window.getComputedStyle(node).width === "8px" && dom.window.getComputedStyle(node).height === "8px").map((node: any) => dom.window.getComputedStyle(node).backgroundColor);
       assert.equal(backgrounds.length, 3);
       assert.equal(new Set(backgrounds).size, 3);
-      const { LIGHT } = await import("../../shared/palette");
+      const { LIGHT_THEME } = await import("./fixtures/themes");
       const rgb = (color: string) => { const node = dom.window.document.createElement("div"); node.style.color = color; return node.style.color; };
-      assert.deepEqual(new Set(backgrounds), new Set([LIGHT.green, LIGHT.amber, LIGHT.red].map(rgb)));
+      assert.deepEqual(new Set(backgrounds), new Set([LIGHT_THEME.colors.statusSuccess, LIGHT_THEME.colors.statusWarning, LIGHT_THEME.colors.statusDanger].map(rgb)));
       assert.ok(mounted.container.textContent.includes(lang === "en" ? "red warning" : t("leader.usage.thresholds", { reminder: "0.01", warning: "0.02" }).split("\uFF1A")[0]));
       const button = mounted.container.querySelector(`[aria-label="${t("leader.ui.detailsA11y", { action: t("leader.ui.expand"), code: "warning" })}"]`);
       button.click(); await tick();

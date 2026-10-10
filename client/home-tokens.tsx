@@ -3,6 +3,7 @@ import type { HomeView } from "../shared/home-view";
 import { barPx, chartMax, dayCaption, daySum, poolSum, shareCaption, shareFlex, stackPx, TOKEN_POOLS, weekSum, type TokenPoolKey } from "../shared/token-block";
 import { t } from "../shared/i18n";
 import { fmtZhTokens } from "../shared/token-chart";
+import { mix } from "./theme";
 import { Metric, Nums, ResponsiveGrid, Section, type Styles } from "./ui";
 
 export function TokenBlock({ s, days, shares }: { s: Styles; days: HomeView["days"]; shares: HomeView["roleShares"] }) {
@@ -22,7 +23,7 @@ export function TokenBlock({ s, days, shares }: { s: Styles; days: HomeView["day
 }
 
 function poolColors(s: Styles): Record<TokenPoolKey, string> {
-  return { claude: s.p.text, cursor: s.p.textSecondary, grok: s.p.hint };
+  return { claude: s.p.blue, cursor: mix(s.p.blue, s.p.bg, 0.3), grok: mix(s.p.blue, s.p.bg, 0.6) };
 }
 
 function PoolMetrics({ s, days }: { s: Styles; days: HomeView["days"] }) {
@@ -79,7 +80,7 @@ function ShareBar({ s, shares }: { s: Styles; shares: HomeView["roleShares"] }) 
       {shares.length === 0 ? <Text style={s.muted}>{t("home.tokens.noShares")}</Text> : null}
       {shares.length > 0 ? (
         <View style={{ height: 5, borderRadius: 3, overflow: "hidden", flexDirection: "row", backgroundColor: s.p.track }}>
-          {shares.map((share, index) => <View key={share.name} style={{ flex: shareFlex(share.pct), backgroundColor: index % 2 === 0 ? s.p.text : s.p.hint }} />)}
+          {shares.map((share, index) => <View key={share.name} style={{ flex: shareFlex(share.pct), backgroundColor: mix(s.p.blue, s.p.bg, shares.length > 1 ? 0.65 * index / (shares.length - 1) : 0) }} />)}
         </View>
       ) : null}
       <Nums style={s.text}>{shareCaption(shares)}</Nums>

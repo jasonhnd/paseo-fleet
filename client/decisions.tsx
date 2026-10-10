@@ -120,7 +120,7 @@ function SummaryBar({ s, model }: { s: Styles; model: ReturnType<typeof useDecis
 
 function FilterChip({ s, label, on, onPress }: { s: Styles; label: string; on: boolean; onPress: () => void }) {
   return (
-    <Pressable accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={t("decisions.list.filterOnly", { label })} style={pressed({ minHeight: 44, paddingHorizontal: 12, justifyContent: "center", borderRadius: 22, borderWidth: 1, borderColor: on ? s.p.primaryBg : s.p.border, backgroundColor: on ? s.p.primaryBg : "transparent" })} onPress={onPress}>
+    <Pressable accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={t("decisions.list.filterOnly", { label })} style={pressed({ minHeight: 44, paddingHorizontal: 12, justifyContent: "center", borderRadius: 22, borderWidth: 1, borderColor: on ? s.p.primaryBg : s.p.border, backgroundColor: on ? s.p.primaryBg : s.p.transparent })} onPress={onPress}>
       <Text style={[s.ghostText, { color: on ? s.p.primaryFg : s.p.text, fontWeight: on ? "600" : "400" }]}>{label}</Text>
     </Pressable>
   );
