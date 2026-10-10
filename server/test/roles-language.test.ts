@@ -33,12 +33,15 @@ function demo(setting: unknown) {
   const kanban = join(dir, "kanban.config.json");
   writeFileSync(kanban, JSON.stringify({ supervisors: { demo: supervisor } }));
   writeFileSync(join(fakebin, "paseo"), `#!/usr/bin/env python3
-import json, sys
+import json, os, sys
 args = sys.argv[1:]
 if args[:2] == ['provider', 'ls']:
     print(json.dumps([{'provider': p, 'status': 'available'} for p in ['codex', 'claude']]))
 elif args[:2] == ['provider', 'models']:
-    print(json.dumps([{'id': m, 'thinkingOptionIds': ['medium', 'high']} for m in ['gpt-6.1-sol', 'claude-sonnet-5-5']]))
+    print(json.dumps([{'id': m, 'thinkingOptionIds': ['medium', 'high', 'ultra']} for m in ['gpt-6.1-sol', 'claude-sonnet-5-5', 'demo-fast-model']]))
+elif args == ['reload']:
+    with open(os.path.join(os.environ['PASEO_HOME'], 'demo-reloads.log'), 'a') as log:
+        log.write('demo reload\\n')
 else:
     sys.exit('unexpected fake Paseo command')
 `, { mode: 0o755 });
@@ -59,6 +62,29 @@ function idFrom(text: string, token: string) {
   const id = new RegExp(`^${token} (\\S+)$`, "m").exec(text)?.[1];
   assert.ok(id, text);
   return id;
+}
+
+for (const lang of ["zh-CN", "en"] as const) {
+  test(`roles set preserves host model features and configured exclusions in ${lang}`, () => {
+    const d = demo(lang);
+    const executor = () => JSON.parse(readFileSync(d.config, "utf8")).daemon.agentProfiles.find((p: { role: string }) => p.role === "executor");
+    d.run(["set", "executor", "codex/demo-fast-model", "--thinking", "ultra", "--feature", "fast=true", "--feature", "fast_mode=true"]);
+    assert.equal(executor().model, "demo-fast-model");
+    assert.equal(executor().thinkingOptionId, "ultra");
+    assert.deepEqual(executor().featureValues, { fast: true, fast_mode: true });
+    d.run(["set", "executor", "codex/demo-fast-model"]);
+    assert.deepEqual(executor().featureValues, { fast: true, fast_mode: true });
+    assert.equal(readFileSync(join(d.paseo, "demo-reloads.log"), "utf8"), "demo reload\ndemo reload\n");
+
+    d.write("afc.config.json", { language: lang, bannedProviders: ["codex"] });
+    const before = readFileSync(d.config, "utf8");
+    const refused = spawnSync(process.execPath, [roles, "set", "executor", "codex/demo-fast-model", "--force", "--dry-run"], {
+      env: d.env, encoding: "utf8", timeout: 30_000,
+    });
+    assert.equal(refused.status, 1);
+    assert.ok(refused.stderr.includes(tIn(lang, "roles.policy.refuseBannedProvider", { provider: "codex" })), refused.stderr);
+    assert.equal(readFileSync(d.config, "utf8"), before);
+  });
 }
 
 for (const lang of ["zh-CN", "en"] as const) {

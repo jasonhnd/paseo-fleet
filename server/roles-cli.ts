@@ -254,7 +254,6 @@ async function run(argv: string[]) {
   const refuse = swapRefusal(provider, model, v.thinking, readBannedProviders(STATE));
   if (refuse) throw new Error(refuse);
   const features = kv(v.feature);
-  if (Object.entries(features).some(([k, value]) => ["fast", "fast_mode"].includes(k) && /^(true|1|yes|on)$/i.test(String(value)))) fail("cli.roles.refuse.fast");
   if (p!.provider !== provider) {
     if (!v.mode && p!.modeId !== undefined) { delete p!.modeId; console.log(t("cli.roles.set.droppedMode")); }
     if (!v.feature && p!.featureValues !== undefined) { delete p!.featureValues; console.log(t("cli.roles.set.droppedFeatures")); }
@@ -269,7 +268,6 @@ async function run(argv: string[]) {
   if (v.thinking !== undefined) p!.thinkingOptionId = v.thinking;
   if (v.mode !== undefined) p!.modeId = v.mode;
   if (v.feature) p!.featureValues = features;
-  else if (p!.featureValues) { for (const k of ["fast", "fast_mode"]) if (/^(true|1|yes|on)$/i.test(String(p!.featureValues[k]))) { delete p!.featureValues[k]; console.log(t("cli.roles.set.droppedFast")); } }
   const inherited = swapRefusal(provider, model, p!.thinkingOptionId, readBannedProviders(STATE));
   if (inherited) throw new Error(inherited);
   p!.family = v.family || family(provider, model) || p!.family;

@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { pickableModels, swapRefusal } from "../../shared/roles-policy";
 import { supervisorSlots } from "../../shared/supervisor-shift-rows";
 import { chooseDataDir, legacyStateDir } from "../paths";
+import { isUnreviewedMerge } from "../insights";
 
 test("public model choices retain host options and only apply configured exclusions", () => {
   const models = [
@@ -14,6 +15,18 @@ test("public model choices retain host options and only apply configured exclusi
   assert.equal(swapRefusal("cursor", "demo-model", "high", ["cursor"]) === null, false);
   assert.deepEqual(pickableModels(models, ["cursor"]), [models[0]]);
   assert.equal(swapRefusal("", "demo-model", null) === null, false);
+});
+
+test("unreviewed merges use a rolling window independent of the calendar year", () => {
+  for (const year of [2020, 2024, 2030]) {
+    const now = Date.parse(`${year}-01-10T12:00:00Z`);
+    const merged = { mergedAt: `${year}-01-09T12:00:00Z`, reviewerAgentId: null };
+    assert.equal(isUnreviewedMerge(merged, now), true);
+    assert.equal(isUnreviewedMerge({ ...merged, reviewerAgentId: "demo-reviewer" }, now), false);
+    assert.equal(isUnreviewedMerge({ ...merged, mergedAt: `${year}-01-03T12:00:00Z` }, now), false);
+    assert.equal(isUnreviewedMerge({ ...merged, mergedAt: null }, now), false);
+    assert.equal(isUnreviewedMerge({ ...merged, mergedAt: "invalid" }, now), false);
+  }
 });
 
 test("registered projects sort by configured code without a built-in project list", () => {

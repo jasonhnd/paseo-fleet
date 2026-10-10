@@ -25,10 +25,13 @@ const PROVIDER_REFRESH_MS = 6 * 3600_000;
 const LOOKUP_CONCURRENCY = 6;
 /** Insights younger than this are served as they are; older ones are served once more while a rebuild runs. */
 const INSIGHTS_FRESH_MS = 60_000;
-/** When the "review before merge" rule started (user instruction, 2026-09-24 23:55 JST). */
-const REVIEW_RULE_SINCE = Date.parse("2026-09-24T14:55:00Z");
 
 // ---------------- helpers ----------------
+
+/** Flag recent merges without a reviewer using a rolling window. */
+export function isUnreviewedMerge(pr: Pick<BoardPr, "mergedAt" | "reviewerAgentId">, now = Date.now()): boolean {
+  return Boolean(pr.mergedAt && now - Date.parse(pr.mergedAt) < 7 * DAY && !pr.reviewerAgentId);
+}
 
 function mentions(title: string, n: number): boolean {
   return new RegExp(`#${n}(?!\\d)|PR ?${n}(?!\\d)`).test(title);
@@ -111,7 +114,7 @@ async function pullRequests(records: AgentRecord[], logs: Record<string, Facts>)
         reviewerAgentId: rev?.id ?? null,
         reviewVerdict: rev ? (logs[rev.id]?.verdict ?? "unknown") : "none",
       };
-      if (pr.mergedAt && Date.parse(pr.mergedAt) > REVIEW_RULE_SINCE && Date.now() - Date.parse(pr.mergedAt) < 7 * DAY && !rev) unreviewed.push(pr);
+      if (isUnreviewedMerge(pr)) unreviewed.push(pr);
     }
   }
   unreviewed.sort((a, b) => (b.mergedAt ?? "").localeCompare(a.mergedAt ?? ""));
