@@ -3,6 +3,7 @@
 import { TOKYO_OFFSET_MS, tokyoDayStart } from "./dispatch";
 import { type CrashSignal, parseCrashSignal } from "./daemon-log";
 import { t } from "./i18n";
+import { readSupervisorTable, supervisorIdFor } from "./decisions";
 
 export const CRASH_BURST_MS = 10 * 60_000;
 export const CRASH_COOLDOWN_MS = 30 * 60_000;
@@ -373,12 +374,9 @@ export function assessMissingCwd(run: MissingRun, now: number, kanbanRoot: strin
 export function crashNotifyTargets(config: unknown, opsProject: string): string[] {
   const ids: string[] = [];
   if (!config || typeof config !== "object" || Array.isArray(config)) return ids;
-  const row = config as { supervisorAgentId?: unknown; supervisors?: unknown };
-  const table = row.supervisors;
-  if (table && typeof table === "object" && !Array.isArray(table)) {
-    const afc = (table as Record<string, unknown>)[opsProject];
-    if (typeof afc === "string" && afc.trim()) ids.push(afc.trim());
-  }
+  const row = config as { supervisorAgentId?: unknown };
+  const afc = supervisorIdFor(opsProject, readSupervisorTable(config));
+  if (afc) ids.push(afc);
   if (typeof row.supervisorAgentId === "string" && row.supervisorAgentId.trim() && !ids.includes(row.supervisorAgentId.trim())) {
     ids.push(row.supervisorAgentId.trim());
   }

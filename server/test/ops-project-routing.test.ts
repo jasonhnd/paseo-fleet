@@ -76,6 +76,36 @@ test("daemon crash delivery reads the operations project and still notifies the 
   assert.deepEqual(crashNotifyTargets({ supervisors: [] }, "Demo operations"), []);
 });
 
+test("coupon and crash delivery match project keys case-insensitively with exact keys taking priority", async () => {
+  const configPath = join(process.env.AFC_DATA_DIR!, "afc.config.json");
+  await write(configPath, { opsProject: "Demo operations" });
+  for (const supervisors of [
+    { "DEMO OPERATIONS": configured, "paseo-fleet": legacy },
+    { "DEMO OPERATIONS": legacy, "Demo operations": configured },
+  ]) {
+    await write(kanbanConfigPath(), { supervisors, supervisorAgentId: legacy });
+    const coupons: string[] = [];
+    const result = await deliver([{ who: "afc", text: "Demo coupon use", legacy: "use", keys: ["demo-use"] }],
+      async id => { coupons.push(id); });
+    assert.deepEqual(coupons, [configured]);
+    assert.equal(result.use, true);
+    assert.deepEqual(result.keys, ["demo-use"]);
+    const crashes: string[] = [];
+    await notifyDaemonCrash("Demo daemon crash", async id => { crashes.push(id); });
+    assert.deepEqual(crashes, [configured, legacy]);
+  }
+  assert.deepEqual(crashNotifyTargets({ supervisors: { "DEMO OPERATIONS": configured }, supervisorAgentId: configured },
+    "Demo operations"), [configured]);
+  await write(kanbanConfigPath(), { supervisors: { "DEMO OPERATIONS": "short", demo: configured, other: configured } });
+  const sent: string[] = [];
+  const result = await deliver([
+    { who: "afc", text: "Demo coupon use", legacy: "use", keys: ["demo-use"] },
+    { who: "all", text: "Demo coupon broadcast", legacy: "announce" },
+  ], async id => { sent.push(id); });
+  assert.deepEqual(sent, [configured], "Only the broadcast goes out; short ids are rejected and duplicate ids are skipped");
+  assert.deepEqual(result, { use: false, announce: true, keys: [] });
+});
+
 test("early-reset delivery reads the configured supervisors entry and marks only successful sends", async () => {
   await write(kanbanConfigPath(), table);
   for (const { config, expected } of cases) {
