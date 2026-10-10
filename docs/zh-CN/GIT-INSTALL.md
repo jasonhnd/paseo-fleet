@@ -8,6 +8,10 @@ Paseo 0.11 将选定 Git 版本克隆到受管目录，不会仅根据 lockfile 
 `npm run build`，然后才编译并激活插件。显式包含开发依赖也适用于 daemon 设置
 `NODE_ENV=production` 的情况。daemon 的 PATH 须包含 Node >=22.13 和 npm。
 
+准备脚本还为每份新取得的安装包写入唯一安装标记。ESM 命令从自身模块定位；
+Paseo 的 CJS 服务端包装在 staging 移到正式受管目录后通过此标记定位，
+避免宿主激活升级时仍读到旧配置路径。标记不含宿主绝对路径，每次准备都会刷新。
+
 服务端 API 类型来自 `@getpaseo/plugin/server` 的 `PluginHandlerContext["paseo"]`。
 后台任务在首个 handler 或 hook 运行前也需要连接；`npm run build` 从开发依赖中的
 客户端 SDK 生成 `server/paseo-client.bundle.mjs`，其 protocol、relay、Zod 是锁定的
@@ -198,6 +202,21 @@ p plugin update agent-fleet-cockpit --check --ref "$AFC_TAG" --json
 "$AFC_SHIM_DIR/afc" --help
 "$AFC_SHIM_DIR/afc" leader --help
 "$AFC_SHIM_DIR/roles" ls
+
+# Verify the exported CLI against the currently running installation.
+p plugin ls agent-fleet-cockpit --json > "$AFC_BACKUP/plugin-status.json"
+node --input-type=module <<'NODE'
+import fs from "node:fs";
+import path from "node:path";
+const raw = JSON.parse(fs.readFileSync(path.join(process.env.AFC_BACKUP, "plugin-status.json"), "utf8"));
+const plugin = Array.isArray(raw) ? raw.find(row => row.id === "agent-fleet-cockpit") : raw;
+const data = process.env.AFC_DATA_DIR || path.join(process.env.PASEO_HOME, "plugin-data", "agent-fleet-cockpit");
+const info = JSON.parse(fs.readFileSync(path.join(data, "exports", "cockpit.json"), "utf8"));
+if (!info.cli || info.cli !== path.join(plugin.path, "bin", "afc.mjs") || !fs.statSync(info.cli).isFile())
+  throw new Error("cockpit.json CLI does not name the current installation");
+fs.accessSync(info.cli, fs.constants.X_OK);
+console.log("cockpit.json CLI matches the current installation and is executable");
+NODE
 ```
 
 reload 或恢复全局开关后，`plugin ls` 可能让 AFC 和其他插件短暂显示 `failed`，
@@ -215,6 +234,8 @@ reload 输出的 `restartRequiredPaths: plugins.agent-fleet-cockpit.path` 表示
 确认 Git 来源 identity、批准 tag 的 commit，以及两个保存开关均开启时的 `running`
 （否则为 `disabled`）。打开日常 host 的 AFC cockpit 和设置页，确认语言、配置、plugin-data
 仍在，并检查编译或初始化错误。`afc` shim 已包含 `afc leader`，无需独立 leader shim。
+确认 `exports/cockpit.json` 的 `cli` 指向当前安装目录的 `bin/afc.mjs` 且可执行，
+上面的命令会核对这项。CLI 为 null 或指向旧安装目录都算失败，须查看插件日志中的警告。
 用 `command -v afc` 和 `command -v roles` 确认选中了这些 shim。Git 更新会替换受管目录，
 每次应用更新后须重新生成 shim；普通 update 检查默认 HEAD，要保留发版版本须显式 `--ref`。
 

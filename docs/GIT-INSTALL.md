@@ -9,6 +9,12 @@ when the daemon sets NODE_ENV=production. Preparation runs before compilation an
 activation on install and update.
 Node 22.13 or newer and npm must be available on the daemon's PATH.
 
+Preparation also stamps each acquired package with a unique installation identity.
+ESM commands locate their own package; Paseo's CJS server wrapper uses the stamp
+after staging is moved to the final managed directory. This avoids reading the
+previous config path while the host is activating an update. The stamp contains
+no absolute host path and is refreshed for each preparation.
+
 Server API types come from `PluginHandlerContext["paseo"]` in
 `@getpaseo/plugin/server`. Background tasks also need a connection before the first
 handler or hook runs. Their factory is generated as `server/paseo-client.bundle.mjs`
@@ -218,6 +224,21 @@ p plugin update agent-fleet-cockpit --check --ref "$AFC_TAG" --json
 "$AFC_SHIM_DIR/afc" --help
 "$AFC_SHIM_DIR/afc" leader --help
 "$AFC_SHIM_DIR/roles" ls
+
+# Verify the exported CLI against the currently running installation.
+p plugin ls agent-fleet-cockpit --json > "$AFC_BACKUP/plugin-status.json"
+node --input-type=module <<'NODE'
+import fs from "node:fs";
+import path from "node:path";
+const raw = JSON.parse(fs.readFileSync(path.join(process.env.AFC_BACKUP, "plugin-status.json"), "utf8"));
+const plugin = Array.isArray(raw) ? raw.find(row => row.id === "agent-fleet-cockpit") : raw;
+const data = process.env.AFC_DATA_DIR || path.join(process.env.PASEO_HOME, "plugin-data", "agent-fleet-cockpit");
+const info = JSON.parse(fs.readFileSync(path.join(data, "exports", "cockpit.json"), "utf8"));
+if (!info.cli || info.cli !== path.join(plugin.path, "bin", "afc.mjs") || !fs.statSync(info.cli).isFile())
+  throw new Error("cockpit.json CLI does not name the current installation");
+fs.accessSync(info.cli, fs.constants.X_OK);
+console.log("cockpit.json CLI matches the current installation and is executable");
+NODE
 ```
 
 Immediately after reload or restoring the global switch, `plugin ls` may briefly
@@ -241,6 +262,9 @@ saved enabled switches were on; otherwise expect `disabled`. Open the daily
 host's AFC cockpit and AFC settings page, confirm the saved language/configuration
 and plugin-data are present, and check logs for compilation or initialization
 errors. The `afc` shim also routes `afc leader`; no separate leader shim is required.
+Confirm `exports/cockpit.json` has a `cli` naming the current installed
+`bin/afc.mjs`, with executable permission, as checked above. A null CLI or an old
+installation path fails this check; inspect the warning in plugin logs.
 Confirm `command -v afc` and `command -v roles` select these shims. Git updates
 replace the managed directory, so regenerate the shims after every applied update.
 An ordinary update checks default HEAD, not the install tag; use an explicit `--ref`
