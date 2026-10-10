@@ -116,8 +116,9 @@ reported as unknown.
 
 In Fleet Settings, **AFC operations project** saves the optional `opsProject`
 string in `afc.config.json`, for example `{ "opsProject": "demo-operations" }`.
-It names the Kanban project whose registered `<leader>` receives AFC's early-reset
-and daily health notices. New `afc decide add` and `afc decide decided` records
+It names the Kanban project whose registered `<leader>` receives AFC's early-reset,
+daily health and coupon-use notices, plus daemon crash, Cursor login/usage and
+keychain probe alerts. New `afc decide add` and `afc decide decided` records
 without `--project` use this project; an explicit `--project` still wins. Missing
 or invalid values fall back to `paseo-fleet`. Names are trimmed, must be nonempty
 and cannot contain control characters; invalid settings writes are rejected

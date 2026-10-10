@@ -2076,5 +2076,5 @@
   "leader.ui.handled": "已处理",
   "leader.attention.undoClose": "撤销关闭",
   "settings.opsProject": "AFC 运行通知项目",
-  "settings.opsProjectHint": "由这个看板项目登记的 <leader> 接收 AFC 提前重置和每日体检通知。新建待拍板未指定 --project 时使用它；已有记录保留原项目。清空使用 paseo-fleet。"
+  "settings.opsProjectHint": "由这个看板项目登记的 <leader> 接收 AFC 提前重置、每日体检和用券通知，以及 daemon 崩溃、Cursor 登录／用量和钥匙串探测告警。新建待拍板未指定 --project 时使用它；已有记录保留原项目。清空使用 paseo-fleet。"
 }

@@ -2076,5 +2076,5 @@
   "leader.ui.handled": "Handled",
   "leader.attention.undoClose": "Undo close",
   "settings.opsProject": "AFC operations project",
-  "settings.opsProjectHint": "Board project whose registered leader receives AFC early-reset and daily health notices. New AFC decisions without --project use it; existing decisions keep their projects. Clear to use paseo-fleet."
+  "settings.opsProjectHint": "Board project whose registered leader receives AFC early-reset, daily health and coupon-use notices, plus daemon crash, Cursor login/usage and keychain probe alerts. New AFC decisions without --project use it; existing decisions keep their projects. Clear to use paseo-fleet."
 }
