@@ -34,3 +34,15 @@ test("legacy migration discovery accepts an explicit directory without embedding
   assert.equal(overridden.source, "override");
   assert.equal(overridden.dir, "/demo/current-state");
 });
+
+test("optional plugin status checks use the configured id and distinguish an exact row", async () => {
+  const { parseStatusOutput } = await import("../../shared/access-parse");
+  const stdout = "PLUGIN                  STATUS          ENABLED\n" +
+    "demo-chat-other         stopped         yes\n" +
+    "demo-chat               running         yes\n";
+  const outcome = { stdout, stderr: "", ok: true, timedOut: false, missing: false, abortedLogin: false };
+  assert.equal(parseStatusOutput("slack-plugin", outcome).state, "unknown");
+  assert.equal(parseStatusOutput("slack-plugin", outcome, "demo-chat").state, "in");
+  assert.equal(parseStatusOutput("slack-plugin", outcome, "demo-chat-other").state, "out");
+  assert.equal(parseStatusOutput("slack-plugin", outcome, "demo-missing").state, "out");
+});

@@ -123,7 +123,7 @@ function listed(service: MapService, spec: StatusCommand | null, commandId: stri
 
 async function runOne(id: string, spec: StatusCommand, env: NodeJS.ProcessEnv, timeoutMs: number): Promise<LiveCheck> {
   try {
-    return parseStatusOutput(id, await runStatus(spec.bin, spec.args, env, timeoutMs));
+    return parseStatusOutput(id, await runStatus(spec.bin, spec.args, env, timeoutMs), spec.pluginId);
   } catch {
     return { state: "unknown", account: null, scopeCount: null, detail: t("access.detail.commandFailed") };
   }

@@ -203,10 +203,10 @@ export function partsFromPlan(plan: PlanPercents, sand: SandRead | null): { part
   }
   let grokNote: string | null = null;
   if (sand?.excluded) {
-    windows.push(row(t("cursor.api.sandboxLabel"), null, null, null, sand.resetsAt));
+    windows.push(row("Grok", null, null, null, sand.resetsAt));
     grokNote = t("cursor.api.grokNotSeparate");
   } else if (sand && !sand.formatError && !sand.unauthorized && sand.pct !== null) {
-    windows.push(row(t("cursor.api.sandboxLabel"), sand.pct, null, null, sand.resetsAt));
+    windows.push(row("Grok", sand.pct, null, null, sand.resetsAt));
   } else if (sand?.unauthorized) {
     grokNote = msgGrokDenied();
   } else if (sand?.formatError) {

@@ -2019,5 +2019,6 @@
   "doctor.platform.keychainOptional": "Keychain presence checks are macOS-only and optional.",
   "doctor.platform.keychainSkipped": "Keychain checks are not applicable on this operating system and are skipped.",
   "doctor.platform.processSkipped": "Unix process inspection was skipped on this operating system; process findings are unverified.",
-  "cursor.api.sandboxLabel": "Agent sandbox"
+  "cursor.api.sandboxLabel": "Agent sandbox",
+  "access.detail.pluginUnconfigured": "No plugin id is configured for this status check"
 }

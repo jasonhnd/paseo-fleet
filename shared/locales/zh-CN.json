@@ -2019,5 +2019,6 @@
   "doctor.platform.keychainOptional": "钥匙串存在性检查仅限 macOS，可选开启。",
   "doctor.platform.keychainSkipped": "此系统不适用钥匙串检查，已跳过。",
   "doctor.platform.processSkipped": "此系统已跳过 Unix 进程检查；进程状态尚未验证。",
-  "cursor.api.sandboxLabel": "代理沙盒"
+  "cursor.api.sandboxLabel": "代理沙盒",
+  "access.detail.pluginUnconfigured": "此状态检查尚未配置插件 ID"
 }

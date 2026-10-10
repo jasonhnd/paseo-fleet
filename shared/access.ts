@@ -62,9 +62,9 @@ function prose(value: unknown, max = 240): string | null {
 
 function readCheck(value: unknown): StatusCommand | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const row = value as { bin?: unknown; args?: unknown };
+  const row = value as { bin?: unknown; args?: unknown; pluginId?: unknown };
   if (typeof row.bin !== "string" || !Array.isArray(row.args) || row.args.some((arg) => typeof arg !== "string")) return null;
-  return { bin: row.bin, args: row.args as string[] };
+  return { bin: row.bin, args: row.args as string[], ...(typeof row.pluginId === "string" ? { pluginId: row.pluginId } : {}) };
 }
 
 function sameCommand(spec: StatusCommand | undefined, check: StatusCommand | null): boolean {

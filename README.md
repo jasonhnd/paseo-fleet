@@ -114,7 +114,9 @@ overrides it, and `ROLES_STATE_DIR` overrides roles-command state only. Legacy
 discovery checks `~/.config/fleet-roles`; set `AFC_LEGACY_DATA_DIR` for another
 previous state directory, or use migration's explicit `--from` path. The optional
 read-only sidebar adapter requires `AFC_SANDBOX_ROSTER_DIR` to select its persistence
-directory; it does not probe an owner's application directory by default.
+directory; it does not probe an owner's application directory by default. An access
+map plugin-listing check uses its explicit `pluginId` field; an unspecified id is
+reported as unknown.
 
 `npm run compat` is an offline compiler, type-check and regression gate. It does
 not contact a daemon or prove desktop mounting, provider authentication, migration

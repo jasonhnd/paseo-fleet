@@ -2040,7 +2040,8 @@ var en_default = {
   "doctor.platform.keychainOptional": "Keychain presence checks are macOS-only and optional.",
   "doctor.platform.keychainSkipped": "Keychain checks are not applicable on this operating system and are skipped.",
   "doctor.platform.processSkipped": "Unix process inspection was skipped on this operating system; process findings are unverified.",
-  "cursor.api.sandboxLabel": "Agent sandbox"
+  "cursor.api.sandboxLabel": "Agent sandbox",
+  "access.detail.pluginUnconfigured": "No plugin id is configured for this status check"
 };
 
 // shared/locales/zh-CN.json
@@ -4065,7 +4066,8 @@ var zh_CN_default = {
   "doctor.platform.keychainOptional": "\u94A5\u5319\u4E32\u5B58\u5728\u6027\u68C0\u67E5\u4EC5\u9650 macOS\uFF0C\u53EF\u9009\u5F00\u542F\u3002",
   "doctor.platform.keychainSkipped": "\u6B64\u7CFB\u7EDF\u4E0D\u9002\u7528\u94A5\u5319\u4E32\u68C0\u67E5\uFF0C\u5DF2\u8DF3\u8FC7\u3002",
   "doctor.platform.processSkipped": "\u6B64\u7CFB\u7EDF\u5DF2\u8DF3\u8FC7 Unix \u8FDB\u7A0B\u68C0\u67E5\uFF1B\u8FDB\u7A0B\u72B6\u6001\u5C1A\u672A\u9A8C\u8BC1\u3002",
-  "cursor.api.sandboxLabel": "\u4EE3\u7406\u6C99\u76D2"
+  "cursor.api.sandboxLabel": "\u4EE3\u7406\u6C99\u76D2",
+  "access.detail.pluginUnconfigured": "\u6B64\u72B6\u6001\u68C0\u67E5\u5C1A\u672A\u914D\u7F6E\u63D2\u4EF6 ID"
 };
 
 // shared/i18n.ts

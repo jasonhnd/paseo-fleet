@@ -7,6 +7,8 @@ export const SECRET_MARKERS = ["gho_", "ghp_", "ghu_", "ghs_", "github_pat_", "B
 export interface StatusCommand {
   bin: string;
   args: string[];
+  /** Plugin id to inspect in a read-only plugin listing, supplied by the access map. */
+  pluginId?: string;
 }
 
 /** Exact argv of status commands. login / logout / permission changes are not in this list. */
@@ -341,7 +343,8 @@ function connectorStatus(text: string, name: "Notion" | "Slack", ok: boolean): L
   return unknown(t("access.detail.connectorUnknown", { name, method: mcpMethod() }));
 }
 
-function slackPlugin(text: string, ok: boolean): LiveCheck {
+function slackPlugin(text: string, ok: boolean, pluginId?: string): LiveCheck {
+  if (!pluginId?.trim() || secretValue(pluginId)) return unknown(t("access.detail.pluginUnconfigured"));
   const lines = stripAnsi(text).split("\n").map((line) => line.replace(/\s+$/, ""));
   const header = lines.find((line) => line.includes("PLUGIN") && line.includes("STATUS"));
   if (!header) return unknown(failedDetail(text, ok));
@@ -349,7 +352,7 @@ function slackPlugin(text: string, ok: boolean): LiveCheck {
   const enabledAt = header.indexOf("ENABLED");
   if (statusAt < 0) return unknown(t("access.detail.unrecognized"));
   for (const line of lines) {
-    if (!line.startsWith("chat-agents")) continue;
+    if (line.slice(0, statusAt).trim() !== pluginId.trim()) continue;
     const status = line.slice(statusAt, enabledAt > statusAt ? enabledAt : statusAt + 16).trim().toLowerCase();
     if (!status || secretValue(status)) return { state: "unknown", account: null, scopeCount: null, detail: t("access.detail.tokenDropped") };
     if (status === "running") return { state: "in", account: null, scopeCount: null, detail: t("access.detail.slackRunning") };
@@ -384,11 +387,12 @@ const PARSERS: Record<string, (text: string, ok: boolean) => LiveCheck> = {
   "slack-plugin": slackPlugin,
 };
 
-export function parseStatusOutput(id: string, outcome: StatusOutcome): LiveCheck {
+export function parseStatusOutput(id: string, outcome: StatusOutcome, pluginId?: string): LiveCheck {
   if (outcome.timedOut) return unknown(t("access.detail.timedOut"));
   if (outcome.missing) return unknown(t("access.detail.commandMissing"));
   if (outcome.abortedLogin) return unknown(t("access.detail.loginStopped"));
   const text = `${outcome.stdout}\n${outcome.stderr}`;
-  const parse = Object.prototype.hasOwnProperty.call(PARSERS, id) ? PARSERS[id] : undefined;
+  const parse = id === "slack-plugin" ? (text: string, ok: boolean) => slackPlugin(text, ok, pluginId)
+    : Object.prototype.hasOwnProperty.call(PARSERS, id) ? PARSERS[id] : undefined;
   return scrub(parse ? parse(text, outcome.ok) : unknown(t("access.detail.noParser")));
 }
