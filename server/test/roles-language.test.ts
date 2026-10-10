@@ -77,6 +77,12 @@ test("new AFC decisions use the configured default without relabeling explicit o
     const decidedId = idFrom(d.run(["decide", "decided", "--title", "Demo", "--note", "Proceed"]), "decided");
     d.write("afc.config.json", { language: "en", opsProject: false });
     const fallbackId = add();
+    const bytes = readFileSync(join(d.state, "decisions.json"), "utf8");
+    for (const action of ["add", "decided"]) {
+      const invalid = spawnSync(process.execPath, [roles, "decide", action, "--project", "", "--title", "Demo invalid", "--note", "Demo note", "--detail", "A: proceed; B: wait. Recommend: A"], { env: d.env, encoding: "utf8" });
+      assert.equal(invalid.status, 1);
+      assert.equal(readFileSync(join(d.state, "decisions.json"), "utf8"), bytes);
+    }
     const rows = JSON.parse(readFileSync(join(d.state, "decisions.json"), "utf8"));
     assert.deepEqual(rows.find((row: any) => row.id === original.id), original);
     for (const [id, project] of [[defaultId, "paseo-fleet"], [configuredId, "Demo operations"], [explicitId, "demo"], [decidedId, "Demo operations"], [fallbackId, "paseo-fleet"]]) {

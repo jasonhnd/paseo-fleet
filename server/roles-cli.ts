@@ -138,6 +138,7 @@ async function decide(action: string, id: string | undefined, v: Row) {
   if (action === "add" || action === "decided") {
     // Only new records use this default; existing records keep their stored project.
     v.project ??= readOpsProject(STATE);
+    required(v.project, action === "add" ? "cli.roles.addRequired" : "cli.roles.decidedRequired");
     required(v.title, action === "add" ? "cli.roles.addRequired" : "cli.roles.decidedRequired");
     if (action === "decided") required(v.note?.trim(), "cli.roles.decidedNoteRequired");
     if (action === "add" && !v["force-open"] && !validDetail(v.detail || "")) fail("cli.roles.detailNeedsOptions");
