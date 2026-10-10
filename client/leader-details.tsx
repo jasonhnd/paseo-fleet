@@ -40,15 +40,18 @@ export function LeaderDetails({ s, project, detail, data, paused = false, reply 
   const now = Date.parse(data.generatedAt) || Date.now();
   return <View style={{gap:12}}>
     <LeaderSection s={s} title={t("leader.ui.waitingOnYou")} summary={t("leader.ui.itemCount", { count: decisions.filter((row) => !closedIds.has(row.id)).length })}>
-      {decisions.length === 0 ? <Text style={s.muted}>{t("leader.ui.noOpenDecisions")}</Text> : decisions.map(d=><View key={d.id} style={[s.item,{gap:8,borderLeftWidth:d.blocking ? 3 : 0,borderLeftColor:s.p.red,paddingLeft:d.blocking ? 8 : 0}]}>
-        <Text style={d.blocking ? s.red : s.muted}>{d.blocking ? `${t("leader.ui.blockingWork")} · ` : ""}{d.id}</Text>
+      {decisions.length === 0 ? <Text style={s.muted}>{t("leader.ui.noOpenDecisions")}</Text> : decisions.map(d=>{
+        const closed = closedIds.has(d.id);
+        const blocking = d.blocking && !closed;
+        return <View key={d.id} style={[s.item,{gap:8,borderLeftWidth:blocking ? 3 : 0,borderLeftColor:blocking ? s.p.red : s.p.border,paddingLeft:blocking ? 8 : 0}]}>
+        <Text style={blocking ? s.red : s.muted}>{blocking ? `${t("leader.ui.blockingWork")} · ` : closed ? `${t("leader.ui.handled")} · ` : ""}{d.id}</Text>
         {d.owner ? <Text style={s.muted}>{t("leader.ui.owner", { owner: d.owner })}{d.forceOpen ? ` · ${t("leader.ui.forceOpen")}` : ""}</Text> : null}
         <Text style={[s.text,{fontWeight:"600"}]}>{d.title}</Text>
         {d.detail ? <Excerpt s={s} text={d.detail} lines={6} /> : null}
         <DecisionActions s={s} id={d.id} title={d.title} detail={d.detail} initialPanelClosed={closedIds.has(d.id)} onResult={(message) => {
           if (message.panelClosed || message.panelRestored) setHeld((prev) => new Map(prev).set(d.id, { row: d, closed: message.panelClosed === true }));
         }} />
-      </View>)}
+      </View>;})}
     </LeaderSection>
     {detail?.question ? <LeaderSection s={s} title={t("leader.ui.askedUnregistered")} summary={t("leader.ui.ago", { elapsed: elapsedLabel(detail.question.at,now) })}>
       <Text style={s.yellow}>{t("leader.ui.mayBeWaiting")}</Text>

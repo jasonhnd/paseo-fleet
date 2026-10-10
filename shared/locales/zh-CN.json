@@ -2072,5 +2072,7 @@
   "decisions.reply.restoredAlready": "本来就是开着的",
   "decisions.reply.restoredNotified": "已重新打开，并通知了 {title}",
   "decisions.reply.userDismissNote": "用户在面板上关闭",
-  "decisions.card.processed": "{count} 条已处理"
+  "decisions.card.processed": "{count} 条已处理",
+  "leader.ui.handled": "已处理",
+  "leader.attention.undoClose": "撤销关闭"
 }

@@ -30,9 +30,9 @@ test("mounted close and undo settle counts and blocking styles before and after 
   const tick = () => new Promise(resolve => setTimeout(resolve, 70));
   try {
     const outfile = join(dir, "entry.mjs");
-    await build({ stdin: { contents: `import {createRoot} from 'react-dom/client'; import {QueryClient, QueryClientProvider} from '@tanstack/react-query'; import {Decisions} from './client/decisions'; import {LeaderTab} from './client/home'; import {useStyles} from './client/ui'; import {setLanguage} from './shared/i18n';
+    await build({ stdin: { contents: `import {createRoot} from 'react-dom/client'; import {QueryClient, QueryClientProvider} from '@tanstack/react-query'; import {Decisions} from './client/decisions'; import {LeaderTab} from './client/home'; import {AttentionBlock} from './client/leader-attention'; import {LeaderDetails} from './client/leader-details'; import {useStyles} from './client/ui'; import {setLanguage} from './shared/i18n';
       export function mount(lang,which,initial){setLanguage(lang);const container=document.createElement('div');document.body.appendChild(container);const root=createRoot(container);const query=new QueryClient();
-      function Surface({data}){const s=useStyles({colors:{surface0:'#ffffff'}},{compact:false,platform:'web'});return which==='leader'?<LeaderTab s={s} data={data} openAgent={null}/>:<Decisions s={s} data={data} openAgent={null} showSettings={false}/>;}
+      function Surface({data}){const s=useStyles({colors:{surface0:'#ffffff'}},{compact:false,platform:'web'});return which==='attention'?<AttentionBlock s={s} data={data} nowMs={Date.parse(data.generatedAt)}/>:which==='details'?<LeaderDetails s={s} project="demo" data={data}/>:which==='leader'?<LeaderTab s={s} data={data} openAgent={null}/>:<Decisions s={s} data={data} openAgent={null} showSettings={false}/>;}
       const update=data=>root.render(<QueryClientProvider client={query}><Surface data={data}/></QueryClientProvider>);update(initial);return {container,update,unmount:()=>{root.unmount();query.clear();container.remove();}};}`,
       resolveDir: resolve(import.meta.dirname, "../.."), sourcefile: "entry.tsx", loader: "tsx" }, bundle: true, platform: "node", format: "esm", outfile, jsx: "automatic", logLevel: "error",
       define: { "process.env.NODE_ENV": '"production"', __DEV__: "false" }, alias: { "react-native": "react-native-web" },
@@ -63,7 +63,62 @@ test("mounted close and undo settle counts and blocking styles before and after 
         mounted = mount(lang, surface, snapshot([], [{ ...decision, letter: "A", doneAt: createdAt }])); await tick(); assert.ok(text().includes(label("home.unregistered"))); assert.ok(text().includes(decision.title)); mounted.unmount(); mounted = null;
       }
     }
-    assert.equal(calls.filter(choice => choice === "restore").length, 4);
+    // A registered project bypasses the unregistered Decisions list entirely.
+    const registered = (decisions = [decision]) => {
+      const data = snapshot(decisions);
+      return { ...data, supervisorPanel: { ...data.supervisorPanel, rows: [{ project: "demo", code: "DEMO", agentId: "demo-leader" }] } };
+    };
+    for (const lang of ["en", "zh-CN"] as const) for (const surface of ["attention", "details"]) {
+      const text = () => mounted.container.textContent as string;
+      const label = (key: Parameters<typeof tIn>[1]) => tIn(lang, key);
+      const clickLabel = async (name: string) => {
+        const button = [...mounted.container.querySelectorAll("[aria-label]")].find((node: any) => node.getAttribute("aria-label") === name) as any;
+        assert.ok(button, name); button.click(); await tick();
+      };
+      const blockingLabel = () => [...mounted.container.querySelectorAll("div,span")].find((node: any) => node.textContent.trim() === (surface === "attention" ? label("leader.ui.blockingWork") : `${label("leader.ui.blockingWork")} · ${decision.id}`)) as any;
+      const detailRow = () => {
+        const marker = `${label("leader.ui.handled")} · ${decision.id}`;
+        let node = [...mounted.container.querySelectorAll("div,span")].find((candidate: any) => candidate.textContent.trim() === marker)?.parentElement;
+        if (!node) node = blockingLabel()?.parentElement;
+        while (node && ![...node.children].some((child: any) => child.textContent === decision.title)) node = node.parentElement;
+        assert.ok(node, "Decision detail row"); return node;
+      };
+      const assertOpen = () => {
+        const count = surface === "attention" ? tIn(lang, "leader.attention.headingCount", { count: 1 }) : tIn(lang, "leader.ui.itemCount", { count: 1 });
+        assert.ok(text().includes(count), text());
+        const blocked = blockingLabel(); assert.ok(blocked, text());
+        assert.equal(dom.window.getComputedStyle(blocked).color, rgb(LIGHT.red));
+        if (surface === "details") assert.equal(dom.window.getComputedStyle(detailRow()).borderLeftWidth, "3px");
+      };
+      const assertClosed = () => {
+        const count = surface === "attention" ? tIn(lang, "leader.attention.headingCount", { count: 0 }) : tIn(lang, "leader.ui.itemCount", { count: 0 });
+        assert.ok(text().includes(count), text());
+        assert.ok(!blockingLabel(), text());
+        const handled = [...mounted.container.querySelectorAll("div,span")].find((node: any) => node.textContent.trim() === (surface === "attention" ? label("leader.ui.handled") : `${label("leader.ui.handled")} · ${decision.id}`));
+        assert.ok(handled, text());
+        assert.notEqual(dom.window.getComputedStyle(handled).color, rgb(LIGHT.red));
+        if (surface === "details") assert.equal(dom.window.getComputedStyle(detailRow()).borderLeftWidth, "0px");
+      };
+      mounted = mount(lang, surface, registered()); await tick(); assertOpen();
+      if (surface === "attention") await clickLabel(`${label("leader.attention.decide")} DEMO`);
+      await clickLabel(label("decisions.actions.dismiss")); await clickLabel(label("decisions.actions.dismissYesLabel")); assertClosed();
+      mounted.update(registered([])); await tick(); assertClosed();
+      if (surface === "attention") {
+        await clickLabel(`${label("leader.ui.collapse")} DEMO`); assertClosed();
+        const collapsed = mounted.container.querySelector(`[aria-label="${label("decisions.actions.dismissUndoLabel")}"]`);
+        assert.equal(collapsed, null);
+        // The collapsed action opens the undo control instead of inviting another choice.
+        await clickLabel(`${label("leader.attention.undoClose")} DEMO`); assertClosed();
+      }
+      await clickLabel(label("decisions.actions.dismissUndoLabel")); assertOpen();
+      mounted.update(registered()); await tick(); assertOpen();
+      if (surface === "attention") {
+        await clickLabel(`${label("leader.ui.collapse")} DEMO`);
+        assert.ok(mounted.container.querySelector(`[aria-label="${label("leader.attention.decide")} DEMO"]`));
+      }
+      mounted.unmount(); mounted = null;
+    }
+    assert.equal(calls.filter(choice => choice === "restore").length, 8);
   } finally {
     mounted?.unmount(); dom.window.close(); delete g.__decisionRpc;
     await rm(dir, { recursive: true, force: true });
