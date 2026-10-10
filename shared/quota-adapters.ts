@@ -5,8 +5,11 @@
 //   codex-cli   Codex's weekly window via Paseo; coupons and credits via `codex app-server`
 //   grok-cli    Grok's weekly window via Paseo, the `grok` /usage screen, or a hand copy
 //   cursor-api  Cursor's official usage API, the cursor-agent screen, or a hand copy (optional, off by default)
+//   antigravity-cli  local `agy /usage` table for display (optional, off by default). Not the Paseo ACP pool
+//                    unless both channels report the same version, tier and quota source. The reader does not.
 //   manual      a percent copied by hand from the vendor's dashboard
-// Copilot, Gemini, and Antigravity stay on `manual`: no percent can be read without a login.
+// Copilot and a direct Gemini provider stay on `manual`: no percent can be read without a login.
+// `usageProvider` "gemini" does not select `antigravity-cli`.
 // Pi and Oh My Pi spend a Claude or Codex quota and do not get a pool of their own.
 // Any other built-in that only fronts those accounts is the same: no separate pool.
 // A plan without `adapter` (files written before this field existed) gets the adapter whose provider matches
@@ -24,8 +27,16 @@ export const GROK_CLI = "grok-cli";
 export const CURSOR_API = "cursor-api";
 export const MUSE_MSP = "muse-msp";
 export const OPENCODE_GO_API = "opencode-go-api";
+export const ANTIGRAVITY_CLI = "antigravity-cli";
 export const MANUAL = "manual";
-export const ADAPTER_IDS = [CLAUDE_CLI, CODEX_CLI, GROK_CLI, CURSOR_API, MUSE_MSP, OPENCODE_GO_API, MANUAL] as const;
+export const ADAPTER_IDS = [CLAUDE_CLI, CODEX_CLI, GROK_CLI, CURSOR_API, MUSE_MSP, OPENCODE_GO_API, ANTIGRAVITY_CLI, MANUAL] as const;
+/** Display bucket inside one Antigravity plan. Missing: no CLI rows, ACP dispatch stays unknown. */
+export const ANTIGRAVITY_BUCKETS = ["gemini", "claude-gpt"] as const;
+export type AntigravityBucket = (typeof ANTIGRAVITY_BUCKETS)[number];
+/** Primary window. Its percent is the ACP pool, never a CLI row that has not been proven to be that pool. */
+export const ANTIGRAVITY_ACP_WINDOW = "acp-dispatch";
+export const ANTIGRAVITY_WEEK_WINDOW = "cli-week";
+export const ANTIGRAVITY_FIVE_HOUR_WINDOW = "cli-five-hour";
 export type AdapterId = (typeof ADAPTER_IDS)[number];
 
 /** Adapter metadata for company labels and opt-in policies; none of these providers is excluded by default. */
@@ -37,10 +48,10 @@ export const PROVIDER_COMPANIES: Readonly<Record<string, string>> = {
 /** macOS keychain presence probe. Not a quota source, but optional in the same way. */
 export const KEYCHAIN = "keychain";
 /** Adapters that stay off unless switched on (server/adapters/config.ts). */
-export const OPTIONAL_ADAPTERS = [CURSOR_API, KEYCHAIN] as const;
+export const OPTIONAL_ADAPTERS = [CURSOR_API, KEYCHAIN, ANTIGRAVITY_CLI] as const;
 export type OptionalAdapter = (typeof OPTIONAL_ADAPTERS)[number];
 export type AdapterSwitches = Record<OptionalAdapter, boolean>;
-export const ADAPTERS_OFF: AdapterSwitches = { [CURSOR_API]: false, [KEYCHAIN]: false };
+export const ADAPTERS_OFF: AdapterSwitches = { [CURSOR_API]: false, [KEYCHAIN]: false, [ANTIGRAVITY_CLI]: false };
 
 type ProviderOf<T extends string> = T extends `${infer P}-${infer Rest}`
   ? Rest extends `${string}-${string}` ? `${P}-${ProviderOf<Rest>}` : P
@@ -256,6 +267,27 @@ function buildSpecs(): Record<AdapterId, AdapterSpec> {
     },
     [MUSE_MSP]: providerWeekSpec(t("quota.adapters.muse"), 4, /^(?:\d+(?:\.\d+)?-(?:hour|minute|day)|Current window)$/i),
     [OPENCODE_GO_API]: providerWeekSpec(t("quota.adapters.opencodeGo"), 5, null),
+    [ANTIGRAVITY_CLI]: {
+      optional: true,
+      readsProvider: false,
+      period: "window",
+      neverPrefer: true,
+      leaderPool: false,
+      session: null,
+      keepsLabels: true,
+      unread: null,
+      judgedWhenOff: true,
+      firstWindowFallback: false,
+      subWindows: [],
+      handCopy: null,
+      companyKey: null,
+      couponShiftsReset: false,
+      judgeRank: 6,
+      cardRank: 6,
+      names: { line: "Antigravity", label: "Antigravity", short: "Antigravity", via: t("quota.adapters.via", { name: "Antigravity" }) },
+      cardName: null,
+      couponName: null,
+    },
     [MANUAL]: {
       optional: false,
       readsProvider: false,
@@ -276,8 +308,8 @@ function buildSpecs(): Record<AdapterId, AdapterSpec> {
       },
       companyKey: null,
       couponShiftsReset: false,
-      judgeRank: 6,
-      cardRank: 6,
+      judgeRank: 7,
+      cardRank: 7,
       names: {},
       cardName: null,
       couponName: null,

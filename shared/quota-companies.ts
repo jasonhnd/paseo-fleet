@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { t, tAll } from "./i18n";
-import { CLAUDE_CLI, CODEX_CLI, type CompanyEntry, CURSOR_API, cardOrder, GROK_CLI, isWeeklyWindow, MUSE_MSP, OPENCODE_GO_API, MANUAL, sessionWindowOf, type QuotaWindowIdentity } from "./quota-adapters";
+import { ANTIGRAVITY_ACP_WINDOW, ANTIGRAVITY_CLI, ANTIGRAVITY_FIVE_HOUR_WINDOW, ANTIGRAVITY_WEEK_WINDOW, CLAUDE_CLI, CODEX_CLI, type CompanyEntry, CURSOR_API, cardOrder, GROK_CLI, isWeeklyWindow, MUSE_MSP, OPENCODE_GO_API, MANUAL, sessionWindowOf, type QuotaWindowIdentity } from "./quota-adapters";
 import { reasonSaysNoDispatch, reasonWaitsForWindow } from "./quota-reason";
 
 const CLAUDE_STOP_PCT = 75;
@@ -95,6 +95,8 @@ export interface CompanyProviderWindow extends QuotaWindowIdentity {
   resetsAt: string | null;
   source: "provider" | "manual" | "screen" | "none";
   readAt: string | null;
+  readError?: string | null;
+  readingState?: "live" | "manual" | "stale" | "unknown";
 }
 
 export interface CompanyCursorWindow {
@@ -265,6 +267,8 @@ function windowBase(input: {
   /** Claude's main week during an unused double week. */
   stopPctOverride?: number;
   amountText?: string | null;
+  /** Replaces the generic source sentence. Used to label the agy table and the unproven ACP row. */
+  sourceTextOverride?: string;
 }): CompanyWindow {
   const unread = input.sourceKind === "unread" || input.sourceKind === "off";
   const stale = input.sourceKind === "stale";
@@ -276,7 +280,7 @@ function windowBase(input: {
     resetsAt: input.resetsAt,
     source: input.source,
     readAt: input.readAt,
-    sourceText: sourceText(input.sourceKind, input.readAt),
+    sourceText: input.sourceTextOverride ?? sourceText(input.sourceKind, input.readAt),
     who: input.who,
     dispatchText: dispatchText(input.pool, input.mode),
     pacePct: input.showPace ? input.pool?.pacePct ?? null : null,
@@ -592,9 +596,65 @@ function codexCard(company: CompanyEntry, input: BuildCompaniesInput): CompanyCa
   };
 }
 
+function antigravityCard(company: CompanyEntry, input: BuildCompaniesInput): CompanyCard {
+  const rows = input.windows.filter((row) => row.planId === company.planId);
+  const acp = rows.find((row) => row.id === ANTIGRAVITY_ACP_WINDOW);
+  const pool = input.pools[company.planId];
+  const cliRow = (row: CompanyProviderWindow | undefined, id: string, name: string) => windowBase({
+    id: `${company.key}-${id}`,
+    name,
+    usedPct: row?.usedPct ?? null,
+    resetsAt: row?.resetsAt ?? null,
+    source: "screen",
+    readAt: row?.readAt ?? null,
+    sourceKind: "screen",
+    sourceTextOverride: t("quota.antigravity.cliSource"),
+    who: "",
+    pool,
+    mode: "off",
+    showPace: false,
+  });
+  const week = rows.find((row) => row.id === ANTIGRAVITY_WEEK_WINDOW);
+  const five = rows.find((row) => row.id === ANTIGRAVITY_FIVE_HOUR_WINDOW);
+  const proven = acp?.source === "provider" && acp.usedPct !== null;
+  const acpWindow = windowBase({
+    id: `${company.key}-${ANTIGRAVITY_ACP_WINDOW}`,
+    name: t("quota.antigravity.acp"),
+    usedPct: acp?.usedPct ?? null,
+    resetsAt: acp?.resetsAt ?? null,
+    source: proven ? "provider" : "none",
+    readAt: acp?.readAt ?? null,
+    sourceKind: "auto",
+    ...(proven ? {} : { sourceTextOverride: acp?.readError || t("quota.antigravity.acpUnknown") }),
+    who: "",
+    pool,
+    mode: "pool",
+    showPace: false,
+  });
+  const windows = [
+    acpWindow,
+    ...(week ? [cliRow(week, ANTIGRAVITY_WEEK_WINDOW, week.label)] : []),
+    ...(five ? [cliRow(five, ANTIGRAVITY_FIVE_HOUR_WINDOW, five.label)] : []),
+  ];
+  const remaining = remainingOf(acp?.usedPct ?? null);
+  return {
+    id: company.key,
+    adapter: company.adapter,
+    name: company.cardName,
+    remainingPct: remaining,
+    headline: headline(remaining, acp?.readingState === "stale"),
+    stale: acp?.readingState === "stale",
+    notice: proven ? null : acp?.readError ?? t("quota.antigravity.acpUnknown"),
+    windows,
+    couponLine: input.coupons?.[company.key]?.line,
+    couponPlan: null,
+  };
+}
+
 const CARD_BUILDERS: Record<string, (company: CompanyEntry, input: BuildCompaniesInput) => CompanyCard> = {
   [CLAUDE_CLI]: claudeCard,
   [CURSOR_API]: cursorCard,
+  [ANTIGRAVITY_CLI]: antigravityCard,
   [GROK_CLI]: singleWindowCard,
   [CODEX_CLI]: codexCard,
   [MUSE_MSP]: singleWindowCard,

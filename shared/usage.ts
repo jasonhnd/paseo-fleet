@@ -90,7 +90,7 @@ const cursorReadSchema = z.object({
 const planSchema = z.object({
   id: z.string(),
   name: z.string(),
-  /** Quota source adapter in force (shared/quota-adapters.ts): claude-cli, codex-cli, grok-cli, cursor-api or manual. */
+  /** Quota source adapter in force (shared/quota-adapters.ts): claude-cli, codex-cli, grok-cli, cursor-api, antigravity-cli or manual. */
   adapter: z.string().optional(),
   /** Billing day of a monthly plan (plans.json `cycleDay`), so the panel's pool catalog has the same periods. */
   cycleDay: z.number().optional(),

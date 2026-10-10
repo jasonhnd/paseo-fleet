@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { DEFAULT_LEADER_THRESHOLDS } from "../shared/leader-usage";
 import { configReadRpc, configWriteRpc, type SettingsFile, type SettingsSnapshot } from "../shared/settings";
-import { ADAPTER_IDS, OPTIONAL_ADAPTERS, providerOf } from "../shared/quota-adapters";
+import { ADAPTER_IDS, ANTIGRAVITY_CLI, CURSOR_API, KEYCHAIN, OPTIONAL_ADAPTERS, providerOf } from "../shared/quota-adapters";
 import { CYCLE_KINDS } from "../shared/quota-cycle";
 import { LANGUAGE_SETTINGS, language, t, type MessageKey } from "../shared/i18n";
 import { adoptSettingsLanguage } from "./settings-language";
@@ -100,7 +100,10 @@ export function SettingsEditor({ s, file, read, write, onLanguage }: { s: Styles
       <Field s={s} label={t("settings.provider")} value={provider} onChange={setProvider} />
       <Action s={s} label={t("settings.addProvider")} disabled={!provider.trim() || bannedProviders.includes(provider.trim())} onPress={() => { patch("bannedProviders", [...bannedProviders, provider.trim()]); setProvider(""); }} />
       <Text style={s.muted}>{t("settings.adapters")}</Text>
-      {OPTIONAL_ADAPTERS.map(id => <Toggle key={id} s={s} label={t(id === "cursor-api" ? "settings.cursor" : "settings.keychain")} value={typeof object(draft.adapters)[id] === "boolean" ? object(draft.adapters)[id] === true : snapshot.effectiveAdapters?.[id] ?? false} onChange={value => patch("adapters", { ...object(draft.adapters), [id]: value })} />)}
+      {OPTIONAL_ADAPTERS.map(id => <View key={id}>
+        <Toggle s={s} label={t(id === CURSOR_API ? "settings.cursor" : id === KEYCHAIN ? "settings.keychain" : "settings.antigravity")} value={typeof object(draft.adapters)[id] === "boolean" ? object(draft.adapters)[id] === true : snapshot.effectiveAdapters?.[id] ?? false} onChange={value => patch("adapters", { ...object(draft.adapters), [id]: value })} />
+        {id === ANTIGRAVITY_CLI ? <Text style={s.muted}>{t("settings.antigravityHint")}</Text> : null}
+      </View>)}
       <Text style={s.muted}>{t("settings.reloadHint")}</Text>
       <DispatchSettings s={s} rows={snapshot.dispatchRows ?? []} value={draft.dispatchOverrides} onChange={value => patch("dispatchOverrides", value)} />
     </> : <>
@@ -108,7 +111,7 @@ export function SettingsEditor({ s, file, read, write, onLanguage }: { s: Styles
       {plans.map((row, index) => <View key={index} style={{ gap: 8, paddingVertical: 12, borderBottomWidth: 1, borderColor: s.p.border }}>
         <View style={[s.row, { flexWrap: "wrap" }]}>{(["id", "name", "providers", "priceUsdMonthly", "stopPct", "cycleDay"] as const).map(key => <Field key={key} s={s} label={t(`settings.plan.${key}`)} value={key === "providers" ? list(row[key]) : String(row[key] ?? "")} onChange={value => planPatch(index, key, key === "providers" ? terms(value) : ["priceUsdMonthly", "stopPct", "cycleDay"].includes(key) ? value === "" ? undefined : Number(value) : value)} />)}</View>
         <Text style={s.muted}>{t("settings.plan.adapter")}</Text>
-        <View style={[s.row, { flexWrap: "wrap" }]}>{ADAPTER_IDS.map(id => <Action key={id} s={s} label={t("settings.adapterId", { id })} disabled={row.adapter === id} onPress={() => planUpdate(index, { adapter: id, ...(id !== "manual" && !row.usageProvider ? { usageProvider: providerOf(id) } : {}) })} />)}</View>
+        <View style={[s.row, { flexWrap: "wrap" }]}>{ADAPTER_IDS.map(id => <Action key={id} s={s} label={t("settings.adapterId", { id })} disabled={row.adapter === id} onPress={() => planUpdate(index, id === ANTIGRAVITY_CLI ? { adapter: id, usageProvider: "antigravity", providers: ["antigravity"], dispatch: false, quotaProtection: "pause" } : { adapter: id, ...(id !== "manual" && !row.usageProvider ? { usageProvider: providerOf(id) } : {}) })} />)}</View>
         <Field s={s} label={t("settings.plan.usageProvider")} value={String(row.usageProvider ?? "")} onChange={value => planPatch(index, "usageProvider", value)} />
         <Text style={s.muted}>{t("settings.plan.bindingHint")}</Text>
         <QuotaFields s={s} row={row} update={changes => planUpdate(index, changes)} />
@@ -134,6 +137,11 @@ function QuotaFields({ s, row, update }: { s: Styles; row: Record<string, unknow
   const reading = object(row.manualOverride === undefined ? row.manual : row.manualOverride);
   const setReading = (key: string, value: unknown) => update({ manualOverride: { source: "manual", ttlSeconds: 86400, at: new Date().toISOString(), ...reading, [key]: value } });
   return <>
+    {row.adapter === ANTIGRAVITY_CLI ? <>
+      <Text style={s.muted}>{t("settings.antigravityBucket")}</Text>
+      <View style={[s.row, { flexWrap: "wrap" }]}>{(["gemini", "claude-gpt"] as const).map(bucket => <Action key={bucket} s={s} label={t(bucket === "gemini" ? "settings.bucket.gemini" : "settings.bucket.claudeGpt")} disabled={row.antigravityBucket === bucket} onPress={() => update({ antigravityBucket: bucket, providers: ["antigravity"], usageProvider: "antigravity", dispatch: false, quotaProtection: "pause" })} />)}</View>
+      <Text style={s.muted}>{t("settings.antigravityHint")}</Text>
+    </> : null}
     <Text style={s.h2}>{t("settings.cycle")}</Text>
     {!cycle.kind ? <Text style={s.muted}>{t("settings.cycle.legacy")}</Text> : null}
     <View style={[s.row, { flexWrap: "wrap" }]}>{CYCLE_KINDS.map(kind => <Action key={kind} s={s} label={t(`settings.cycle.${kind}`)} disabled={cycle.kind === kind} onPress={() => update({ quotaCycle: kind === "unknown" ? { kind } : kind === "duration" ? { kind, seconds: 18000, startsAt: new Date().toISOString() } : { kind, timeZone: typeof cycle.timeZone === "string" ? cycle.timeZone : "UTC", hour: 0, minute: 0, ...(kind === "month" ? { day: 1 } : kind === "week" ? { weekday: 0 } : {}) } })} />)}</View>

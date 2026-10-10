@@ -1,9 +1,10 @@
 /// <reference types="node" />
 import { bannedProviderTerms } from "../../shared/provider-policy";
 // Optional adapter switches, from `afc.config.json` in the data directory:
-//   { "adapters": { "cursor-api": true, "keychain": true } }
+//   { "adapters": { "cursor-api": true, "keychain": true, "antigravity-cli": false } }
 // cursor-api: Cursor's official usage API, the cursor-agent screen and the Cursor login watch.
 // keychain:   the once-a-minute macOS keychain presence probe.
+// antigravity-cli: local agy /usage display. No state file counts as in-use; only a literal true starts it.
 // A switch that is not set is off, with one exception for installs that predate the switches: an adapter whose
 // state file is already in the data directory (it was running before) stays on until the switch is written.
 // Only a literal true or false counts. A file that cannot be read is treated as missing.
@@ -12,7 +13,7 @@ import { join } from "node:path";
 import { leaderThresholds, type LeaderThresholds } from "../../shared/leader-usage";
 import { hiddenPlanTerms } from "../../shared/hidden-plans";
 import { opsProject } from "../../shared/ops-project";
-import { ADAPTERS_OFF, type AdapterSwitches, CURSOR_API, KEYCHAIN, OPTIONAL_ADAPTERS, type OptionalAdapter } from "../../shared/quota-adapters";
+import { ADAPTERS_OFF, ANTIGRAVITY_CLI, type AdapterSwitches, CURSOR_API, KEYCHAIN, OPTIONAL_ADAPTERS, type OptionalAdapter } from "../../shared/quota-adapters";
 import { STATE_DIR } from "../util";
 
 export const AFC_CONFIG_FILE = "afc.config.json";
@@ -21,6 +22,8 @@ export const AFC_CONFIG_FILE = "afc.config.json";
 export const IN_USE_MARKERS: Record<OptionalAdapter, readonly string[]> = {
   [CURSOR_API]: ["cursor-usage.json", "cursor-login-state.json"],
   [KEYCHAIN]: ["keychain-probe-state.json"],
+  // Empty on purpose. A cache or usage file must not turn the reader on the way Cursor's old state files do.
+  [ANTIGRAVITY_CLI]: [],
 };
 
 /** Pure: explicit switches win; an unset one follows `inUse`. */

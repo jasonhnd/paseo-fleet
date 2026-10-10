@@ -8,11 +8,12 @@
 //                                      provider dollar balance stays on the monthly window as display only.
 // A plan with no window at all gets one "quota not public" row so its spend still shows.
 // Pure apart from the clock: callers pass the readings in.
-import { adapterSpec, CURSOR_API, mainWindowOf, MUSE_MSP, OPENCODE_GO_API, type AdapterId } from "../../shared/quota-adapters";
+import { adapterSpec, ANTIGRAVITY_CLI, CURSOR_API, mainWindowOf, MUSE_MSP, OPENCODE_GO_API, type AdapterId, type AntigravityBucket } from "../../shared/quota-adapters";
 import type { UsageWindow } from "../../shared/usage";
 import { t } from "../../shared/i18n";
 import type { Json } from "../util";
 import type { CursorUsageReading } from "../cursor-usage";
+import { antigravityPlanWindows, type AntigravityReading } from "../quota/antigravity-usage";
 import { oneMonthBefore } from "../pools-pace";
 import { cursorLivePct } from "../usage-view";
 import { cycleBounds, manualState, validPercent, type ManualReading, type QuotaCycle } from "../../shared/quota-cycle";
@@ -36,6 +37,8 @@ export interface WindowPlan {
   manual?: { usedPct: number; at: string } | null;
   manualOverride?: ManualReading | null;
   quotaCycle?: QuotaCycle;
+  /** gemini or claude-gpt. Missing: the ACP row stays unknown and no CLI rows are shown. */
+  antigravityBucket?: AntigravityBucket | null;
 }
 
 /** One token row of the usage scan: the hour it fell in, who spent it, and its value at API prices. */
@@ -50,6 +53,8 @@ export interface WindowContext<R extends UsdRow = UsdRow> {
   balances: Map<string, Json[]>;
   /** Cursor's last reading; null when the cursor-api adapter is off or nothing was read. */
   cursorReading: CursorUsageReading | null;
+  /** agy /usage table. Null when antigravity-cli is off. Never a substitute for a proven ACP observation. */
+  antigravityReading?: AntigravityReading | null;
   sumUsd: (pred: (r: R) => boolean) => number;
   quotaError?: string | null;
   now?: number;
@@ -240,6 +245,16 @@ function hiddenWindowOf(cfg: WindowPlan, ctx: WindowContext): UsageWindow {
 
 /** Every window of one plan under its adapter, in display order. */
 export function windowsFor(cfg: WindowPlan, adapter: AdapterId, ctx: WindowContext): UsageWindow[] {
+  // Before the hand-copy fallback: a stored usedPct must not become the ACP percent.
+  if (adapter === ANTIGRAVITY_CLI) {
+    const now = ctx.now ?? Date.now();
+    return antigravityPlanWindows(
+      { id: cfg.id, antigravityBucket: cfg.antigravityBucket ?? null, priceUsdMonthly: cfg.priceUsdMonthly },
+      ctx.antigravityReading ?? null,
+      now,
+      ctx.sumUsd((row) => cfg.providers.includes(row.provider)),
+    );
+  }
   const provider = adapterSpec(adapter).readsProvider ? providerWindowsOf(cfg, adapter, ctx) : [];
   if (cfg.quotaCycle || cfg.manualOverride !== undefined) return configuredWindows(cfg, adapter, ctx, provider);
   const windows = [...provider, ...(cfg.cycleDay ? [monthlyWindowOf(cfg, adapter, ctx)] : [])];

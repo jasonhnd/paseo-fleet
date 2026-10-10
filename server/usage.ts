@@ -8,6 +8,7 @@ import { activeDispatchPriority, type DispatchPriority, poolStatusPriority, reso
 import {
   type AdapterSwitches,
   adapterOf,
+  ANTIGRAVITY_CLI,
   CLAUDE_CLI,
   CODEX_CLI,
   CURSOR_API,
@@ -26,6 +27,7 @@ import { publishDispatch } from "./dispatch";
 import { deliverEarlyResetNotices, readEarlyResetLines } from "./early-reset";
 import { ledgerBuckets } from "./ledger";
 import { readCursorUsageFile, type CursorUsageReading } from "./cursor-usage";
+import { readAntigravityUsage, unavailableAntigravityReading, type AntigravityReading } from "./quota/antigravity-usage";
 import { settleSuperGrokChoice, type SuperGrokChoice } from "./grok-usage";
 import { configuredStopPct, type CursorReadMeta, MANUAL_STOP, oneMonthBefore, poolStatus, type PoolStatus, type SuperGrokReadMeta, writePoolStatus } from "./pools";
 import { textHidden } from "../shared/hidden-plans";
@@ -57,7 +59,7 @@ interface PlanConfig {
   id: string;
   name: string;
   /**
-   * Where the quota percent comes from: claude-cli, codex-cli, grok-cli, cursor-api or manual.
+   * Where the quota percent comes from: claude-cli, codex-cli, grok-cli, cursor-api, antigravity-cli or manual.
    * Missing: inferred from `usageProvider` / `providers` (shared/quota-adapters.ts baseAdapterOf).
    */
   adapter?: string;
@@ -90,6 +92,8 @@ interface PlanConfig {
   quotaCycle?: QuotaCycle;
   manualOverride?: ManualReading | null;
   quotaProtection?: "pause" | "none";
+  /** Display bucket for antigravity-cli. Does not make the agy table the ACP pool. */
+  antigravityBucket?: "gemini" | "claude-gpt";
   /**
    * grok-cli only. Missing means on. False skips the grok `/usage show` screen.
    * A live Paseo window still wins either way.
@@ -265,6 +269,7 @@ interface PlanContext {
   windowsBy: Map<string, Json[]>;
   balances: Map<string, Json[]>;
   cursorReading: CursorUsageReading | null;
+  antigravityReading: AntigravityReading | null;
   sumUsd: (pred: (r: Row) => boolean) => number;
   switches: AdapterSwitches;
   quotaError?: string | null;
@@ -387,13 +392,16 @@ export async function assemble(paseo: PaseoApi, period: Period, options?: { capt
   const plansFile = await readPlans();
   const planConfigs = usablePlans(plansFile.plans).filter((p) => !providerBanned(p, banned));
   const auto = planConfigs.some(p => adapterSpec(adapterOf(p, switches)).readsProvider);
-  const [{ rows: all, scannedAt, estimated }, usage, records, profiles, cursorReading] = await Promise.all([
+  const wantAntigravity = switches[ANTIGRAVITY_CLI] === true && planConfigs.some(p => adapterOf(p, switches) === ANTIGRAVITY_CLI);
+  const [{ rows: all, scannedAt, estimated }, usage, records, profiles, cursorReading, antigravityReading] = await Promise.all([
     allRows(),
     auto ? providerUsage(paseo) : Promise.resolve({ windows: new Map<string, Json[]>(), balances: new Map<string, Json[]>(), error: null }),
     readAgentRecords(),
     readRoleProfiles(),
     // cursor-api off: no Cursor reading at all; its plans fall back to the hand copy.
     switches[CURSOR_API] && planConfigs.some(p => adapterOf(p, switches) === CURSOR_API) ? readCursorUsageFile() : Promise.resolve(null),
+    // Off, or no plan on this adapter: do not spawn agy. A failed read stays an unknown ACP hold.
+    wantAntigravity ? readAntigravityUsage().catch(() => unavailableAntigravityReading()) : Promise.resolve(null),
   ]);
   const warnings: string[] = [];
   if (usage.error) warnings.push(t("usage.warn.quotaUnread", { error: usage.error }));
@@ -408,6 +416,7 @@ export async function assemble(paseo: PaseoApi, period: Period, options?: { capt
     windowsBy: usage.windows,
     balances: usage.balances,
     cursorReading,
+    antigravityReading,
     sumUsd: (pred) => rows.reduce((s, r) => (pred(r) ? s + usd(r) : s), 0),
     switches,
     quotaError: usage.error,

@@ -19,6 +19,8 @@ test("first run creates examples and never replaces existing files", async () =>
   const config = await readSettings("config", dir);
   assert.equal(config.document.language, "system");
   assert.equal((config.document.adapters as Record<string, boolean>)["cursor-api"], false);
+  assert.equal((config.document.adapters as Record<string, boolean>)["antigravity-cli"], false);
+  assert.equal(config.effectiveAdapters?.["antigravity-cli"], false);
   await writeFile(join(dir, "plans.json"), "invalid demo configuration");
   initializeSettings(dir, fileURLToPath(new URL("../../examples/", import.meta.url)));
   assert.equal(await readFile(join(dir, "plans.json"), "utf8"), "invalid demo configuration");
