@@ -749,7 +749,7 @@ export async function requestSupervisorShift(
       at: new Date().toISOString(),
       project: slot.code,
       oldId,
-      newId: existingNewId,
+      newId: latest.newId,
       contextTokens: null,
       result: failed.detail,
     }).catch(() => undefined);

@@ -2020,6 +2020,7 @@
   "settings.leaderUsageHint": "按 token 数填写：超过第一项提醒，超过第二项显示红色警告。警告值必须大于提醒值。",
   "settings.leaderUsage.reminderTokens": "提醒阈值（token）",
   "settings.leaderUsage.warningTokens": "警告阈值（token）",
+  "settings.leaderUsage.invalidOrder": "警告值必须大于提醒值。",
   "leader.usage.thresholds": "上下文：超过 {reminder} 提醒，超过 {warning} 红色警告。",
   "leader.usage.reminder": "上下文用量提醒：建议换 <leader>。",
   "leader.usage.warning": "上下文用量警告：请尽快换 <leader>。",

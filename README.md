@@ -137,7 +137,9 @@ afc leader cancel demo                  # clear stopped tracking; keep both sess
 
 The plugin must be running on the selected local daemon. Commands use
 `$PASEO_HOME/config.json`'s daemon listen address; `--host 127.0.0.1:PORT`
-selects a different local TCP endpoint. No login credentials are read. A protected
+selects a different local TCP endpoint. IPv6 loopback requires brackets, for example
+`--host '[::1]:PORT'`; the daemon listen address must use the same bracketed form.
+No login credentials are read. A protected
 endpoint can reject the handshake; the command reports the rejection.
 
 Settings stores `leaderUsage.reminderTokens` and `leaderUsage.warningTokens` in

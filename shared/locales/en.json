@@ -2020,6 +2020,7 @@
   "settings.leaderUsageHint": "Token counts: reminder above the first threshold; red warning above the second. Warning must exceed reminder.",
   "settings.leaderUsage.reminderTokens": "Reminder threshold (tokens)",
   "settings.leaderUsage.warningTokens": "Warning threshold (tokens)",
+  "settings.leaderUsage.invalidOrder": "Warning must exceed reminder.",
   "leader.usage.thresholds": "Context: reminder above {reminder}; red warning above {warning}.",
   "leader.usage.reminder": "Context reminder: consider a leader swap.",
   "leader.usage.warning": "Context warning: swap the leader soon.",

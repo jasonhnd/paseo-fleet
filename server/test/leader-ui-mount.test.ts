@@ -54,12 +54,18 @@ test("mounted settings save thresholds with revisions and homepage renders the c
     assert.ok(mounted.container.textContent.includes(t("settings.saved")));
     await fill("warningTokens", "50"); await save();
     assert.ok(mounted.container.querySelector('[role="alert"]'));
+    assert.ok(mounted.container.textContent.includes(t("settings.leaderUsage.invalidOrder")));
     assert.deepEqual(readLeaderThresholds(dir), { reminderTokens: 100, warningTokens: 200 });
     const config = await readSettings("config", dir);
     await writeSettings({ file: "config", revision: config.revision, document: { ...config.document, language: "zh-CN" } }, dir);
     setLanguage("en");
     await fill("warningTokens", "250"); await save();
     assert.ok(mounted.container.textContent.includes(t("settings.conflict")));
+    mounted.unmount();
+    setLanguage("zh-CN"); mounted = mount("zh-CN"); await tick();
+    await fill("warningTokens", "50"); await save();
+    assert.ok(mounted.container.querySelector('[role="alert"]').textContent.includes(t("settings.leaderUsage.invalidOrder")));
+    assert.deepEqual(readLeaderThresholds(dir), { reminderTokens: 100, warningTokens: 200 });
     for (const lang of ["en", "zh-CN"] as const) {
       setLanguage(lang);
       const thresholds = readLeaderThresholds(dir);

@@ -2,10 +2,6 @@
 import type { LeaderThresholds } from "./leader-usage";
 import { t, tAll, type MessageKey } from "./i18n";
 
-/** At or below this, the row is green. Above it, yellow. */
-export const YELLOW_OVER = 500_000;
-/** Above this, the row is red. The boundary itself stays yellow. */
-export const RED_OVER = 750_000;
 export const HANDOVER_TIMEOUT_MS = 15 * 60 * 1000;
 export const TAKEOVER_TIMEOUT_MS = 15 * 60 * 1000;
 export const TAKEOVER_POLL_MS = 2_000;

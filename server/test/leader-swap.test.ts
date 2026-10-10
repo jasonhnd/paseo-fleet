@@ -104,7 +104,7 @@ for (const stage of ["handover", "open", "detach", "wait", "archive"]) test(`RPC
   assert.equal(f.keys.size, 1);
 });
 
-for (const unavailable of ["session", "workspace-missing", "workspace-empty", "old-workspace-missing"]) test(`RPC preserves the new session across reloads while ${unavailable} is unreadable`, async () => {
+for (const unavailable of ["session", "workspace-missing", "workspace-null", "workspace-empty", "old-workspace-missing"]) test(`RPC preserves the new session across reloads while ${unavailable} is unreadable`, async () => {
   const f = fixture(); f.fail("wait");
   await leaderSwap({} as never, input(), f.ports); await settled();
   f.fail("");
@@ -114,7 +114,12 @@ for (const unavailable of ["session", "workspace-missing", "workspace-empty", "o
   f.ports.getAgent = async id => {
     const agent = await getAgent(id);
     if (id === newId && unavailable === "session") return null;
-    if (id === newId && unavailable === "workspace-missing") return { ...fresh, workspaceId: null };
+    if (id === newId && unavailable === "workspace-missing") {
+      const snapshot = { ...fresh };
+      Reflect.deleteProperty(snapshot, "workspaceId");
+      return snapshot;
+    }
+    if (id === newId && unavailable === "workspace-null") return { ...fresh, workspaceId: null };
     if (id === newId && unavailable === "workspace-empty") return { ...fresh, workspaceId: "" };
     if (id === "old" && unavailable === "old-workspace-missing") return { ...f.old, workspaceId: null };
     return agent;
@@ -162,6 +167,24 @@ test("a confirmed different workspace remains terminal across reloads without op
   assert.deepEqual(f.calls, calls);
   assert.equal(f.creates.length, 1);
   assert.equal(f.archiveCount(), 0);
+});
+
+test("unexpected failure after creation logs the saved new id and resumes without another session", async () => {
+  const f = fixture();
+  f.ports.checkpoint = async row => { if (row.newId) throw new Error("Demo interruption after creation"); };
+  await leaderSwap({} as never, input(), f.ports);
+  const stopped = await settled();
+  assert.equal(stopped.job?.phase, "failed");
+  assert.equal(stopped.job?.newId, "new-1");
+  const handoff = JSON.parse(readFileSync(f.log, "utf8").trim());
+  assert.equal(handoff.newId, stopped.job?.newId);
+  assert.equal(f.archiveCount(), 0);
+  f.ports.checkpoint = undefined;
+  resetShiftClaimsForTests();
+  await leaderSwap({} as never, input(), f.ports);
+  assert.equal((await settled()).job?.phase, "done");
+  assert.equal(f.creates.length, 1);
+  assert.equal(f.archiveCount(), 1);
 });
 
 test("completed swaps remain visible live but never reappear on the homepage after reload", async () => {
