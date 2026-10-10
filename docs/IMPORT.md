@@ -34,6 +34,9 @@ Later source changes must be compared with the recorded baseline before porting.
 - Make legacy state lookup and the optional external sidebar directory configurable.
   Plugin status checks require a configured id rather than an owner's plugin name.
   Model selection retains host options and applies configured provider exclusions.
+  The roles CLI follows the same exclusions, accepts explicit feature values, and
+  preserves inherited features when staying on the same provider. Unreviewed merge
+  insights use a rolling seven-day window without an installation-specific start date.
 - Extend the shared command builder for both plugin layouts. Namespace imports let
   esbuild drop unused Zod exports, locales, and converters without weakening privacy
   rules or altering dependency source files.
@@ -50,6 +53,8 @@ identity, history secrets, contract, shared gates, and package file checks.
 The compiler is the installed Paseo server compiler, version 0.11.2.
 The previous source compiler harness also compiled both imported entries and checked
 that every shared source file avoids Node built-ins.
+Regression coverage includes persisted CLI fast and ultra options in both languages,
+configured provider exclusions, and recent unreviewed merges across calendar years.
 
 The npm package is unpacked and exercised with Node, an empty PATH, no node_modules,
 and isolated demo directories. Roles, migration and coupon help, decision creation
