@@ -1,6 +1,7 @@
 /// <reference types="node" />
 import { execFile } from "node:child_process";
-import { readFile, rename, writeFile, mkdir } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { readFile, rename, open, rm, mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { dataDir, paseoConfigPath } from "./paths";
@@ -106,11 +107,23 @@ export async function readJson<T>(path: string, fallback: T): Promise<T> {
   }
 }
 
+/** Atomic replacement across processes; concurrent writers use their own sibling temp files.
+ * Last rename wins. This does not serialize read/modify/write operations or sync data to disk.
+ */
 export async function writeJson(path: string, data: unknown): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
-  const tmp = `${path}.tmp`;
-  await writeFile(tmp, JSON.stringify(data, null, 2));
-  await rename(tmp, path);
+  const tmp = join(dirname(path), `.${basename(path)}.${process.pid}.${randomUUID()}.tmp`);
+  // Exclusive creation establishes ownership. If open fails, never remove that path.
+  const file = await open(tmp, "wx");
+  try {
+    await file.writeFile(JSON.stringify(data, null, 2));
+    await file.close();
+    await rename(tmp, path);
+  } catch (error) {
+    await file.close().catch(() => {});
+    await rm(tmp, { force: true }).catch((cleanup) => logSwallowed("JSON temp cleanup", cleanup));
+    throw error;
+  }
 }
 
 const memo = new Map<string, { at: number; value: Promise<unknown> }>();

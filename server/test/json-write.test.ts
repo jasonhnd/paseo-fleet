@@ -136,3 +136,59 @@ test("real mkdir and rename failures reject and preserve unrelated temporary fil
   assert.equal(await fs.readFile(other, "utf8"), "owned elsewhere");
   assert.deepEqual((await fs.readdir(dir)).sort(), [".other-writer.tmp", "blocker", "target.json"]);
 });
+
+test("an exclusive-open collision rejects without deleting the other owner's file", async (t) => {
+  const dir = await fresh();
+  const file = join(dir, "snapshot.json");
+  const open = fs.open;
+  let occupied = "";
+  t.mock.method(fs, "open", async (path: string, flags: string) => {
+    occupied = path;
+    await fs.writeFile(path, "owned elsewhere", { flag: "wx" });
+    return open(path, flags);
+  });
+  syncBuiltinESMExports();
+  try {
+    await assert.rejects(writeJson(file, {}), { code: "EEXIST" });
+    assert.equal(await fs.readFile(occupied, "utf8"), "owned elsewhere");
+    await assert.rejects(fs.stat(file), { code: "ENOENT" });
+  } finally { t.mock.restoreAll(); syncBuiltinESMExports(); }
+});
+
+test("a partial write failure rejects with the original error and cleans only its own temp", async (t) => {
+  const dir = await fresh();
+  const file = join(dir, "snapshot.json");
+  await writeJson(file, { previous: true });
+  const other = join(dir, ".other-writer.tmp");
+  await fs.writeFile(other, "owned elsewhere");
+  const failure = Object.assign(new Error("disk full"), { code: "ENOSPC" });
+  const open = fs.open;
+  t.mock.method(fs, "open", async (path: string, flags: string) => {
+    const handle = await open(path, flags);
+    const write = handle.writeFile.bind(handle);
+    t.mock.method(handle, "writeFile", async () => { await write("partial"); throw failure; });
+    return handle;
+  });
+  syncBuiltinESMExports();
+  try {
+    await assert.rejects(writeJson(file, {}), (error) => error === failure);
+    assert.deepEqual(await readJson(file, null), { previous: true });
+    assert.equal(await fs.readFile(other, "utf8"), "owned elsewhere");
+    assert.deepEqual((await fs.readdir(dir)).sort(), [".other-writer.tmp", "snapshot.json"]);
+  } finally { t.mock.restoreAll(); syncBuiltinESMExports(); }
+});
+
+test("a cleanup failure is logged without masking the failed write", async (t) => {
+  const dir = await fresh();
+  const file = join(dir, "snapshot.json");
+  await fs.mkdir(file);
+  const logs: unknown[][] = [];
+  t.mock.method(fs, "rm", async () => { throw Object.assign(new Error("cleanup denied"), { code: "EACCES" }); });
+  t.mock.method(console, "error", (...args: unknown[]) => { logs.push(args); });
+  syncBuiltinESMExports();
+  try {
+    await assert.rejects(writeJson(file, {}), (error: NodeJS.ErrnoException) => ["EISDIR", "EPERM", "ENOTEMPTY"].includes(error.code ?? ""));
+    assert.equal(logs.length, 1);
+    assert.match(String(logs[0]), /JSON temp cleanup.*cleanup denied/);
+  } finally { t.mock.restoreAll(); syncBuiltinESMExports(); }
+});
