@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Source-checkout-only development probes (npm ci with dev dependencies); not shipped in npm tarballs.
 // Offline acceptance probes. No provider, daemon, credential or board mutations.
 // Run after npm ci: node test/antigravity/check-isolation.mjs [--usage-run file]
 import { readFile } from "node:fs/promises";

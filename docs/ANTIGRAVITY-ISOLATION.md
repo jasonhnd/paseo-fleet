@@ -6,9 +6,20 @@ task, provider permissions, authentication or a mounted panel.
 
 ## Offline acceptance probes
 
-Install the locked dependencies as described in the README. In a task-owned temporary
-directory, set absolute `PASEO_HOME`, `AFC_DATA_DIR`, `KANBAN_DATA_DIR`,
-`ROLES_STATE_DIR` and `TMPDIR` before running:
+These are development acceptance tools for a complete Fleet source checkout.
+Run `npm ci` with development dependencies included, as described in the README,
+before using either entry below. An npm tarball or an install-only Paseo environment
+does not include these tools; a Git checkout must also have the complete source and
+development dependencies. The npm package continues to exclude `test/` and other
+development-only tools.
+
+In a task-owned temporary directory, set all six absolute isolation roots:
+`PASEO_HOME`, `AFC_DATA_DIR`, `KANBAN_DATA_DIR`, `ROLES_STATE_DIR`, `TMPDIR` and
+`AFC_TRANSCRIPT_HOME`. Preserve the caller's `PASEO_AGENT_ID`; do not clear or replace
+its identity. Use empty disposable data and transcript directories, without reading
+or copying credentials or a full daemon configuration. These commands run offline;
+they do not start a model or daemon, connect to the daily host, enable a provider,
+or change any bans, profile pauses or pool settings.
 
 ```sh
 node test/antigravity/check-isolation.mjs
