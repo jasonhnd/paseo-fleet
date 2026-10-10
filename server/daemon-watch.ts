@@ -18,6 +18,7 @@ import {
   takeComplete,
 } from "../shared/daemon-crash";
 import { kanbanConfigPath, kanbanRoot } from "./paths";
+import { readOpsProject } from "./adapters/config";
 import { BIN, PASEO_DIR, readJson, run, runOutcome, STATE_DIR, writeJson, sendToAgent } from "./util";
 
 export const CRASH_STATE_PATH = join(STATE_DIR, "daemon-crash-state.json");
@@ -161,14 +162,19 @@ async function runTick(): Promise<void> {
   if (due) next = { ...next, missing: await checkMissingCwd(now) };
   await writeJson(CRASH_STATE_PATH, next);
   if (!scanned.notify || !scanned.notice) return;
-  const ids = crashNotifyTargets(await readJson<unknown>(KANBAN_CONFIG, null));
+  await notifyDaemonCrash(scanned.notice);
+}
+
+/** Read the current operations project at delivery time. */
+export async function notifyDaemonCrash(notice: string, notify = sendToAgent): Promise<void> {
+  const ids = crashNotifyTargets(await readJson<unknown>(KANBAN_CONFIG, null), readOpsProject());
   if (ids.length === 0) {
     console.error("[afc] daemon crash: no <leader> id, no notice for this wave");
     return;
   }
   for (const id of ids) {
     try {
-      await sendToAgent(id, scanned.notice);
+      await notify(id, notice);
     } catch (error) {
       console.error("[afc] daemon crash notify:", String(error).slice(0, 200));
     }

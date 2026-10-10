@@ -369,14 +369,14 @@ export function assessMissingCwd(run: MissingRun, now: number, kanbanRoot: strin
   return { checkedAt: now, ok: true, count: row.count, listPath: absoluteListPath(row.listPath, kanbanRoot) };
 }
 
-/** AFC supervisor, then the Kanban supervisor. Missing ids are skipped. */
-export function crashNotifyTargets(config: unknown): string[] {
+/** Operations project supervisor, then the Kanban supervisor. Missing ids are skipped. */
+export function crashNotifyTargets(config: unknown, opsProject: string): string[] {
   const ids: string[] = [];
   if (!config || typeof config !== "object" || Array.isArray(config)) return ids;
   const row = config as { supervisorAgentId?: unknown; supervisors?: unknown };
   const table = row.supervisors;
   if (table && typeof table === "object" && !Array.isArray(table)) {
-    const afc = (table as Record<string, unknown>)["paseo-fleet"];
+    const afc = (table as Record<string, unknown>)[opsProject];
     if (typeof afc === "string" && afc.trim()) ids.push(afc.trim());
   }
   if (typeof row.supervisorAgentId === "string" && row.supervisorAgentId.trim() && !ids.includes(row.supervisorAgentId.trim())) {

@@ -9,7 +9,7 @@ import { crashNotifyTargets } from "../shared/daemon-crash";
 import { t } from "../shared/i18n";
 import { CURSOR_API, KEYCHAIN } from "../shared/quota-adapters";
 import { platformCapabilities } from "./platform";
-import { adapterOn } from "./adapters/config";
+import { adapterOn, readOpsProject } from "./adapters/config";
 import {
   alertsFromProbe,
   applyProbeTick,
@@ -323,7 +323,7 @@ async function rerunSchedules(state: ProbeState, now: number, logPath: string): 
 }
 
 async function notifySupervisors(): Promise<void> {
-  const ids = crashNotifyTargets(await readJson<unknown>(KANBAN_CONFIG, null));
+  const ids = crashNotifyTargets(await readJson<unknown>(KANBAN_CONFIG, null), readOpsProject());
   if (ids.length === 0) {
     console.error("[afc] keychain probe: no <leader> id, skipping this round of notices");
     return;

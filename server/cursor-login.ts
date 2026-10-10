@@ -29,7 +29,7 @@ import {
 } from "../shared/cursor-login";
 import { kanbanConfigPath } from "./paths";
 import { baseAdapterOf, CURSOR_API } from "../shared/quota-adapters";
-import { adapterOn } from "./adapters/config";
+import { adapterOn, readOpsProject } from "./adapters/config";
 import { readPlanSources } from "./adapters/plans";
 import { requestPoolRefreshNow } from "./pool-refresh";
 import { BIN, readJson, run, STATE_DIR, writeJson, sendToAgent } from "./util";
@@ -113,7 +113,7 @@ async function notifyKanbanLeader(notice: string): Promise<boolean> {
 }
 
 async function notifyLeaders(notice: string): Promise<boolean> {
-  const ids = crashNotifyTargets(await readJson<unknown>(KANBAN_CONFIG, null));
+  const ids = crashNotifyTargets(await readJson<unknown>(KANBAN_CONFIG, null), readOpsProject());
   if (ids.length === 0) {
     console.error("[afc] cursor login: no <leader> id, skipping this round of notices");
     return false;

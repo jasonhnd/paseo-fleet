@@ -26,7 +26,7 @@ import { crashNotifyTargets } from "../shared/daemon-crash";
 import { t } from "../shared/i18n";
 import { cursorScreenOffNotice } from "../shared/quota-companies";
 import { baseAdapterOf, CURSOR_API } from "../shared/quota-adapters";
-import { adapterOn } from "./adapters/config";
+import { adapterOn, readOpsProject } from "./adapters/config";
 import { readPlanSources } from "./adapters/plans";
 import { BIN, HOME, readJson, run as runCmd } from "./util";
 import {
@@ -261,7 +261,7 @@ async function sendLeaderNote(id: string, text: string): Promise<void> {
 }
 
 async function defaultNotifyLoginLost(): Promise<void> {
-  const ids = crashNotifyTargets(await readJson<unknown>(KANBAN_CONFIG, null));
+  const ids = crashNotifyTargets(await readJson<unknown>(KANBAN_CONFIG, null), readOpsProject());
   if (ids.length === 0) {
     console.error("[afc] cursor usage: no <leader> id, skipping this round of notices");
     return;

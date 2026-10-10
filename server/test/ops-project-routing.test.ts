@@ -17,6 +17,9 @@ const { kanbanConfigPath } = await import("../paths");
 const { afcLeaderId, productionDailyDeps, runDailyOnce, summaryLeaderId } = await import("../doctor-daily");
 const { clearKanbanSourceMemo } = await import("../kanban-source");
 const { deliverEarlyResetNotices, EARLY_RESET_FILE, setEarlyResetNotify } = await import("../early-reset");
+const { deliver } = await import("../reset-coupons-notify");
+const { notifyDaemonCrash } = await import("../daemon-watch");
+const { crashNotifyTargets } = await import("../../shared/daemon-crash");
 await mkdir(process.env.AFC_DATA_DIR, { recursive: true });
 await mkdir(join(process.env.KANBAN_DATA_DIR, "exports"), { recursive: true });
 after(() => rm(root, { recursive: true, force: true }));
@@ -27,6 +30,51 @@ const table = { supervisors: { "paseo-fleet": legacy, "Demo operations": configu
 const write = (path: string, value: unknown) => writeFile(path, JSON.stringify(value));
 const cases = [{ config: {}, expected: legacy }, { config: { opsProject: " Demo operations " }, expected: configured },
   { config: { opsProject: 42 }, expected: legacy }];
+
+test("coupon use notices read the operations project at delivery time and preserve broadcasts", async () => {
+  await write(kanbanConfigPath(), table);
+  for (const { config, expected } of cases) {
+    await write(join(process.env.AFC_DATA_DIR!, "afc.config.json"), config);
+    const sent: { id: string; text: string }[] = [];
+    const result = await deliver([
+      { who: "afc", text: "Demo coupon use", legacy: "use", keys: ["demo-use"] },
+      { who: "all", text: "Demo coupon broadcast", legacy: "announce" },
+    ], async (id, text) => { sent.push({ id, text }); });
+    assert.deepEqual(sent, [
+      { id: expected, text: "Demo coupon use" },
+      { id: legacy, text: "Demo coupon broadcast" },
+      { id: configured, text: "Demo coupon broadcast" },
+    ]);
+    assert.deepEqual(result, { use: true, announce: true, keys: ["demo-use"] });
+  }
+  await write(join(process.env.AFC_DATA_DIR!, "afc.config.json"), { opsProject: "Demo unregistered" });
+  const sent: string[] = [];
+  const result = await deliver([{ who: "afc", text: "Demo use", legacy: "use", keys: ["demo-use"] }],
+    async id => { sent.push(id); });
+  assert.deepEqual(sent, []);
+  assert.equal(result.use, false);
+  assert.deepEqual(result.keys, []);
+});
+
+test("daemon crash delivery reads the operations project and still notifies the board leader", async () => {
+  const boardLeader = "00000000-0000-4000-8000-000000000003";
+  await write(kanbanConfigPath(), { ...table, supervisorAgentId: boardLeader });
+  for (const { config, expected } of cases) {
+    await write(join(process.env.AFC_DATA_DIR!, "afc.config.json"), config);
+    const sent: { id: string; text: string }[] = [];
+    await notifyDaemonCrash("Demo daemon crash", async (id, text) => { sent.push({ id, text }); });
+    assert.deepEqual(sent, [
+      { id: expected, text: "Demo daemon crash" },
+      { id: boardLeader, text: "Demo daemon crash" },
+    ]);
+  }
+  await write(join(process.env.AFC_DATA_DIR!, "afc.config.json"), { opsProject: "Demo unregistered" });
+  const sent: string[] = [];
+  await notifyDaemonCrash("Demo daemon crash", async id => { sent.push(id); });
+  assert.deepEqual(sent, [boardLeader]);
+  assert.deepEqual(crashNotifyTargets({ ...table, supervisorAgentId: configured }, "Demo operations"), [configured]);
+  assert.deepEqual(crashNotifyTargets({ supervisors: [] }, "Demo operations"), []);
+});
 
 test("early-reset delivery reads the configured supervisors entry and marks only successful sends", async () => {
   await write(kanbanConfigPath(), table);

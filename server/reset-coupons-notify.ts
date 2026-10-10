@@ -3,6 +3,7 @@
 import { readJson, writeJson, type Json } from "./util";
 import { KANBAN_CONFIG, RESET_COUPON_STATE, type ResetCouponState } from "./reset-coupons-types";
 import { lock, readState } from "./reset-coupons-state";
+import { readOpsProject } from "./adapters/config";
 
 export interface Send {
   who: "afc" | "all";
@@ -50,11 +51,12 @@ async function leaders(): Promise<{ afc: string | null; all: string[] }> {
   const supervisors = raw.supervisors;
   const all: string[] = [];
   let afc: string | null = null;
+  const opsProject = readOpsProject();
   if (supervisors && typeof supervisors === "object") {
     for (const [project, id] of Object.entries(supervisors as Record<string, unknown>)) {
       if (typeof id !== "string" || id.length < 8) continue;
       all.push(id);
-      if (project === "paseo-fleet") afc = id;
+      if (project === opsProject) afc = id;
     }
   }
   return { afc, all: [...new Set(all)] };
