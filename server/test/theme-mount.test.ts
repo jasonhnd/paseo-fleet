@@ -8,7 +8,7 @@ import { createRequire } from "node:module";
 import { test } from "node:test";
 import { build } from "esbuild";
 import type { PluginTheme } from "@getpaseo/plugin";
-import { mix, themeColors } from "../../shared/theme-colors";
+import { paletteFromTheme } from "../../shared/palette";
 import { PANEL_TABS } from "../../shared/panel-tabs";
 import { buildSupervisorRows } from "../../shared/supervisor-shift";
 import { LIGHT_THEME, DARK_THEME } from "./fixtures/themes";
@@ -67,8 +67,8 @@ test("homepage, all panel tabs and settings repaint from two complete host theme
   const tick = () => new Promise(resolve => setTimeout(resolve, 80));
   const normalize = (color: string) => { const node = dom.window.document.createElement("div"); node.style.color = color; return node.style.color; };
   const allowedColors = (theme: PluginTheme) => {
-    const p = themeColors(theme);
-    return new Set([...Object.values(theme.colors), ...Object.values(p), mix(p.blue, p.bg, 0.3), mix(p.blue, p.bg, 0.6), mix(p.blue, p.bg, 0), mix(p.blue, p.bg, 0.65)].map(normalize));
+    const p = paletteFromTheme(theme);
+    return new Set([...Object.values(theme.colors), ...Object.values(p).filter((value): value is string => typeof value === "string"), ...Object.values(p.poolColors), ...p.shareColors].map(normalize));
   };
   const sample = (theme: PluginTheme) => {
     const allowed = allowedColors(theme), colors: string[] = [];
@@ -88,7 +88,7 @@ test("homepage, all panel tabs and settings repaint from two complete host theme
     }
     assert.ok(colors.length > 10, "The real surface must have painted content");
     assert.ok(colors.includes(normalize(theme.colors.foreground)));
-    assert.ok(colors.includes(normalize(theme.colors.foregroundMuted)));
+    assert.ok(colors.includes(normalize(paletteFromTheme(theme).textSecondary)));
     return new Set(colors);
   };
   try {
@@ -138,8 +138,8 @@ test("homepage, all panel tabs and settings repaint from two complete host theme
       assert.deepEqual(await visit(LIGHT_THEME), light, `${kind} must repaint on a second switch`);
       if (kind === "settings") assert.ok(mounted.container.querySelectorAll("input").length > 10, "Settings fields and dispatch editor must mount");
       if (kind === "board") {
-        const used = new Set([...Object.values(LIGHT_THEME.colors)].map(normalize));
-        for (const key of ["surface0", "surface1", "surface2", "border", "foreground", "foregroundMuted", "accent", "accentForeground", "statusSuccess", "statusWarning", "statusDanger"] as const) assert.ok(light.has(normalize(LIGHT_THEME.colors[key])) && used.has(normalize(LIGHT_THEME.colors[key])), key);
+        const p = paletteFromTheme(LIGHT_THEME);
+        for (const key of ["bg", "card", "raised", "border", "text", "textSecondary", "primaryBg", "primaryFg", "success", "warning", "danger", "accentBg", "accent"] as const) assert.ok(light.has(normalize(p[key])), key);
         assert.ok(!mounted.container.textContent.includes("Follow Paseo"), "No independent color mode switch remains");
       }
       mounted.unmount(); mounted = null;

@@ -4,7 +4,7 @@ import { Pressable, type StyleProp, Text, type TextStyle, View, type ViewStyle }
 import { t } from "../shared/i18n";
 import { DEFAULT_PANEL_PREFS, fontSizes, type PanelPrefs } from "../shared/panel-prefs";
 import { breakpointForWidth, columnsForWidth, GRID_GAP, gridCellWidth, gridColumns, PANEL_MAX_WIDTH, type Breakpoint } from "../shared/responsive";
-import { MONO, type ThemeColors, themeColors, SANS } from "./theme";
+import { MONO, type Palette, paletteFromTheme, SANS } from "./theme";
 
 export type Theme = PluginSurfaceProps["theme"];
 export type Layout = PluginSurfaceProps["layout"];
@@ -15,12 +15,12 @@ export function useStyles(theme: Theme, layout: Layout, prefs: PanelPrefs = DEFA
   const breakpoint = breakpointForWidth(width);
   const compact = breakpoint === "phone";
   const columns = columnsForWidth(width);
-  const p = useMemo(() => themeColors(theme), [theme]);
+  const p = paletteFromTheme(theme);
   const f = fontSizes(prefs.fontStep, compact);
   return useMemo(() => buildStyles(p, f, breakpoint, columns), [p, f, breakpoint, columns]);
 }
 
-function buildStyles(p: ThemeColors, f: ReturnType<typeof fontSizes>, breakpoint: Breakpoint, columns: 1 | 2 | 3) {
+function buildStyles(p: Palette, f: ReturnType<typeof fontSizes>, breakpoint: Breakpoint, columns: 1 | 2 | 3) {
   const compact = breakpoint === "phone";
   const bodyLine = Math.round(f.body * 1.45);
   const sans = { fontFamily: SANS };
@@ -134,7 +134,7 @@ function tonePair(s: Styles, tone: Tone): { bg: string; fg: string } {
   if (tone === "green") return { bg: s.p.greenBg, fg: s.p.green };
   if (tone === "yellow") return { bg: s.p.amberBg, fg: s.p.amber };
   if (tone === "red") return { bg: s.p.redBg, fg: s.p.red };
-  if (tone === "blue") return { bg: s.p.primaryBg, fg: s.p.primaryFg };
+  if (tone === "blue") return { bg: s.p.accentBg, fg: s.p.accent };
   return { bg: s.p.raised, fg: s.p.textSecondary };
 }
 

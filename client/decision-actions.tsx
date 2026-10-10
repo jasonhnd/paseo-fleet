@@ -196,7 +196,7 @@ function OptionButton({ s, option, recommended, active, busy, onPress }: {
       })}
       onPress={onPress}
     >
-      <View style={{ width: LETTER_BOX, height: LETTER_BOX, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: recommended ? s.p.blue : s.p.card, borderWidth: recommended ? 0 : 1, borderColor: s.p.border }}>
+      <View style={{ width: LETTER_BOX, height: LETTER_BOX, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: recommended ? s.p.primaryBg : s.p.card, borderWidth: recommended ? 0 : 1, borderColor: s.p.border }}>
         <Text style={[s.h2, { color: recommended ? s.p.primaryFg : s.p.text }]}>{option.letter}</Text>
       </View>
       <Text style={[s.text, { flex: 1, minWidth: 0 }]}>{option.text || t("decisions.actions.noText")}</Text>
@@ -207,8 +207,8 @@ function OptionButton({ s, option, recommended, active, busy, onPress }: {
 
 function RecommendTag({ s }: { s: Styles }) {
   return (
-    <View style={{ backgroundColor: s.p.blue, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 2, alignSelf: "flex-start", flexShrink: 0 }}>
-      <Text style={[s.badgeText, { color: s.p.primaryFg }]}>{t("decisions.actions.recommended")}</Text>
+    <View style={{ backgroundColor: s.p.accentBg, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 2, alignSelf: "flex-start", flexShrink: 0 }}>
+      <Text style={[s.badgeText, { color: s.p.accent }]}>{t("decisions.actions.recommended")}</Text>
     </View>
   );
 }

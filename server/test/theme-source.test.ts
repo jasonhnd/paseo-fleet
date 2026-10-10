@@ -51,7 +51,16 @@ function colorLiterals(source: string): string[] {
   return [...new Set(found)];
 }
 
-test("client and shared have no color literals outside the missing-host fallback and fixtures", async () => {
+const sourceExempt = (name: string) => name === "shared/theme-fallback.ts";
+
+test("source exemptions contain only the single missing-host fallback", () => {
+  assert.equal(sourceExempt("shared/theme-fallback.ts"), true);
+  for (const name of ["client/__fixtures__/colors.ts", "shared/__fixtures__/colors.ts", "client/theme-fallback.ts", "shared/nested/theme-fallback.ts"]) {
+    assert.equal(sourceExempt(name), false, name);
+  }
+});
+
+test("client and shared have no color literals outside the missing-host fallback", async () => {
   const root = resolve(import.meta.dirname, "../..");
   const failures: string[] = [];
   for (const dir of ["client", "shared"]) {
@@ -59,7 +68,7 @@ test("client and shared have no color literals outside the missing-host fallback
       if (!entry.isFile() || !/\.(?:[cm]?[jt]sx?|json|css)$/.test(entry.name)) continue;
       const path = resolve(entry.parentPath, entry.name);
       const name = relative(root, path).replaceAll("\\", "/");
-      if (name === "shared/theme-fallback.ts" || name.split("/").includes("__fixtures__")) continue;
+      if (sourceExempt(name)) continue;
       const source = await readFile(path, "utf8");
       const colors = entry.name.endsWith(".css")
         ? [...source.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/(?:color|background|fill|stroke|shadow|outline)\s*:\s*([^;}]+)/gi)]
