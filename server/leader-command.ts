@@ -1,4 +1,4 @@
-import type { PaseoApi } from "@getpaseo/client";
+import type { PaseoApi } from "./paseo-api";
 import { t, tAll } from "../shared/i18n";
 import type { LeaderSwapInput, LeaderSwapResult } from "../shared/leader-command";
 import type { LeaderUsageReport } from "../shared/leader-usage";
