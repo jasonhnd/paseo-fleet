@@ -1,4 +1,4 @@
-import { DEFAULT_PANEL_PREFS, isColorMode, isFontStep, type PanelPrefs } from "./panel-prefs";
+import { DEFAULT_PANEL_PREFS, isFontStep, type PanelPrefs } from "./panel-prefs";
 import { isPanelTab, type PanelTab } from "./panel-tabs";
 
 /**
@@ -7,12 +7,12 @@ import { isPanelTab, type PanelTab } from "./panel-tabs";
  */
 export interface PrefsView {
   tab: PanelTab | null;
-  appearance: Pick<PanelPrefs, "fontStep" | "colorMode"> | null;
+  appearance: Pick<PanelPrefs, "fontStep"> | null;
 }
 
 export type PrefsAction =
   | { type: "select-tab"; tab: PanelTab }
-  | { type: "set-appearance"; patch: Partial<Pick<PanelPrefs, "fontStep" | "colorMode">>; base: PanelPrefs }
+  | { type: "set-appearance"; patch: Partial<Pick<PanelPrefs, "fontStep">>; base: PanelPrefs }
   | { type: "saved"; saved: unknown }
   | { type: "save-failed"; loaded: PanelPrefs | undefined };
 
@@ -23,7 +23,7 @@ export function prefsReducer(state: PrefsView, action: PrefsAction): PrefsView {
     case "select-tab":
       return { ...state, tab: action.tab };
     case "set-appearance":
-      return { ...state, appearance: { fontStep: action.base.fontStep, colorMode: action.base.colorMode, ...state.appearance, ...action.patch } };
+      return { ...state, appearance: { fontStep: action.base.fontStep, ...state.appearance, ...action.patch } };
     case "saved": {
       // A server older than the client may drop or omit fields; keep only valid ones, never the tab.
       const raw = (action.saved && typeof action.saved === "object" ? action.saved : {}) as Record<string, unknown>;
@@ -33,13 +33,12 @@ export function prefsReducer(state: PrefsView, action: PrefsAction): PrefsView {
         ...state,
         appearance: {
           fontStep: isFontStep(raw.fontStep) ? raw.fontStep : current.fontStep,
-          colorMode: isColorMode(raw.colorMode) ? raw.colorMode : current.colorMode,
         },
       };
     }
     case "save-failed": {
       const base = action.loaded ?? DEFAULT_PANEL_PREFS;
-      return { ...state, appearance: { fontStep: base.fontStep, colorMode: base.colorMode } };
+      return { ...state, appearance: { fontStep: base.fontStep } };
     }
   }
 }
@@ -48,7 +47,6 @@ export function resolvePrefs(view: PrefsView, loaded: PanelPrefs | undefined): P
   const base = loaded ?? DEFAULT_PANEL_PREFS;
   return {
     fontStep: view.appearance?.fontStep ?? base.fontStep,
-    colorMode: view.appearance?.colorMode ?? base.colorMode,
     tab: view.tab ?? (isPanelTab(base.tab) ? base.tab : DEFAULT_PANEL_PREFS.tab),
   };
 }

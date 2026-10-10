@@ -94,7 +94,7 @@ export default function contribute(server: PluginServerContext) {
     return readAccessView();
   });
   server.handle(panelPrefsRpc, async (input) => {
-    const prefs = input.fontStep === undefined && input.colorMode === undefined ? await readPanelPrefs() : await updatePanelPrefs(input);
+    const prefs = input.fontStep === undefined && input.tab === undefined ? await readPanelPrefs() : await updatePanelPrefs(input);
     return { ...prefs, language: language() };
   });
   server.handle(boardSnapshotRpc, async ({ force }, { paseo }) => {

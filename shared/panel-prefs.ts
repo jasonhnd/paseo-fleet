@@ -7,17 +7,12 @@ import { isPanelTab, PANEL_TAB_IDS, type PanelTab } from "./panel-tabs";
 export const FONT_STEPS = ["sm", "md", "lg"] as const;
 export type FontStep = (typeof FONT_STEPS)[number];
 
-export const COLOR_MODES = ["paseo", "light", "dark"] as const;
-export type ColorMode = (typeof COLOR_MODES)[number];
-
 export interface PanelPrefs {
   fontStep: FontStep;
-  /** Legacy persistence/RPC field; appearance always follows the host theme. */
-  colorMode: ColorMode;
   tab: PanelTab;
 }
 
-export const DEFAULT_PANEL_PREFS: PanelPrefs = { fontStep: "md", colorMode: "paseo", tab: "overview" };
+export const DEFAULT_PANEL_PREFS: PanelPrefs = { fontStep: "md", tab: "overview" };
 
 export interface FontSizes {
   title: number;
@@ -55,17 +50,12 @@ export function isFontStep(value: unknown): value is FontStep {
   return value === "sm" || value === "md" || value === "lg";
 }
 
-export function isColorMode(value: unknown): value is ColorMode {
-  return value === "paseo" || value === "light" || value === "dark";
-}
-
-/** A non-object, or a field outside the three choices, falls back to M / follow Paseo for that field. */
+/** Invalid font/tab values use defaults. Retired appearance fields are ignored. */
 export function parsePanelPrefs(raw: unknown): PanelPrefs {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { ...DEFAULT_PANEL_PREFS };
   const obj = raw as Record<string, unknown>;
   return {
     fontStep: isFontStep(obj.fontStep) ? obj.fontStep : DEFAULT_PANEL_PREFS.fontStep,
-    colorMode: isColorMode(obj.colorMode) ? obj.colorMode : DEFAULT_PANEL_PREFS.colorMode,
     tab: isPanelTab(obj.tab) ? obj.tab : DEFAULT_PANEL_PREFS.tab,
   };
 }
@@ -74,12 +64,10 @@ export const panelPrefsRpc = defineRpc({
   name: "board.panel-prefs",
   input: z.object({
     fontStep: z.enum(FONT_STEPS).optional(),
-    colorMode: z.enum(COLOR_MODES).optional(),
     tab: z.enum(PANEL_TAB_IDS).optional(),
   }),
   output: z.object({
     fontStep: z.enum(FONT_STEPS),
-    colorMode: z.enum(COLOR_MODES),
     tab: z.enum(PANEL_TAB_IDS),
     /** The server's language (afc.config.json); the panel shows the same. Optional for an older server. */
     language: z.enum(LANGUAGES).optional(),

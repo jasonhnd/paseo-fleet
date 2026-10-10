@@ -2,9 +2,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
-  DEFAULT_PANEL_PREFS,
   parsePanelPrefs,
-  type ColorMode,
   type FontStep,
   type PanelPrefs,
 } from "../shared/panel-prefs";
@@ -17,30 +15,36 @@ import type { PanelTab } from "../shared/panel-tabs";
  */
 export const PANEL_PREFS_PATH = join(STATE_DIR, "panel-prefs.json");
 
-export async function readPanelPrefs(path = PANEL_PREFS_PATH): Promise<PanelPrefs> {
+async function readRawPrefs(path: string): Promise<Record<string, unknown>> {
   try {
-    return parsePanelPrefs(JSON.parse(await readFile(path, "utf8")));
+    const raw: unknown = JSON.parse(await readFile(path, "utf8"));
+    return raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") logSwallowed("panel-prefs read", error);
-    return { ...DEFAULT_PANEL_PREFS };
+    return {};
   }
+}
+
+export async function readPanelPrefs(path = PANEL_PREFS_PATH): Promise<PanelPrefs> {
+  return parsePanelPrefs(await readRawPrefs(path));
 }
 
 const writes = new Map<string, Promise<PanelPrefs>>();
 
-/** Serialize read/modify/write so a fast tab click and a font change both survive. */
+/** Serialize patches, preserving unknown fields except the retired color mode. */
 export async function updatePanelPrefs(
-  patch: { fontStep?: FontStep; colorMode?: ColorMode; tab?: PanelTab },
+  patch: { fontStep?: FontStep; tab?: PanelTab },
   path = PANEL_PREFS_PATH,
 ): Promise<PanelPrefs> {
   const pending = (writes.get(path) ?? Promise.resolve()).catch(() => { /* the earlier writer already reported its own failure to its caller */ }).then(async () => {
-    const current = await readPanelPrefs(path);
+    const raw = await readRawPrefs(path);
+    const current = parsePanelPrefs(raw);
     const next: PanelPrefs = {
       fontStep: patch.fontStep ?? current.fontStep,
-      colorMode: patch.colorMode ?? current.colorMode,
       tab: patch.tab ?? current.tab,
     };
-    await writeJson(path, next);
+    const { colorMode: _retired, ...otherFields } = raw;
+    await writeJson(path, { ...otherFields, ...next });
     return next;
   });
   writes.set(path, pending);
