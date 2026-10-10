@@ -41,19 +41,24 @@ adapters. Select the temporary endpoint explicitly on every daemon command.
 Check the provider implementation: a CLI driver is not an ACP provider merely
 because both use the same provider id.
 
-Also isolate the process HOME and `AFC_TRANSCRIPT_HOME`. Moving only plugin data
-and Paseo home does not isolate transcript discovery: the usage scanner otherwise
-walks the default home for provider history. Clear only the task-owned caches after
-correcting an accidental discovery. The restarted scanner must show no personal
-files, and the mounted panel must have no personal usage.
+Isolate Paseo home, all plugin data roots and `AFC_TRANSCRIPT_HOME`. The process
+may keep its normal OS `HOME` so the official provider can use its existing
+authentication itself. Do not read or copy authentication files. Moving only plugin
+data and Paseo home does not isolate transcript discovery: point the scanner at an
+empty task-owned transcript directory and verify that it finds no personal files.
+The mounted panel must have no personal usage. Clear only task-owned caches if
+an accidental discovery occurred. A completely empty OS HOME is not required.
 
-Authentication must follow the provider's official flow. If a fresh home cannot
-authenticate, report the missing condition. Do not copy credentials or redirect
-the isolated provider to another tool's identity. Capture actual initialization and
-session errors; a diagnostic command may exit 0 while reporting a provider error.
+Authentication must follow the provider's official flow. A successful `session/new`
+in an existing diagnostic is session initialization evidence; do not require another
+login merely because an unnecessary empty-OS-HOME experiment failed. It does not
+prove shared CLI/ACP quota, task permissions or a real lifecycle. Do not redirect the
+provider to another tool's identity. Capture actual initialization and session errors;
+a diagnostic command may exit 0 while reporting a provider error.
 Discover telemetry status only through advertised read-only CLI/ACP capabilities.
-An exited settings command, privacy notice or model-generated answer does not
-prove an account opt-out.
+A free-tier privacy notice is a collection/opt-out reminder, not evidence that the
+account setting is on or off. An exited settings command or model-generated answer
+also does not prove an account opt-out.
 
 Open the selected host in a separate local Edge profile. Capture the mounted quota
 page, plugin settings, adapter switch, bucket selection, protection switch and
@@ -91,5 +96,7 @@ by protected unknown quota or authentication, deliver the prepared brief and exa
 missing conditions as waiting work. Do not turn off quota protection to finish it.
 
 After collecting evidence, close the task browser, stop the selected temporary
-daemon, remove only task-owned runtime data and generated files, and keep a durable
-private report. Recheck daily pauses and provider bans without changing them.
+daemon and keep a durable private report. Keep temporary runtime caches, profiles,
+logs and screenshots under the task temporary directory for the board's 24-hour
+cleanup policy; remove only task-owned files if earlier cleanup is necessary.
+Recheck daily pauses and provider bans without changing them.

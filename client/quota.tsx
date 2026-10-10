@@ -5,7 +5,7 @@ import { Pressable, Text, View } from "react-native";
 import { clipError } from "../shared/clip-error";
 import { t } from "../shared/i18n";
 import { priorityLine } from "../shared/dispatch-priority";
-import { poolCatalog, poolNames } from "../shared/quota-adapters";
+import { ANTIGRAVITY_CLI, poolCatalog, poolNames } from "../shared/quota-adapters";
 import { quotaPageReason } from "../shared/quota-line";
 import {
   axisMax,
@@ -52,7 +52,7 @@ function useQuotaPage() {
   return { period, setPeriod, q, confirming, confirmMsg, recheck };
 }
 
-export function Quota({ s }: { s: Styles }) {
+export function Quota({ s, antigravityInSummary = false }: { s: Styles; antigravityInSummary?: boolean }) {
   const page = useQuotaPage();
   if (page.q.isError) return <Text style={s.red}>{t("quota.ui.loadFailed", { error: String(page.q.error) })}</Text>;
   const data = page.q.data;
@@ -61,7 +61,7 @@ export function Quota({ s }: { s: Styles }) {
     <View style={{ gap: 28 }}>
       <PeriodRow s={s} period={page.period} data={data} onPick={page.setPeriod} />
       {data.warnings.map((warning) => <Text key={warning} style={s.muted}>ⓘ {warning}</Text>)}
-      <CompanySection s={s} data={data} confirming={page.confirming} message={page.confirmMsg} onRecheck={page.recheck} />
+      <CompanySection s={s} data={data} antigravityInSummary={antigravityInSummary} confirming={page.confirming} message={page.confirmMsg} onRecheck={page.recheck} />
       <QuotaGrid s={s} data={data} period={page.period} />
       <Text style={s.muted}>{pricesFootnote(data.pricesAt)}</Text>
     </View>
@@ -80,15 +80,17 @@ function PeriodRow({ s, period, data, onPick }: { s: Styles; period: Period; dat
   );
 }
 
-function CompanySection({ s, data, confirming, message, onRecheck }: {
-  s: Styles; data: BoardUsage; confirming: boolean; message: string | null; onRecheck: () => void;
+function CompanySection({ s, data, antigravityInSummary, confirming, message, onRecheck }: {
+  s: Styles; data: BoardUsage; antigravityInSummary: boolean; confirming: boolean; message: string | null; onRecheck: () => void;
 }) {
+  const companies = (data.companies ?? []).filter(company => !antigravityInSummary || company.adapter !== ANTIGRAVITY_CLI);
+  if (companies.length === 0 && antigravityInSummary) return null;
   return (
     <Section s={s} title={t("quota.ui.companiesTitle")} hint={t("quota.ui.companiesHint")}>
       <Text style={s.muted}>{t("quota.home.markerHint")}</Text>
       <CompanyCards
         s={s}
-        companies={quotaPageCompanies(data.companies ?? [], quotaPageReason)}
+        companies={quotaPageCompanies(companies, quotaPageReason)}
         showPace
         markerBasis="remaining"
         now={Date.now()}
@@ -160,10 +162,12 @@ function CostSection({ s, dispatch }: { s: Styles; dispatch: BoardUsage["dispatc
 }
 
 function PlansSection({ s, data }: { s: Styles; data: BoardUsage }) {
+  const plans = data.plans.filter(plan => plan.adapter !== ANTIGRAVITY_CLI);
+  if (plans.length === 0) return null;
   return (
     <Section s={s} title={t("quota.ui.plansTitle")} hint={t("quota.ui.plansHint")}>
       <ResponsiveGrid s={s}>
-        {data.plans.map((plan) => <PlanCard key={plan.id} s={s} plan={plan} pools={data.pools ?? {}} />)}
+        {plans.map((plan) => <PlanCard key={plan.id} s={s} plan={plan} pools={data.pools ?? {}} />)}
       </ResponsiveGrid>
     </Section>
   );

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { t, tAll } from "./i18n";
-import { ANTIGRAVITY_ACP_WINDOW, ANTIGRAVITY_CLI, ANTIGRAVITY_FIVE_HOUR_WINDOW, ANTIGRAVITY_WEEK_WINDOW, CLAUDE_CLI, CODEX_CLI, type CompanyEntry, CURSOR_API, cardOrder, GROK_CLI, isWeeklyWindow, MUSE_MSP, OPENCODE_GO_API, MANUAL, sessionWindowOf, type QuotaWindowIdentity } from "./quota-adapters";
+import { ANTIGRAVITY_CLI, ANTIGRAVITY_FIVE_HOUR_WINDOW, ANTIGRAVITY_WEEK_WINDOW, CLAUDE_CLI, CODEX_CLI, type CompanyEntry, CURSOR_API, cardOrder, GROK_CLI, isWeeklyWindow, MUSE_MSP, OPENCODE_GO_API, MANUAL, sessionWindowOf, type QuotaWindowIdentity } from "./quota-adapters";
 import { reasonSaysNoDispatch, reasonWaitsForWindow } from "./quota-reason";
 
 const CLAUDE_STOP_PCT = 75;
@@ -44,6 +44,8 @@ export const companyWindowSchema = z.object({
   tone: z.enum(["green", "yellow", "red", "muted"]),
   /** Set for rows that are dollars rather than a percent (Cursor on-demand). */
   amountText: z.string().nullable(),
+  readingState: z.enum(["live", "stale", "unknown"]).optional(),
+  readingExpiresAt: z.string().nullable().optional(),
 });
 
 export const companyCardSchema = z.object({
@@ -97,6 +99,7 @@ export interface CompanyProviderWindow extends QuotaWindowIdentity {
   readAt: string | null;
   readError?: string | null;
   readingState?: "live" | "manual" | "stale" | "unknown";
+  readingExpiresAt?: string | null;
 }
 
 export interface CompanyCursorWindow {
@@ -598,62 +601,35 @@ function codexCard(company: CompanyEntry, input: BuildCompaniesInput): CompanyCa
 
 function antigravityCard(company: CompanyEntry, input: BuildCompaniesInput): CompanyCard {
   const rows = input.windows.filter((row) => row.planId === company.planId);
-  const acp = rows.find((row) => row.id === ANTIGRAVITY_ACP_WINDOW);
-  const pool = input.pools[company.planId];
-  const cliRow = (row: CompanyProviderWindow | undefined, id: string, name: string) => {
+  const windows = (["gemini", "claude-gpt"] as const).flatMap((bucket) => (["five-hour", "week"] as const).map((window) => {
+    const id = `${bucket}-${window === "week" ? ANTIGRAVITY_WEEK_WINDOW : ANTIGRAVITY_FIVE_HOUR_WINDOW}`;
+    const row = rows.find((candidate) => candidate.id === id);
     const stale = row?.readingState === "stale";
+    const known = row?.usedPct != null && row.readingState !== "unknown";
     const when = clock(row?.readAt ?? null);
-    return windowBase({
-      id: `${company.key}-${id}`,
-      name,
-      usedPct: row?.usedPct ?? null,
-      resetsAt: row?.resetsAt ?? null,
-      source: "screen",
-      readAt: row?.readAt ?? null,
-      sourceKind: stale ? "stale" : "screen",
-      sourceTextOverride: stale
-        ? t("quota.antigravity.cliStale", { when: when || row?.readAt || "" })
-        : t("quota.antigravity.cliSource"),
-      who: "",
-      pool,
-      mode: "off",
-      showPace: false,
-    });
-  };
-  const week = rows.find((row) => row.id === ANTIGRAVITY_WEEK_WINDOW);
-  const five = rows.find((row) => row.id === ANTIGRAVITY_FIVE_HOUR_WINDOW);
-  const proven = acp?.source === "provider" && acp.usedPct !== null;
-  const acpWindow = windowBase({
-    id: `${company.key}-${ANTIGRAVITY_ACP_WINDOW}`,
-    name: t("quota.antigravity.acp"),
-    usedPct: acp?.usedPct ?? null,
-    resetsAt: acp?.resetsAt ?? null,
-    source: proven ? "provider" : "none",
-    readAt: acp?.readAt ?? null,
-    sourceKind: "auto",
-    ...(proven ? {} : { sourceTextOverride: acp?.readError || t("quota.antigravity.acpUnknown") }),
-    who: "",
-    pool,
-    mode: "pool",
-    showPace: false,
-  });
-  const windows = [
-    acpWindow,
-    ...(week ? [cliRow(week, ANTIGRAVITY_WEEK_WINDOW, week.label)] : []),
-    ...(five ? [cliRow(five, ANTIGRAVITY_FIVE_HOUR_WINDOW, five.label)] : []),
-  ];
-  const remaining = remainingOf(acp?.usedPct ?? null);
+    return {
+      ...windowBase({
+        id: `${company.key}-${id}`,
+        name: t(bucket === "gemini" ? window === "week" ? "quota.antigravity.geminiWeek" : "quota.antigravity.geminiFiveHour"
+          : window === "week" ? "quota.antigravity.claudeWeek" : "quota.antigravity.claudeFiveHour"),
+        usedPct: known ? row.usedPct : null, resetsAt: known ? row.resetsAt : null,
+        source: known ? "screen" : "unread", readAt: known ? row.readAt : null,
+        sourceKind: stale ? "stale" : known ? "screen" : "unread",
+        sourceTextOverride: stale ? t("quota.antigravity.cliStale", { when: when || row?.readAt || "" })
+          : known ? t("quota.antigravity.sampledAt", { when: when || row.readAt || "" })
+          : row?.readError || t("quota.antigravity.displayUnknown"),
+        who: "", pool: undefined, mode: "off", showPace: false,
+      }),
+      readingState: stale ? "stale" as const : known ? "live" as const : "unknown" as const,
+      readingExpiresAt: row?.readingExpiresAt ?? null,
+      dispatchText: t("quota.antigravity.displayPaused"),
+    };
+  }));
   return {
-    id: company.key,
-    adapter: company.adapter,
-    name: company.cardName,
-    remainingPct: remaining,
-    headline: headline(remaining, acp?.readingState === "stale"),
-    stale: acp?.readingState === "stale",
-    notice: proven ? null : acp?.readError ?? t("quota.antigravity.acpUnknown"),
-    windows,
-    couponLine: input.coupons?.[company.key]?.line,
-    couponPlan: null,
+    id: company.key, adapter: company.adapter, name: "Antigravity",
+    remainingPct: null, headline: t("quota.antigravity.displayPaused"),
+    stale: windows.some((row) => row.readingState === "stale"),
+    notice: t("quota.antigravity.displayPaused"), noticeMuted: true, windows,
   };
 }
 
@@ -674,5 +650,8 @@ const CARD_BUILDERS: Record<string, (company: CompanyEntry, input: BuildCompanie
  * Does not decide dispatch; `pools` is the snapshot `pools.ts` already wrote.
  */
 export function buildCompanies(input: BuildCompaniesInput): CompanyCard[] {
-  return cardOrder(input.companies).map((company) => (CARD_BUILDERS[company.adapter] ?? singleWindowCard)(company, input));
+  // Every Antigravity plan reads the same two CLI buckets. Keep protected pools separate, but show the table once.
+  const first = input.companies.find(company => company.adapter === ANTIGRAVITY_CLI);
+  return cardOrder(input.companies).filter(company => company.adapter !== ANTIGRAVITY_CLI || company === first)
+    .map((company) => (CARD_BUILDERS[company.adapter] ?? singleWindowCard)(company, input));
 }

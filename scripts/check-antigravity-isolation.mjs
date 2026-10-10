@@ -59,7 +59,7 @@ const input = { id: "demo", providers: ["antigravity"], priceUsdMonthly: null, a
 for (const switches of [{ "antigravity-cli": false }, {}]) {
   const adapter = adapterOf({ ...input, adapter: "antigravity-cli" }, switches);
   const windows = windowsFor(input, adapter, { windowsBy: new Map(), balances: new Map(), cursorReading: null, antigravityReading: null, sumUsd: () => 0, now });
-  check("reader off cannot fall back to fresh manual zero", adapter === "antigravity-cli" && !poolStatus([plan("demo", windows)], { now }).demo.dispatchable, { adapter, windows });
+  check(Object.hasOwn(switches, "antigravity-cli") ? "reader explicitly off cannot fall back to fresh manual zero" : "reader switch missing cannot fall back to fresh manual zero", adapter === "antigravity-cli" && !poolStatus([plan("demo", windows)], { now }).demo.dispatchable, { adapter, windows });
 }
 const manualWindows = windowsFor(input, "manual", { windowsBy: new Map(), balances: new Map(), cursorReading: null, antigravityReading: null, sumUsd: () => 0, now });
 check("other manual provider remains dispatchable", poolStatus([plan("other", manualWindows, { adapter: "manual", providers: ["other-provider"] })], { now }).other.dispatchable, manualWindows);

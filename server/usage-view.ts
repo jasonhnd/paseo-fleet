@@ -2,7 +2,7 @@
 // Pure view helpers for usage.ts: Cursor read shapes, dispatch/pool/company views and the Cursor link banner.
 import type { DispatchStats } from "../shared/dispatch";
 import { poolLabel } from "../shared/dispatch";
-import { CURSOR_API, isMonthlyWindow } from "../shared/quota-adapters";
+import { ANTIGRAVITY_CLI, CURSOR_API, isMonthlyWindow } from "../shared/quota-adapters";
 import type { CompanyCursorRead, CompanyProviderWindow } from "../shared/quota-companies";
 import type { BoardUsage, UsagePlan } from "../shared/usage";
 import { cursorLinkOverride, msgUnlinked, type CursorUsageReading } from "./cursor-usage";
@@ -106,7 +106,7 @@ export function poolView(pools: Record<string, PoolStatus>, earlyReset: Record<s
 
 /** Windows of every plan the company cards draw from plan windows; a cursor-api plan's card uses the Cursor read instead. */
 export function companyWindows(plans: UsagePlan[], readAt: string): CompanyProviderWindow[] {
-  return plans.filter((p) => p.adapter !== CURSOR_API).flatMap((p) => p.windows.map((w) => ({
+  return plans.filter((p) => p.adapter !== CURSOR_API).flatMap((p) => (p.adapter === ANTIGRAVITY_CLI ? p.antigravityDisplay ?? p.windows : p.windows).map((w) => ({
     planId: p.id,
     label: w.label,
     id: w.id,
@@ -118,6 +118,7 @@ export function companyWindows(plans: UsagePlan[], readAt: string): CompanyProvi
     readAt: w.sampledAt ?? w.manualAt ?? readAt,
     readError: w.readError ?? null,
     readingState: w.readingState,
+    readingExpiresAt: w.readingExpiresAt,
   })));
 }
 
