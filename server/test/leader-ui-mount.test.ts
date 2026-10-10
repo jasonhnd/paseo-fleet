@@ -27,6 +27,11 @@ test("mounted settings save thresholds with revisions and homepage renders the c
   g.__leaderRpc = () => { rpcCalls++; throw new Error("Unexpected host mutation"); };
   let mounted: any;
   const tick = () => new Promise(resolve => setTimeout(resolve, 80));
+  const waitFor = async (condition: () => boolean) => {
+    const deadline = Date.now() + 10_000;
+    while (!condition() && Date.now() < deadline) await tick();
+    assert.ok(condition(), "Timed out waiting for settings fields to mount");
+  };
   try {
     const outfile = join(dir, "entry.mjs");
     await build({ stdin: { contents: `import {createRoot} from 'react-dom/client'; import {QueryClient, QueryClientProvider} from '@tanstack/react-query'; import {SettingsEditor} from './client/settings'; import {LeaderBlock} from './client/home-leaders'; import {useStyles} from './client/ui'; import {setLanguage} from './shared/i18n';
@@ -40,8 +45,9 @@ test("mounted settings save thresholds with revisions and homepage renders the c
       } }], banner: { js: "import {createRequire} from 'node:module';const require=createRequire(import.meta.url);" },
     });
     const { mount } = await import(pathToFileURL(outfile).href);
-    mounted = mount("en"); await tick();
+    setLanguage("en"); mounted = mount("en");
     const field = (key: "reminderTokens" | "warningTokens") => mounted.container.querySelector(`[aria-label="${t(`settings.leaderUsage.${key}`)}"]`);
+    await waitFor(() => Boolean(field("reminderTokens") && field("warningTokens")));
     assert.equal(field("reminderTokens").value, "500000"); assert.equal(field("warningTokens").value, "750000");
     const fill = async (key: "reminderTokens" | "warningTokens", value: string) => {
       Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, "value")!.set!.call(field(key), value);
@@ -62,7 +68,8 @@ test("mounted settings save thresholds with revisions and homepage renders the c
     await fill("warningTokens", "250"); await save();
     assert.ok(mounted.container.textContent.includes(t("settings.conflict")));
     mounted.unmount();
-    setLanguage("zh-CN"); mounted = mount("zh-CN"); await tick();
+    setLanguage("zh-CN"); mounted = mount("zh-CN");
+    await waitFor(() => Boolean(field("reminderTokens") && field("warningTokens")));
     await fill("warningTokens", "50"); await save();
     assert.ok(mounted.container.querySelector('[role="alert"]').textContent.includes(t("settings.leaderUsage.invalidOrder")));
     assert.deepEqual(readLeaderThresholds(dir), { reminderTokens: 100, warningTokens: 200 });
