@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Offline acceptance probes. No provider, daemon, credential or board mutations.
-// Run after npm ci: node scripts/check-antigravity-isolation.mjs [--usage-run file]
+// Run after npm ci: node test/antigravity/check-isolation.mjs [--usage-run file]
 import { readFile } from "node:fs/promises";
 import { isAbsolute } from "node:path";
 import { register } from "tsx/esm/api";
@@ -8,11 +8,11 @@ for (const key of ["AFC_DATA_DIR", "KANBAN_DATA_DIR", "ROLES_STATE_DIR", "PASEO_
   if (!process.env[key] || !isAbsolute(process.env[key])) throw new Error(`Set an absolute isolated ${key} before running the probes`);
 }
 register();
-const { readingFromRun, antigravityPlanWindows } = await import("../server/quota/antigravity-usage.ts");
-const { poolStatus } = await import("../server/pools-status.ts");
-const { profilePaused, applyDispatchMatrix } = await import("../shared/dispatch.ts");
-const { adapterOf } = await import("../shared/quota-adapters.ts");
-const { windowsFor } = await import("../server/adapters/windows.ts");
+const { readingFromRun, antigravityPlanWindows } = await import("../../server/quota/antigravity-usage.ts");
+const { poolStatus } = await import("../../server/pools-status.ts");
+const { profilePaused, applyDispatchMatrix } = await import("../../shared/dispatch.ts");
+const { adapterOf } = await import("../../shared/quota-adapters.ts");
+const { windowsFor } = await import("../../server/adapters/windows.ts");
 
 const now = Date.parse("2028-06-01T00:00:00Z");
 const table = [

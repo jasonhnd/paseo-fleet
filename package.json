@@ -63,6 +63,7 @@
     "contract:check": "node scripts/sync-contract.mjs --check",
     "contract:manifest": "node scripts/sync-contract.mjs --write-manifest",
     "shared:check": "node scripts/compare-scripts.mjs",
+    "antigravity:check": "node test/antigravity/check-isolation.mjs",
     "typecheck": "node scripts/typecheck.mjs",
     "test": "node --test \"scripts/*.test.mjs\"",
     "test:plugin": "node scripts/test-plugin.mjs",

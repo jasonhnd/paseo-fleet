@@ -11,8 +11,9 @@ directory, set absolute `PASEO_HOME`, `AFC_DATA_DIR`, `KANBAN_DATA_DIR`,
 `ROLES_STATE_DIR` and `TMPDIR` before running:
 
 ```sh
-node scripts/check-antigravity-isolation.mjs
-node scripts/check-antigravity-isolation.mjs --usage-run "$TMPDIR/usage-run.json"
+node test/antigravity/check-isolation.mjs
+node test/antigravity/check-isolation.mjs --usage-run "$TMPDIR/usage-run.json"
+npm run antigravity:check -- --usage-run "$TMPDIR/usage-run.json"
 ```
 
 The optional input is a saved command result with `stdout`, `stderr`, `code`,
@@ -22,7 +23,8 @@ contains only parsed samples and decisions, never raw command output. Store raw
 results privately and redact account identifiers before sharing.
 
 Exit 0 means these offline probes pass; exit 1 lists failed acceptance expectations.
-The probes are separate from `npm run verify`. In particular, check nonzero and
+These Fleet-specific probes live outside the shared gate scripts and are separate
+from `npm run verify`. In particular, check nonzero and
 signal exits even when stdout already contains a valid partial quota table. Such
 output must not be accepted as a successful live reading. Record a failed probe
 as a defect, rather than changing its expectation to match the implementation.
