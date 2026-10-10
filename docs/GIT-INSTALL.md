@@ -205,8 +205,8 @@ for (const name of ["afc", "roles"]) {
 NODE
 p plugin ls agent-fleet-cockpit --json
 p plugin logs agent-fleet-cockpit --json
-"$AFC_SHIM_DIR/afc" --help
-"$AFC_SHIM_DIR/roles" ls
+if [ -x "$AFC_SHIM_DIR/afc" ]; then "$AFC_SHIM_DIR/afc" --help; fi
+if [ -x "$AFC_SHIM_DIR/roles" ]; then "$AFC_SHIM_DIR/roles" ls; fi
 ```
 
 Keep the backup until the selected daily daemon has been checked independently.
