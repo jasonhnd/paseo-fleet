@@ -49,6 +49,12 @@ for (const [name, value, error] of [
 }
 const stale = status(valid, now + 86400000);
 check("expired CLI is marked stale and ACP stays closed", !stale.pool.dispatchable && stale.windows.slice(1).every(w => w.readingState === "stale"), stale);
+// Matching channel identities here are artificial test data, never production evidence.
+const identity = { version: "9.9.9", tier: "synthetic-tier", quotaSource: "synthetic-specific-pool", observedAt: new Date(now).toISOString() };
+const proven = { ...valid, cli: { ...identity, channel: "agy-cli" }, acp: { ...identity, channel: "paseo-acp" } };
+const exhausted = { ...proven, samples: proven.samples.map(s => ({ ...s, remainingPct: 0, usedPct: 100 })) };
+check("synthetic exhausted ACP pool stays closed", !status(exhausted).pool.dispatchable, status(exhausted));
+check("synthetic expired proven ACP reading stays closed", !status(proven, now + 86400000).pool.dispatchable && status(proven, now + 86400000).windows[0].readingState === "stale", status(proven, now + 86400000));
 const input = { id: "demo", providers: ["antigravity"], priceUsdMonthly: null, antigravityBucket: "gemini", quotaCycle: { kind: "unknown" }, manualOverride: { usedPct: 0, at: new Date(now).toISOString(), ttlSeconds: 86400 } };
 for (const switches of [{ "antigravity-cli": false }, {}]) {
   const adapter = adapterOf({ ...input, adapter: "antigravity-cli" }, switches);
