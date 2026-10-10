@@ -61,7 +61,7 @@ export function AttentionBlock({ s, data, nowMs, openAgent = null }: { s: Styles
   const openKeys = new Set(openItems.map((item) => item.key));
   const extras = [...held.values()].filter((entry) => !openKeys.has(entry.item.key));
   const items = [...openItems, ...extras.map((entry) => entry.item)];
-  const closedKeys = new Set(extras.filter((entry) => entry.closed).map((entry) => entry.item.key));
+  const closedKeys = new Set([...held.values()].filter((entry) => entry.closed).map((entry) => entry.item.key));
   const note = (item: AttentionItem, message: ReplyMessage) => {
     if (item.kind === "decision" && message.chosen) setKept((prev) => new Map(prev).set(item.key, { item, chosen: message.chosen as ChosenState }));
     if (item.kind === "decision" && (message.panelClosed || message.panelRestored)) setHeld((prev) => new Map(prev).set(item.key, { item, closed: message.panelClosed === true }));

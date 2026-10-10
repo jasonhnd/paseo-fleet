@@ -52,13 +52,14 @@ function useDecisionLists(data: BoardSnapshot) {
   const now = Date.parse(data.generatedAt) || Date.now();
   const base = useMemo(() => withKept(data.decisions.filter((row) => row.kind === "decide"), kept), [data.decisions, kept]);
   const cards = useMemo(() => withHeld(base, held), [base, held]);
-  const panelClosed = useMemo(() => closedIds(base, held), [base, held]);
+  const panelClosed = useMemo(() => closedIds(held), [held]);
   const unread = useMemo(() => data.decisions.filter((row) => row.kind === "unread"), [data.decisions]);
   const unowned = useMemo(() => partitionUnownedDecisions(data.decisions.filter((row) => row.kind === "decide")).unowned, [data.decisions]);
-  const sorted = useMemo(() => sortCardRows(cards, now, deferred), [cards, now, deferred]);
+  const settled = useMemo(() => new Set([...deferred, ...kept.keys(), ...panelClosed]), [deferred, kept, panelClosed]);
+  const processed = useMemo(() => new Set([...kept.keys(), ...panelClosed]), [kept, panelClosed]);
+  const sorted = useMemo(() => sortCardRows(cards, now, settled), [cards, now, settled]);
   const active = effectiveProjectFilter(sorted, filter);
   const visible = useMemo(() => filterByProject(sorted, active), [sorted, active]);
-  const settled = useMemo(() => new Set([...deferred, ...kept.keys()]), [deferred, kept]);
   const empty = decisionsLookEmpty(cards.length, 0, unread.length, 0, 0);
   const defer = (id: string) => setDeferred((prev) => addSet(prev, id));
   const note = (row: Decision, message: ReplyMessage) => {
@@ -66,7 +67,7 @@ function useDecisionLists(data: BoardSnapshot) {
     if (chosen) setKept((prev) => new Map(prev).set(row.id, { decision: row, chosen }));
     if (message.panelClosed || message.panelRestored) setHeld((prev) => new Map(prev).set(row.id, { decision: row, closed: message.panelClosed === true }));
   };
-  return { now, cards, unread, unowned, sorted, visible, deferred, settled, chosen: kept, panelClosed, filter: active, setFilter, empty, defer, note };
+  return { now, cards, unread, unowned, sorted, visible, deferred, settled, processed, chosen: kept, panelClosed, filter: active, setFilter, empty, defer, note };
 }
 
 /** A panel-closed row stays until the open list has it again. */
@@ -76,9 +77,9 @@ function withHeld(rows: Decision[], held: ReadonlyMap<string, HeldClose>): Decis
   return [...rows, ...extra];
 }
 
-function closedIds(rows: Decision[], held: ReadonlyMap<string, HeldClose>): Set<string> {
-  const open = new Set(rows.map((row) => row.id));
-  return new Set([...held.values()].filter((entry) => entry.closed && !open.has(entry.decision.id)).map((entry) => entry.decision.id));
+function closedIds(held: ReadonlyMap<string, HeldClose>): Set<string> {
+  // Successful local closes take effect before the refreshed open snapshot arrives.
+  return new Set([...held.values()].filter((entry) => entry.closed).map((entry) => entry.decision.id));
 }
 
 /** Answers stored by the server (last 24 hours) come back as answered cards when the panel is opened again. */
@@ -106,7 +107,7 @@ function SummaryBar({ s, model }: { s: Styles; model: ReturnType<typeof useDecis
   const tags = projectTags(model.sorted);
   return (
     <View style={{ gap: 8 }}>
-      <Text style={[s.h2, { fontWeight: "700" }]}>{cardSummaryLine(model.sorted, model.settled)}</Text>
+      <Text style={[s.h2, { fontWeight: "700" }]}>{cardSummaryLine(model.sorted, model.settled)}{model.processed.size > 0 ? ` · ${t("decisions.card.processed", { count: model.processed.size })}` : ""}</Text>
       {tags.length > 0 ? (
         <View style={[s.row, { gap: 8 }]}>
           <FilterChip s={s} label={t("decisions.list.filterAll", { count: model.sorted.length })} on={model.filter === null} onPress={() => model.setFilter(null)} />

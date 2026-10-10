@@ -23,7 +23,7 @@ export function DecisionCard({ s, d, now, openAgent, deferred = false, chosen = 
   onResult?: (message: ReplyMessage) => void;
 }) {
   const stored = d.kind === "decide" && d.source !== "Kanban";
-  const blocking = d.blocking && !deferred && !chosen;
+  const blocking = d.blocking && !deferred && !chosen && !panelClosed;
   return (
     <View style={[s.card, { gap: 12, width: "100%", borderLeftWidth: 4, borderLeftColor: blocking ? s.p.red : s.p.border, opacity: deferred ? 0.8 : 1 }]}>
       <CardHeader s={s} d={d} now={now} blocking={blocking} deferred={deferred} />

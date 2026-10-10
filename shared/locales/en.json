@@ -2071,5 +2071,6 @@
   "decisions.reply.restored": "Reopened",
   "decisions.reply.restoredAlready": "Already open",
   "decisions.reply.restoredNotified": "Reopened and notified {title}",
-  "decisions.reply.userDismissNote": "Closed by the user on the panel"
+  "decisions.reply.userDismissNote": "Closed by the user on the panel",
+  "decisions.card.processed": "{count} handled"
 }

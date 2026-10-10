@@ -36,10 +36,10 @@ export function LeaderDetails({ s, project, detail, data, paused = false, reply 
   const openIds = new Set(openDecisions.map((row) => row.id));
   const extras = [...held.values()].filter((entry) => !openIds.has(entry.row.id));
   const decisions = [...openDecisions, ...extras.map((entry) => entry.row)];
-  const closedIds = new Set(extras.filter((entry) => entry.closed).map((entry) => entry.row.id));
+  const closedIds = new Set([...held.values()].filter((entry) => entry.closed).map((entry) => entry.row.id));
   const now = Date.parse(data.generatedAt) || Date.now();
   return <View style={{gap:12}}>
-    <LeaderSection s={s} title={t("leader.ui.waitingOnYou")} summary={t("leader.ui.itemCount", { count: decisions.length })}>
+    <LeaderSection s={s} title={t("leader.ui.waitingOnYou")} summary={t("leader.ui.itemCount", { count: decisions.filter((row) => !closedIds.has(row.id)).length })}>
       {decisions.length === 0 ? <Text style={s.muted}>{t("leader.ui.noOpenDecisions")}</Text> : decisions.map(d=><View key={d.id} style={[s.item,{gap:8,borderLeftWidth:d.blocking ? 3 : 0,borderLeftColor:s.p.red,paddingLeft:d.blocking ? 8 : 0}]}>
         <Text style={d.blocking ? s.red : s.muted}>{d.blocking ? `${t("leader.ui.blockingWork")} · ` : ""}{d.id}</Text>
         {d.owner ? <Text style={s.muted}>{t("leader.ui.owner", { owner: d.owner })}{d.forceOpen ? ` · ${t("leader.ui.forceOpen")}` : ""}</Text> : null}
