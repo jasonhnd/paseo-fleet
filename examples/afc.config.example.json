@@ -1,0 +1,9 @@
+{
+  "language": "system",
+  "hiddenPlans": [],
+  "bannedProviders": [],
+  "adapters": {
+    "cursor-api": false,
+    "keychain": false
+  }
+}
