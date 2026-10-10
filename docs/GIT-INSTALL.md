@@ -78,8 +78,11 @@ const home = process.env.PASEO_HOME, backup = process.env.AFC_BACKUP;
 const cfg = JSON.parse(fs.readFileSync(path.join(home, "config.json"), "utf8"));
 const raw = JSON.parse(fs.readFileSync(path.join(backup, "plugin-before.json"), "utf8"));
 const plugin = Array.isArray(raw) ? raw.find(row => row.id === "agent-fleet-cockpit") : raw;
-if (plugin?.source !== "directory" || !plugin.path) throw new Error("Expected the old directory source");
-const state = { oldDirectory: plugin.path, enabled: plugin.enabled,
+const identity = plugin?.installation?.identity;
+const oldDirectory = identity ? (identity.kind === "directory" ? identity.path : null)
+  : (plugin?.source === "git" ? null : plugin?.path);
+if (!oldDirectory) throw new Error("Expected the old directory source");
+const state = { oldDirectory, enabled: plugin.enabled,
   pluginsEnabled: cfg.pluginsEnabled === true, shims: {} };
 fs.mkdirSync(path.join(backup, "shims"));
 for (const name of ["afc", "roles"]) {

@@ -96,7 +96,8 @@ export function modelIdOf(p: Profile): string {
 const isPlainObject = (value: unknown): value is Json => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
 /**
- * Every parseable JSON object under `<paseoDir>/agents/<dir>/*.json`. Null when the agents root cannot be read.
+ * Every parseable JSON object under `<paseoDir>/agents/<dir>/*.json`.
+ * A missing agents root (ENOENT) returns an empty list; other root read failures return null.
  * Unreadable sub-directories and files that are not JSON objects are skipped.
  */
 export async function readAgentRecordFiles(paseoDir: string = PASEO_DIR): Promise<Json[] | null> {
