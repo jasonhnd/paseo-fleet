@@ -8,7 +8,7 @@
 // them, keep using the legacy directory. The choice is made once per process.
 //
 // Other plugins: their install directory comes from `$PASEO_HOME/config.json` (`plugins.<id>.path`);
-// AFC uses its running package location; AFC_HOME is a fallback outside a managed instance.
+// Managed AFC instances use their running package location; standalone tools also honor AFC_HOME.
 // KANBAN_HOME overrides its host-configured path. Kanban's data directory follows the same pattern as ours:
 // KANBAN_DATA_DIR, else its plugin-data directory once it holds a board, else `<install dir>/data`.
 import { accessSync, constants, existsSync, readFileSync, statSync } from "node:fs";
@@ -173,7 +173,8 @@ function envDir(env: Env, name: string): string | null {
 
 /** The running package wins over a host config that is still being updated. */
 export function afcPluginDir(env: Env = process.env, home: string = homedir(), runningDir = runtimePluginDir(env, home)): string | null {
-  return runningDir ?? (hasManagedInstallIdentity() ? null : envDir(env, "AFC_HOME") ?? pluginInstallDir(PLUGIN_IDS.cockpit, env, home));
+  if (hasManagedInstallIdentity()) return runningDir;
+  return envDir(env, "AFC_HOME") ?? runningDir ?? pluginInstallDir(PLUGIN_IDS.cockpit, env, home);
 }
 
 /** The cockpit's command-line directory: `<plugin>/bin`, or `<checkout>/bin` beside the plugin folder. */

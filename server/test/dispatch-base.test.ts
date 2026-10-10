@@ -39,19 +39,20 @@ describe("base dispatch matrix", () => {
     }
   });
 
-  test("the install dir also comes from Paseo's config.json plugin entry", async () => {
+  test("the running source package wins over another directory in host config", async () => {
     mkdirSync(join(home, ".paseo"), { recursive: true });
-    writeFileSync(join(home, ".paseo", "config.json"), JSON.stringify({ plugins: { "agent-fleet-cockpit": { source: "directory", path: PLUGIN_DIR } } }));
+    writeFileSync(join(home, ".paseo", "config.json"), JSON.stringify({ plugins: { "agent-fleet-cockpit": { source: "directory", path: join(home, "old-plugin") } } }));
     try {
+      assert.equal(dispatch.baseMatrixPath(), join(PLUGIN_DIR, "shared/default-dispatch.example.json"));
       assert.ok(Object.keys((await dispatch.loadBaseMatrix()).roles).length > 0);
     } finally {
       rmSync(join(home, ".paseo", "config.json"));
     }
   });
 
-  test("unknown install dir, missing or empty file: an error, never an empty matrix", async () => {
-    assert.equal(dispatch.baseMatrixPath(), null);
-    await assert.rejects(dispatch.loadBaseMatrix(), /install directory unknown/);
+  test("ESM knows its package without config; unknown, missing or empty explicit paths still fail", async () => {
+    assert.equal(dispatch.baseMatrixPath(), join(PLUGIN_DIR, "shared/default-dispatch.example.json"));
+    await assert.rejects(dispatch.loadBaseMatrix(null), /install directory unknown/);
     await assert.rejects(dispatch.loadBaseMatrix(join(dataDir, "shared/default-dispatch.example.json")), /unreadable/);
     const empty = join(home, "empty.json");
     writeFileSync(empty, JSON.stringify({ version: 1, defaultTier: "L2", roles: {}, downgradeWhenTight: [] }));

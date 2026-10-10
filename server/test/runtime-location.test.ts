@@ -47,7 +47,7 @@ test("preparation stamps survive staging relocation and distinguish repeated pre
 
 test("host CJS publication and roles use the new instance while config still names the removed version", async () => {
   const home = mkdtempSync(join(tmpdir(), "afc-upgrade-path-"));
-  const previous = { AFC_DATA_DIR: process.env.AFC_DATA_DIR, PASEO_HOME: process.env.PASEO_HOME };
+  const previous = { AFC_DATA_DIR: process.env.AFC_DATA_DIR, PASEO_HOME: process.env.PASEO_HOME, AFC_HOME: process.env.AFC_HOME };
   const warnings: string[] = [];
   const warn = console.warn;
   try {
@@ -62,6 +62,7 @@ test("host CJS publication and roles use the new instance while config still nam
     put(join(home, "config.json"), JSON.stringify({ plugins: { "agent-fleet-cockpit": { path: old } } }));
     process.env.AFC_DATA_DIR = join(home, "data");
     process.env.PASEO_HOME = home;
+    process.env.AFC_HOME = old;
     console.warn = (...args) => warnings.push(args.join(" "));
     const compiled = await build({
       stdin: { contents: 'export {afcPluginDir, afcBinDir, rolesBin} from "./server/paths"; export {publishCockpitInfo} from "./server/exports";', resolveDir: root, sourcefile: "upgrade-test.ts" },
