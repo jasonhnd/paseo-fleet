@@ -46,8 +46,8 @@ test("mounted close and undo settle counts and blocking styles before and after 
     for (const lang of ["en", "zh-CN"] as const) for (const surface of ["decisions", "leader"]) {
       const text = () => mounted.container.textContent as string;
       const label = (key: Parameters<typeof tIn>[1]) => tIn(lang, key);
-      const click = async (key: Parameters<typeof tIn>[1]) => { const button = [...mounted.container.querySelectorAll("[aria-label]")].find((node: any) => node.getAttribute("aria-label") === label(key)) as HTMLElement; assert.ok(button, label(key)); button.click(); await tick(); };
-      const border = () => [...mounted.container.querySelectorAll("div")].find((node: any) => dom.window.getComputedStyle(node).borderLeftWidth === "4px") as HTMLElement;
+      const click = async (key: Parameters<typeof tIn>[1]) => { const button = [...mounted.container.querySelectorAll("[aria-label]")].find((node: any) => node.getAttribute("aria-label") === label(key)) as any; assert.ok(button, label(key)); button.click(); await tick(); };
+      const border = () => [...mounted.container.querySelectorAll("div")].find((node: any) => dom.window.getComputedStyle(node).borderLeftWidth === "4px") as any;
       const assertOpen = () => { assert.ok(text().includes(tIn(lang, "decisions.card.summaryBlocking", { count: 1, blocking: 1 })), text()); assert.equal(dom.window.getComputedStyle(border()).borderLeftColor, rgb(LIGHT.red)); };
       const assertClosed = () => { assert.ok(text().includes(tIn(lang, "decisions.card.summary", { count: 0 })), text()); assert.ok(text().includes(tIn(lang, "decisions.card.processed", { count: 1 }))); assert.ok(!text().includes(label("decisions.meta.blocking"))); assert.equal(dom.window.getComputedStyle(border()).borderLeftColor, rgb(LIGHT.border)); assert.ok(mounted.container.querySelector(`[aria-label="${label("decisions.actions.dismissUndoLabel")}"]`)); };
       mounted = mount(lang, surface, snapshot()); await tick(); assertOpen();

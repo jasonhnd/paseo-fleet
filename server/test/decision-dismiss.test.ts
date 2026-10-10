@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { tIn } from "../../shared/i18n.ts";
+import { tIn } from "../../shared/i18n";
 import {
   CHECK_AFTER_MS,
   CHECK_RETRY_MS,
@@ -13,7 +13,7 @@ import {
   checkLine,
   dueForCheck,
   spokeAfterCreate,
-} from "../../shared/decision-check.ts";
+} from "../../shared/decision-check";
 import {
   dismissPrompt,
   restorePrompt,
@@ -24,9 +24,9 @@ import {
   type DecideAgent,
   type DecideDeps,
   type OpenDecisionItem,
-} from "../decide-reply.ts";
-import { runOpenDecisionChecks, type CheckDeps, type OpenCheckRequest } from "../decision-check.ts";
-import { parseLeaderActivity } from "../leader-panel.ts";
+} from "../decide-reply";
+import { runOpenDecisionChecks, type CheckDeps, type OpenCheckRequest } from "../decision-check";
+import { parseLeaderActivity } from "../leader-panel";
 
 function check(name: string, cond: boolean, detail?: string): void {
   assert.ok(cond, `${name}${detail ? `: ${detail}` : ""}`);
