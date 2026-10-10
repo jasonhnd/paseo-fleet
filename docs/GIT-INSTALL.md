@@ -57,7 +57,8 @@ and [runtime and CLI reference](https://github.com/getpaseo/paseo/blob/main/publ
 Create a new home under the task's temporary directory. Write `config.json` before
 starting the daemon, with a different `daemon.listen`, relay disabled and providers
 disabled through `agents.providers`. Point HOME, PASEO_HOME, AFC_DATA_DIR,
-AFC_LEGACY_DATA_DIR, KANBAN_DATA_DIR and ROLES_STATE_DIR at isolated locations.
+KANBAN_DATA_DIR and ROLES_STATE_DIR at isolated locations from the start. Leave
+AFC_LEGACY_DATA_DIR unset unless testing an explicit legacy migration.
 Use the bundled web UI and a separate browser profile. Select the isolated endpoint
 explicitly with `--host`; do not combine `--host` and `--home`.
 

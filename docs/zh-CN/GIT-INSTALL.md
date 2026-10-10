@@ -41,8 +41,8 @@ npm 包保留准备入口，不包含 lockfile 和仓库构建工具，但已带
 
 在本任务临时目录下新建 home。启动 daemon 前写好 `config.json`：使用不同的
 `daemon.listen`，禁用 relay，并通过 `agents.providers` 禁用 providers。
-HOME、PASEO_HOME、AFC_DATA_DIR、AFC_LEGACY_DATA_DIR、KANBAN_DATA_DIR、ROLES_STATE_DIR
-均指向隔离目录。使用内置 Web UI 和独立浏览器 profile；用 `--host` 明确指定隔离端点，
+HOME、PASEO_HOME、AFC_DATA_DIR、KANBAN_DATA_DIR、ROLES_STATE_DIR
+从一开始均指向隔离目录；除非专门验证旧数据迁移，否则不设置 AFC_LEGACY_DATA_DIR。使用内置 Web UI 和独立浏览器 profile；用 `--host` 明确指定隔离端点，
 不要同时使用 `--host` 和 `--home`。
 
 发版检查须覆盖临时 tag 的 `file://` 安装、`running` 状态、ID `agent-fleet-cockpit`、
