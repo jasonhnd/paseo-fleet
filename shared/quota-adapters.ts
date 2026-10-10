@@ -286,7 +286,7 @@ function buildSpecs(): Record<AdapterId, AdapterSpec> {
       judgeRank: 6,
       cardRank: 6,
       names: { line: "Antigravity", label: "Antigravity", short: "Antigravity", via: t("quota.adapters.via", { name: "Antigravity" }) },
-      cardName: null,
+      cardName: "Antigravity",
       couponName: null,
     },
     [MANUAL]: {

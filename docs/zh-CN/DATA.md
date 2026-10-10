@@ -25,16 +25,16 @@ plans.json 存用户池/adapter/周期时区/手填/阈值优先序；afc.config
 
 ## Antigravity CLI 展示
 
-antigravity-cli 可选，默认关闭。没有“已在用”标记，数据目录里的文件不会把它打开，也没有命令时不会去跑 agy。开关为 true 时，在空的临时目录里执行 `agy -p "/usage"`，并有超时。表可以有 Gemini 桶和 Claude/GPT 桶，各用一个计划。行是该表的每周和 5 小时剩余，并标明来自 agy CLI。
+antigravity-cli 可选，默认关闭。没有“已在用”标记，数据目录里的文件不会把它打开，也没有命令时不会去跑 agy。开关为 true 时，在空的临时目录里执行 `agy -p "/usage"`，并有超时。一张 Antigravity 卡按固定顺序显示 Gemini 5 小时、Gemini 每周、Claude 5 小时、Claude 每周。Claude 是 CLI 的 Claude/GPT 共用桶，小字标明仅显示。百分比和倒计时来自一次成功读取，不固定任何数字或日期。进度条表示剩余：0% 为空、100% 为满。缺读数保持未知。
 
-这些行不是 Paseo ACP 派活池。ACP 行保持未知，因此不派活，除非 CLI 观察和 ACP 观察的版本、档位、额度来源键相同，且两边都有观察时间。产品名不算这个键。随附的读取只记录 CLI 表，ACP 观察留空，所以安全停派保持有效。手填百分比不能替换这条 ACP 行。开关关闭或未设置时，计划不会改成 manual，也不会启动 agy。其他可选适配器在自己的开关关闭时仍使用手填。超过实时读数时限的 agy 行仍显示，但标成过期样本并保留采样时间。它不是实时读数，也不是 ACP 百分比。quotaProtection 设为 none 会故意关掉这道护栏。
+这些行不是 Paseo ACP 派活池。后端 ACP 行保持未知（不作为卡片的第五行），因此不派活，除非 CLI 观察和 ACP 观察的版本、档位、额度来源键相同，且两边都有观察时间。产品名不算这个键。随附的读取只记录 CLI 表，ACP 观察留空，所以安全停派保持有效。手填百分比不能替换这条 ACP 行。开关关闭或未设置时，计划不会改成 manual，也不会启动 agy。其他可选适配器在自己的开关关闭时仍使用手填。超过实时读数时限的 agy 行仍显示，但标成过期样本并保留采样时间。它不是实时读数，也不是 ACP 百分比。quotaProtection 设为 none 会故意关掉这道护栏。
 
-示例形状不含真实百分比：
+以下计划示例不含真实百分比；安装支持该适配器的版本后，还须在 afc.config.json 中明确设置 adapters.antigravity-cli=true：
 
 ```json
 {
   "id": "example-antigravity-gemini",
-  "name": "Example Antigravity Gemini",
+  "name": "Antigravity",
   "adapter": "antigravity-cli",
   "antigravityBucket": "gemini",
   "providers": ["antigravity"],
@@ -43,7 +43,7 @@ antigravity-cli 可选，默认关闭。没有“已在用”标记，数据目�
 }
 ```
 
-Claude/GPT 展示计划把 antigravityBucket 设为 claude-gpt，providers 仍是 antigravity。不要写成 claude 或 codex，也不要因此新建 Claude ACP 档案。表里有 5 小时重置就显示它。派活不猜测窗口起点，所以这行较短的窗口本身不会把池判为用尽。
+不需要第二个显示计划。antigravityBucket 只标识受保护的 ACP 桶，不影响同时展示两个 CLI 桶。显示数据放在插件 RPC 的 antigravityDisplay 中，与派活 windows 分开，不修改 fleet-quota 快照。不要把 providers 写成 claude 或 codex，也不要因此新建 Claude ACP 档案。非零退出、信号终止、超时、登录错误和坏输出不会产生可用新读数，即使 stdout 含合法表行。表里有 5 小时重置就显示它。派活不猜测窗口起点，所以这行较短的窗口本身不会把池判为用尽。
 
 ## 备份、迁移、移除与隔离
 

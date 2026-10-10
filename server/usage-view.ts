@@ -106,7 +106,7 @@ export function poolView(pools: Record<string, PoolStatus>, earlyReset: Record<s
 
 /** Windows of every plan the company cards draw from plan windows; a cursor-api plan's card uses the Cursor read instead. */
 export function companyWindows(plans: UsagePlan[], readAt: string): CompanyProviderWindow[] {
-  return plans.filter((p) => p.adapter !== CURSOR_API).flatMap((p) => p.windows.map((w) => ({
+  return plans.filter((p) => p.adapter !== CURSOR_API).flatMap((p) => (p.antigravityDisplay ?? p.windows).map((w) => ({
     planId: p.id,
     label: w.label,
     id: w.id,
@@ -118,6 +118,7 @@ export function companyWindows(plans: UsagePlan[], readAt: string): CompanyProvi
     readAt: w.sampledAt ?? w.manualAt ?? readAt,
     readError: w.readError ?? null,
     readingState: w.readingState,
+    readingExpiresAt: w.readingExpiresAt,
   })));
 }
 

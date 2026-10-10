@@ -35,16 +35,16 @@ Hiding a pool is a display setting, not a dispatch stop. Use pool dispatch/prote
 
 ## Antigravity CLI display
 
-`antigravity-cli` is optional and off by default. There is no in-use marker: a file in the data directory does not start it, and a missing `agy` command is not launched. Turning the switch on reads `agy -p "/usage"` in an empty temporary directory, with a timeout. The table can show a Gemini bucket and a Claude/GPT bucket. Each bucket is its own plan. The rows are the weekly and five-hour values from that table, labeled as the agy CLI.
+`antigravity-cli` is optional and off by default. There is no in-use marker: a file in the data directory does not start it, and a missing `agy` command is not launched. Turning the switch on reads `agy -p "/usage"` in an empty temporary directory, with a timeout. The table can show a Gemini bucket and a Claude/GPT bucket. One Antigravity card shows Gemini five-hour, Gemini weekly, Claude five-hour and Claude weekly, in that order. Claude is the CLI’s shared Claude/GPT bucket, labeled as display only. Percentages and countdowns come from a single successful read, with no fixed values or reset dates. The bars show remaining quota, including empty at 0% and full at 100%. Missing readings stay unknown.
 
-Those rows are not the Paseo ACP dispatch pool. The ACP row stays unknown, so the pool is not dispatched, unless the CLI observation and the ACP observation carry the same version, the same tier, and the same quota-source key, each with an observation time. A product name is not that key. The shipped reader records the CLI table only and leaves the ACP observation empty, so the hold stays in place. A hand-copied percent does not replace that ACP row. Leaving the switch off or unset does not change the plan to `manual` and does not launch `agy`. Other optional adapters still use a hand copy when their own switch is off. An agy row older than the live-reading limit stays visible as an expired sample, with the time it was taken. It is not a live reading and it is not the ACP percent. `quotaProtection` set to `none` turns this guard off on purpose.
+Those rows are not the Paseo ACP dispatch pool. The backend ACP row stays unknown (it is not a fifth row on the display card), so the pool is not dispatched, unless the CLI observation and the ACP observation carry the same version, the same tier, and the same quota-source key, each with an observation time. A product name is not that key. The shipped reader records the CLI table only and leaves the ACP observation empty, so the hold stays in place. A hand-copied percent does not replace that ACP row. Leaving the switch off or unset does not change the plan to `manual` and does not launch `agy`. Other optional adapters still use a hand copy when their own switch is off. An agy row older than the live-reading limit stays visible as an expired sample, with the time it was taken. It is not a live reading and it is not the ACP percent. `quotaProtection` set to `none` turns this guard off on purpose.
 
-Suggested shape, with no live percentages:
+Suggested plan shape, with no live percentages. Also explicitly set `adapters.antigravity-cli=true` in `afc.config.json` after installing a version that supports it:
 
 ```json
 {
   "id": "example-antigravity-gemini",
-  "name": "Example Antigravity Gemini",
+  "name": "Antigravity",
   "adapter": "antigravity-cli",
   "antigravityBucket": "gemini",
   "providers": ["antigravity"],
@@ -53,7 +53,7 @@ Suggested shape, with no live percentages:
 }
 ```
 
-A Claude/GPT display plan uses `"antigravityBucket": "claude-gpt"` and the same provider id `antigravity`. It does not use `claude` or `codex`, and it does not create a Claude ACP profile. The five-hour reset is shown when the table includes one. Dispatch does not invent a window start, so that shorter row does not by itself exhaust the pool.
+No second display plan is needed. `antigravityBucket` identifies the protected ACP bucket only; both CLI buckets appear regardless. The display data lives in the plugin RPC’s `antigravityDisplay`, separate from dispatch `windows` and the unchanged fleet-quota snapshot. It does not use `claude` or `codex` as provider ids or create a Claude ACP profile. Nonzero exits, signal termination, timeouts, login errors and bad output provide no usable new readings, even if stdout contains valid rows. The five-hour reset is shown when the table includes one. Dispatch does not invent a window start, so that shorter row does not by itself exhaust the pool.
 
 ## Backup, migration and removal
 

@@ -240,7 +240,7 @@ function QuotaPane({ s, snap }: { s: ReturnType<typeof useStyles>; snap: ReturnT
   return (
     <View style={{ gap: 24 }}>
       {snap ? <QuotaBlock s={s} companies={snap.home.companies} /> : <Empty s={s} text={t("board.loadingQuota")} />}
-      <Quota s={s} />
+      <Quota s={s} antigravityInSummary={!!snap} />
     </View>
   );
 }

@@ -305,7 +305,7 @@ export function antigravityDisplayWindows(reading: AntigravityReading | null, no
     const sample = reading?.error === null ? reading.samples.find((row) => row.bucket === bucket && row.window === window) : undefined;
     const live = !!sample && !!reading && !reading.stale && fresh(reading.readAt, now)
       && (sample.resetsAt === null || Date.parse(sample.resetsAt) > now);
-    return blankWindow({
+    const row = blankWindow({
       id: `${bucket}-${window === "week" ? ANTIGRAVITY_WEEK_WINDOW : ANTIGRAVITY_FIVE_HOUR_WINDOW}`,
       label: cliLabel(bucket, window), primary: false,
       usedPct: sample?.usedPct ?? null, resetsAt: sample?.resetsAt ?? null,
@@ -314,6 +314,8 @@ export function antigravityDisplayWindows(reading: AntigravityReading | null, no
       sampledAt: sample ? reading?.readAt : null, staleUsedPct: sample && !live ? sample.usedPct : null,
       apiUsd: 0, planUsd: null,
     });
+    const expires = sample && reading ? Math.min(Date.parse(reading.readAt) + LIVE_READING_TTL_MS, sample.resetsAt ? Date.parse(sample.resetsAt) : Infinity) : NaN;
+    return { ...row, readingExpiresAt: Number.isFinite(expires) ? new Date(expires).toISOString() : null };
   }));
 }
 

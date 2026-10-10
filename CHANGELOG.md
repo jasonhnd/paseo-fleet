@@ -7,6 +7,7 @@ No public release is declared by this document.
 
 ### Added
 
+- One Antigravity card shows both CLI buckets in four remaining-quota rows, with reset countdowns and a shared Claude/GPT display-only note. ACP dispatch protection and contract snapshots stay separate.
 - Optional `antigravity-cli` shows the local agy `/usage` table. It stays off until switched on, and it does not dispatch the Paseo ACP channel unless that channel is shown to be the same pool. The shipped reader does not establish that.
 - Experimental plugin sources, standalone Node commands and English/Simplified Chinese interfaces.
 - Public setup, workflow, data, compatibility and manual release documentation.
@@ -17,6 +18,8 @@ No public release is declared by this document.
 - No released baseline yet.
 
 ### Fixed
+
+- Failed or signal-terminated agy commands discard even valid stdout rows; only a normal code-zero read can supply new live samples.
 
 - An `antigravity-cli` plan keeps its unknown ACP hold when the reader switch is off or unset. A hand-copied percent does not replace that hold. An expired agy table is shown as a stale sample.
 

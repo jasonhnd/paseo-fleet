@@ -3,7 +3,8 @@ import { Pressable, Text, View } from "react-native";
 import type { CompanyCard, CompanyWindow } from "../shared/quota-companies";
 import { companyRemainingText, resetPhrase } from "../shared/quota-companies";
 import { t, tAll } from "../shared/i18n";
-import { CURSOR_API } from "../shared/quota-adapters";
+import { ANTIGRAVITY_CLI, CURSOR_API } from "../shared/quota-adapters";
+import { AntigravityQuota } from "./antigravity-quota";
 import { remainingMarker } from "../shared/quota-line";
 import { COMPANY_COLUMNS, COMPANY_MIN_CELL_WIDTH, COMPANY_TILE_COLUMNS, COMPANY_TILE_MIN_CELL_WIDTH, companyDispatchSummary } from "../shared/quota-tiles";
 import { Badge, Metric, Nums, pressed, ResponsiveGrid, Section, type Styles, type Tone, Track } from "./ui";
@@ -75,6 +76,7 @@ function WindowRow({ s, row, showPace, now, markerBasis }: { s: Styles; row: Com
 type CardsProps = { s: Styles; companies: CompanyCard[]; showPace: boolean; now: number; cursorFooter?: ReactNode; markerBasis?: "used" | "remaining" };
 
 function CompanyDetail({ s, company, showPace, now, cursorFooter, markerBasis = "used" }: Omit<CardsProps, "companies"> & { company: CompanyCard }) {
+  if (company.adapter === ANTIGRAVITY_CLI) return <AntigravityQuota s={s} company={company} now={now} />;
   return (
     <Metric s={s} value={companyFigure(company)} label={company.name}>
       {company.stale ? <Text style={s.yellow}>{t("quota.companies.source.stale")}</Text> : null}
@@ -135,7 +137,13 @@ function CompanyTile({ s, company, active, onPress }: { s: Styles; company: Comp
 export function CompanyCards(props: CardsProps) {
   const { s, companies } = props;
   if (companies.length === 0) return <Text style={s.muted}>{t("quota.home.noCompanies")}</Text>;
-  if (s.compact) return <CompanyTiles {...props} />;
+  if (s.compact) {
+    const regular = companies.filter((company) => company.adapter !== ANTIGRAVITY_CLI);
+    return <View style={{ gap: 12 }}>
+      {regular.length > 0 ? <CompanyTiles {...props} companies={regular} /> : null}
+      {companies.filter((company) => company.adapter === ANTIGRAVITY_CLI).map((company) => <AntigravityQuota key={company.id} s={s} company={company} now={props.now} />)}
+    </View>;
+  }
   return (
     <ResponsiveGrid s={s} columns={COMPANY_COLUMNS} minCellWidth={COMPANY_MIN_CELL_WIDTH}>
       {companies.map((company) => <CompanyDetail key={company.id} {...props} company={company} />)}

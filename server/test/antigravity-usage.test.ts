@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, test } from "node:test";
 import { t } from "../../shared/i18n";
-import { buildCompanies, companyRemainingText } from "../../shared/quota-companies";
+import { buildCompanies } from "../../shared/quota-companies";
 import {
   ANTIGRAVITY_ACP_WINDOW,
   ANTIGRAVITY_CLI,
@@ -22,6 +22,7 @@ import { companyWindows } from "../usage-view";
 import { LIVE_READING_TTL_MS, POOL_REFRESH_MS } from "../quota-timing";
 import {
   AGY_USAGE_COMMAND,
+  antigravityDisplayWindows,
   antigravityPlanWindows,
   antigravityUsageRequested,
   parseAntigravityUsage,
@@ -379,10 +380,10 @@ describe("same pool", () => {
     assert.equal(five?.readingState, "stale");
     assert.equal(five?.sampledAt, aged.readAt);
     const source = { id: "example-antigravity-gemini", name: "Example Antigravity Gemini", adapter: ANTIGRAVITY_CLI, providers: ["antigravity"] };
-    const plans = [usage(windows, { id: source.id, name: source.name })];
+    const plans = [usage(windows, { id: source.id, name: source.name, antigravityDisplay: antigravityDisplayWindows(aged, NOW) })];
     const shown = companyWindows(plans, new Date(NOW).toISOString());
-    assert.equal(shown.find((row) => row.id === ANTIGRAVITY_WEEK_WINDOW)?.readAt, aged.readAt);
-    assert.notEqual(shown.find((row) => row.id === ANTIGRAVITY_WEEK_WINDOW)?.readAt, new Date(NOW).toISOString());
+    assert.equal(shown.find((row) => row.id === `gemini-${ANTIGRAVITY_WEEK_WINDOW}`)?.readAt, aged.readAt);
+    assert.notEqual(shown.find((row) => row.id === `gemini-${ANTIGRAVITY_WEEK_WINDOW}`)?.readAt, new Date(NOW).toISOString());
     const card = buildCompanies({
       companies: companyCatalog([source], { [ANTIGRAVITY_CLI]: true }),
       windows: shown,
@@ -393,9 +394,9 @@ describe("same pool", () => {
     const local = new Date(Date.parse(aged.readAt) + 9 * 60 * 60 * 1000);
     const pad = (n: number) => String(n).padStart(2, "0");
     const when = `${local.getUTCMonth() + 1}/${local.getUTCDate()} ${pad(local.getUTCHours())}:${pad(local.getUTCMinutes())}`;
-    const cli = card?.windows.find((row) => row.id.endsWith(ANTIGRAVITY_WEEK_WINDOW));
-    const cliFive = card?.windows.find((row) => row.id.endsWith(ANTIGRAVITY_FIVE_HOUR_WINDOW));
-    assert.equal(card?.headline, companyRemainingText(null));
+    const cli = card?.windows.find((row) => row.id.endsWith(`gemini-${ANTIGRAVITY_WEEK_WINDOW}`));
+    const cliFive = card?.windows.find((row) => row.id.endsWith(`gemini-${ANTIGRAVITY_FIVE_HOUR_WINDOW}`));
+    assert.equal(card?.headline, t("quota.antigravity.displayPaused"));
     assert.equal(cli?.readAt, aged.readAt);
     assert.equal(cli?.usedPct, 10);
     assert.equal(cli?.tone, "yellow");
@@ -447,7 +448,7 @@ describe("same pool", () => {
     const pools = poolStatus([usage(windows, { id: source.id, name: source.name })], { now: NOW });
     const card = buildCompanies({
       companies,
-      windows: windows.map((row) => ({
+      windows: antigravityDisplayWindows(reading(PLENTIFUL), NOW).map((row) => ({
         planId: source.id,
         label: row.label,
         id: row.id,
@@ -464,12 +465,15 @@ describe("same pool", () => {
       profiles: [],
       cursor: null,
     })[0];
-    assert.equal(card?.headline, companyRemainingText(null));
+    assert.equal(card?.headline, t("quota.antigravity.displayPaused"));
     assert.equal(card?.remainingPct, null);
     assert.notEqual(card?.windows[0]?.dispatchText, t("quota.companies.dispatchable"));
-    const cli = card?.windows.find((row) => row.id.endsWith(ANTIGRAVITY_WEEK_WINDOW));
+    const cli = card?.windows.find((row) => row.id.endsWith(`gemini-${ANTIGRAVITY_WEEK_WINDOW}`));
     assert.equal(cli?.remainingPct, 100);
-    assert.equal(cli?.sourceText, t("quota.antigravity.cliSource"));
+    assert.ok(cli?.sourceText.startsWith("agy CLI /usage"));
+    assert.equal(card?.windows.length, 4);
+    assert.equal(card?.name, "Antigravity");
+    assert.equal(card?.windows.some(row => row.id.includes(ANTIGRAVITY_ACP_WINDOW)), false);
   });
 
   test("quota protection none is an explicit bypass", () => {
