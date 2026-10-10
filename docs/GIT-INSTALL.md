@@ -62,6 +62,9 @@ plugin-data marker surviving removal. Delete only the test tags afterwards. A fr
 daemon can have no agent records or role profiles; unresolved dispatch slots warn
 until configured. This is separate from compiler or runtime errors.
 
+Run the command blocks with Bash or POSIX `sh`. Pasting them directly into zsh
+can produce `bad substitution`; in zsh, run `bash` first.
+
 ## Daily AFC switch checklist
 
 These commands are a runbook, not an automatic migration. Run them only in the
@@ -115,6 +118,30 @@ for (const name of ["afc", "roles"]) {
 fs.writeFileSync(path.join(backup, "state.json"), JSON.stringify(state, null, 2), { mode: 0o600 });
 NODE
 
+# Poll after restoring/reloading; rollback uses this function too.
+afc_wait() {
+  AFC_EXPECTED="$(node -e 'const fs=require("node:fs");const s=JSON.parse(fs.readFileSync(process.env.AFC_BACKUP+"/state.json"));console.log(s.enabled && s.pluginsEnabled ? "running" : "disabled")')"
+  AFC_ATTEMPT=0
+  while :; do
+    if p plugin ls agent-fleet-cockpit --json > "$AFC_BACKUP/plugin-status.json"; then
+      if AFC_STATUS="$(node -e 'const fs=require("node:fs");const raw=JSON.parse(fs.readFileSync(process.env.AFC_BACKUP+"/plugin-status.json"));const p=Array.isArray(raw) ? raw.find(p=>p.id==="agent-fleet-cockpit") : raw;console.log(p?.status || "unknown")')"; then
+        if [ "$AFC_STATUS" = "$AFC_EXPECTED" ]; then
+          cat "$AFC_BACKUP/plugin-status.json"
+          p plugin logs agent-fleet-cockpit --json
+          return 0
+        fi
+      fi
+    fi
+    if [ "$AFC_ATTEMPT" -ge 30 ]; then
+      echo "AFC did not reach $AFC_EXPECTED within 60 seconds; inspect logs before rollback." >&2
+      p plugin logs agent-fleet-cockpit --json
+      return 1
+    fi
+    sleep 2
+    AFC_ATTEMPT=$((AFC_ATTEMPT + 1))
+  done
+}
+
 # Define pause and restore functions once; rollback uses the same functions.
 afc_pause() {
   node --input-type=module <<'NODE'
@@ -164,6 +191,7 @@ NODE
 p plugin remove agent-fleet-cockpit --json
 p plugin install "file://$AFC_REPO" --ref "$AFC_TAG" --json > "$AFC_BACKUP/plugin-after.json"
 afc_restore
+afc_wait
 
 # Point both commands at the installed, already-built Node entry, with the correct home.
 node --input-type=module <<'NODE'
@@ -185,14 +213,28 @@ for (const name of ["afc", "roles"]) {
 }
 NODE
 
-# Check identity, revision, saved enabled state, logs, data and the built commands.
-p plugin ls agent-fleet-cockpit --json
-p plugin logs agent-fleet-cockpit --json
+# Check identity, revision, data and the built commands after afc_wait.
 p plugin update agent-fleet-cockpit --check --ref "$AFC_TAG" --json
 "$AFC_SHIM_DIR/afc" --help
 "$AFC_SHIM_DIR/afc" leader --help
 "$AFC_SHIM_DIR/roles" ls
 ```
+
+Immediately after reload or restoring the global switch, `plugin ls` may briefly
+report `failed`, including for other plugins, then reach `running` after 5–10
+seconds with no log errors. Use `afc_wait` after each restore/reload that resumes
+plugins: it polls `paseo plugin ls agent-fleet-cockpit --json` on the selected home
+every two seconds for up to 60 seconds (plus command execution time), expecting
+`running` only when both saved switches were on, otherwise `disabled`. A transient
+status is not a failure; only a timeout without the expected status fails the
+status check and calls for rollback. Also inspect `plugin logs` for compilation or
+initialization errors before deciding the switch succeeded or requires rollback.
+
+A reload result containing `restartRequiredPaths: plugins.agent-fleet-cockpit.path`
+reports a source path change. If the listing confirms AFC is `running` from the
+new installed path and the logs have no errors, no daemon restart is needed. If it
+still uses the old path, restart the selected daemon and repeat `afc_wait` and the
+log check. For a saved disabled state, confirm the new path and `disabled` status.
 
 Expect Git source identity, the approved tag's commit, and `running` when both
 saved enabled switches were on; otherwise expect `disabled`. Open the daily
@@ -204,8 +246,8 @@ replace the managed directory, so regenerate the shims after every applied updat
 An ordinary update checks default HEAD, not the install tag; use an explicit `--ref`
 when retaining a release revision.
 
-If installation or a check fails, keep the plugins paused and use rollback in the
-same shell. Restore settings again from the untouched backup, restore the old
+If installation, the 60-second status check, or another check fails, keep the
+plugins paused and use rollback in the same shell. Restore settings again from the untouched backup, restore the old
 source/enabled state, then restore the previous shims. The old directory must still
 have its original dependencies and built commands.
 
@@ -216,6 +258,7 @@ p plugin remove agent-fleet-cockpit --json
 AFC_OLD_DIRECTORY="$(node -e 'const fs=require("node:fs");console.log(JSON.parse(fs.readFileSync(process.env.AFC_BACKUP+"/state.json")).oldDirectory)')"
 p plugin install "$AFC_OLD_DIRECTORY" --json
 afc_restore
+afc_wait
 node --input-type=module <<'NODE'
 import fs from "node:fs";
 import path from "node:path";
@@ -228,11 +271,12 @@ for (const name of ["afc", "roles"]) {
     { dereference: false, verbatimSymlinks: true });
 }
 NODE
-p plugin ls agent-fleet-cockpit --json
-p plugin logs agent-fleet-cockpit --json
 if [ -x "$AFC_SHIM_DIR/afc" ]; then "$AFC_SHIM_DIR/afc" --help; fi
 if [ -x "$AFC_SHIM_DIR/roles" ]; then "$AFC_SHIM_DIR/roles" ls; fi
 ```
+
+After rollback, apply the same polling and log checks; do not treat its first
+listing as a final failure.
 
 Keep the backup until the selected daily daemon has been checked independently.
 These commands do not migrate, replace or delete AFC's plugin-data.

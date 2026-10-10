@@ -45,4 +45,4 @@ paseo plugin update paseo-kanban --check --ref vX.Y.Z
 paseo plugin update paseo-kanban --ref vX.Y.Z
 ```
 
-Fleet 换 id 为 agent-fleet-cockpit。两插件 manifest build 均运行各自的 server/prepare.mjs；Fleet 准备依赖后运行 npm run build，见 [Fleet Git 安装](../GIT-INSTALL.md)。干净环境验收仍是各插件的发版前提，不能用看板的安装结果证明 Fleet。切来源前备份数据和设置，代码回退不撤销数据写入。见 [RELEASE](RELEASE.md)。
+Fleet 换 id 为 agent-fleet-cockpit。两插件 manifest build 均运行各自的 server/prepare.mjs；Fleet 准备依赖后运行 npm run build，见 [Fleet Git 安装](GIT-INSTALL.md)。干净环境验收仍是各插件的发版前提，不能用看板的安装结果证明 Fleet。切来源前备份数据和设置，代码回退不撤销数据写入。见 [RELEASE](RELEASE.md)。

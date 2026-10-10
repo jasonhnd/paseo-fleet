@@ -56,7 +56,7 @@
 
 [工作流](WORKFLOW.md) · [数据](DATA.md) · [兼容](COMPATIBILITY.md) · [发布/更新](RELEASE.md) · [贡献](CONTRIBUTING.md) · [安全](SECURITY.md) · [变更](CHANGELOG.md)
 
-两仓源码先 `npm run build`（Fleet 的 build:cli 是别名）。两插件的 manifest build 均运行各自的 server/prepare.mjs；Fleet Git 准备先 npm ci --include=dev --ignore-scripts --no-audit --no-fund，再 npm run build。生成的 bin/*.bundle.mjs 和 Fleet server/paseo-client.bundle.mjs 不提交 Git，npm 产物含预打包 bundle。见 [Fleet Git 安装与切换](../GIT-INSTALL.md)、[Kanban Git 安装](https://github.com/jasonhnd/paseo-kanban/blob/main/docs/GIT-INSTALL.md)。已打包命令使用 Node，不要求 Python/tsx；干净环境验收仍是发版前提，不能以看板安装结果代替 Fleet 验证。独立 doctor：
+两仓源码先 `npm run build`（Fleet 的 build:cli 是别名）。两插件的 manifest build 均运行各自的 server/prepare.mjs；Fleet Git 准备先 npm ci --include=dev --ignore-scripts --no-audit --no-fund，再 npm run build。生成的 bin/*.bundle.mjs 和 Fleet server/paseo-client.bundle.mjs 不提交 Git，npm 产物含预打包 bundle。见 [Fleet Git 安装与切换](GIT-INSTALL.md)、[Kanban Git 安装](https://github.com/jasonhnd/paseo-kanban/blob/main/docs/GIT-INSTALL.md)。已打包命令使用 Node，不要求 Python/tsx；干净环境验收仍是发版前提，不能以看板安装结果代替 Fleet 验证。独立 doctor：
 
 ```sh
 node "$FLEET_INSTALL/bin/afc.mjs" doctor --json

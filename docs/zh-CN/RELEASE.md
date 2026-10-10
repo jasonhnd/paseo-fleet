@@ -17,7 +17,7 @@ Unreleased 保留 Added、Changed、Fixed、Security、Notes。Notes 写 host �
 - 独立审查、leader 验收、工作区干净，记录伴随完整提交/tag。
 - 隔离 home/data 用真实产品候选 npm 产物与 Git tag 验证安装、桌面、语言、角色、leader 协议/登记、首卡。测只 Fleet、只 Kanban、合装；只 Fleet 不要求首卡。
 - macOS/Linux 分别留证才能称支持，WSL2 单测；验失败恢复、设置恢复、provider 路径、受影响升级/降级。mock 或最小插件不是产品验收。
-- 两插件 manifest build 均运行各自的 server/prepare.mjs，见 [Fleet Git 安装](../GIT-INSTALL.md)、[Kanban Git 安装](https://github.com/jasonhnd/paseo-kanban/blob/main/docs/GIT-INSTALL.md)。Fleet Git 准备运行 npm ci --include=dev --ignore-scripts --no-audit --no-fund，再 npm run build。生成的 bin/*.bundle.mjs 和 Fleet server/paseo-client.bundle.mjs 不提交 Git；npm 产物包含预打包 bundle。干净环境验收仍是各插件的发版前提，不能以看板安装结果代替 Fleet 验证；安装后不能依赖开发目录。
+- 两插件 manifest build 均运行各自的 server/prepare.mjs，见 [Fleet Git 安装](GIT-INSTALL.md)、[Kanban Git 安装](https://github.com/jasonhnd/paseo-kanban/blob/main/docs/GIT-INSTALL.md)。Fleet Git 准备运行 npm ci --include=dev --ignore-scripts --no-audit --no-fund，再 npm run build。生成的 bin/*.bundle.mjs 和 Fleet server/paseo-client.bundle.mjs 不提交 Git；npm 产物包含预打包 bundle。干净环境验收仍是各插件的发版前提，不能以看板安装结果代替 Fleet 验证；安装后不能依赖开发目录。
 - 所有者启用并检查 GitHub Report a vulnerability；不虚构安全邮箱。
 - 获得所有者发版权限；首次公开若压历史，先完成再验证最终提交、打不可变正式 tag。
 
