@@ -11,24 +11,25 @@ import { Badge, OpenRow, type OpenAgent, pressed, type Styles } from "./ui";
 export type Decision = BoardSnapshot["decisions"][number];
 
 /** One open decision as one card: question and tags, what is going on, big option buttons, small side actions. */
-export function DecisionCard({ s, d, now, openAgent, deferred = false, chosen = null, onDefer, onResult }: {
+export function DecisionCard({ s, d, now, openAgent, deferred = false, chosen = null, panelClosed = false, onDefer, onResult }: {
   s: Styles;
   d: Decision;
   now: number;
   openAgent: OpenAgent;
   deferred?: boolean;
   chosen?: ChosenState | null;
+  panelClosed?: boolean;
   onDefer?: (id: string) => void;
   onResult?: (message: ReplyMessage) => void;
 }) {
   const stored = d.kind === "decide" && d.source !== "Kanban";
-  const blocking = d.blocking && !deferred && !chosen;
+  const blocking = d.blocking && !deferred && !chosen && !panelClosed;
   return (
     <View style={[s.card, { gap: 12, width: "100%", borderLeftWidth: 4, borderLeftColor: blocking ? s.p.red : s.p.border, opacity: deferred ? 0.8 : 1 }]}>
       <CardHeader s={s} d={d} now={now} blocking={blocking} deferred={deferred} />
       <Context s={s} title={d.title} detail={d.detail} />
       {stored
-        ? <DecisionActions s={s} id={d.id} title={d.title} detail={d.detail} onDefer={deferred ? undefined : onDefer} onResult={onResult} allowText={canWriteToLeader(d)} initialChosen={chosen} />
+        ? <DecisionActions s={s} id={d.id} title={d.title} detail={d.detail} onDefer={deferred ? undefined : onDefer} onResult={onResult} allowText={canWriteToLeader(d)} initialChosen={chosen} initialPanelClosed={panelClosed} />
         : <OpenRow s={s} row={d} openAgent={openAgent} label={t("decisions.cardView.openAgent")} />}
     </View>
   );

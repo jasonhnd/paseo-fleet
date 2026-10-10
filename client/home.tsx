@@ -134,12 +134,7 @@ export function LeaderTab({ s, data, openAgent }: { s: Styles; data: BoardSnapsh
       <Text style={s.h2}>{t("home.leader.summary", { waiting: summary.waitingLeaders, acceptance: summary.acceptance, blocked: summary.blocked }) + (summary.unresponsiveLeaders > 0 ? t("home.leader.unresponsive", { count: summary.unresponsiveLeaders }) : "")}</Text>
       {shiftLine ? <Text style={s.yellow}>{shiftLine}</Text> : null}
       <LeaderBlock s={s} data={data} openAgent={openAgent} onShiftLine={setShiftLine} />
-      {unregistered.length > 0 || unregisteredChoices.length > 0 ? (
-        <View style={s.card}>
-          <Text style={s.h2}>{t("home.unregistered")}</Text>
-          <Decisions s={s} data={{ ...data, decisions: unregistered, recentChoices: unregisteredChoices }} openAgent={openAgent} showSettings={false} />
-        </View>
-      ) : null}
+      <Decisions s={s} data={{ ...data, decisions: unregistered, recentChoices: unregisteredChoices }} openAgent={openAgent} showSettings={false} sectionTitle={t("home.unregistered")} />
       <Alerts s={s} data={data} openAgent={openAgent} />
     </View>
   );

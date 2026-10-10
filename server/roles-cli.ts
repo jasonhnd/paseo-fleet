@@ -163,7 +163,7 @@ async function decide(action: string, id: string | undefined, v: Row) {
       console.log(`backup ${backup}\nbefore ${before}\nafter ${counts()}\nchanged ${changed}`);
     }); return;
   }
-  if (!["done", "comment", "overturn"].includes(action)) throw new Error(`Unknown decision command: ${action}`);
+  if (!["done", "reopen", "comment", "overturn"].includes(action)) throw new Error(`Unknown decision command: ${action}`);
   required(id, `cli.roles.${action === "overturn" ? "overturn" : action}IdRequired`);
   if (action === "comment") required(v.note?.trim(), "cli.roles.commentNoteRequired");
   if (v.as && !(v.as in CLOSE)) throw new Error("Invalid --as status");
@@ -171,7 +171,15 @@ async function decide(action: string, id: string | undefined, v: Row) {
     const row = find(rows);
     if (action === "done") {
       if (v["auto-shelve"] && (row.status !== "open" || row.blocking || !Number.isFinite(age(row)) || age(row) < 7 * DAY)) return "skipped";
-      row.status = v.as ? CLOSE[v.as] : noteStatus(v.note || ""); row.doneAt = now(); row.note = v.note || ""; return row.status;
+      const status = v.as ? CLOSE[v.as] : noteStatus(v.note || "");
+      // Repeating the same close must preserve the original timestamp.
+      if (!v["auto-shelve"] && row.status === status && (row.note || "") === (v.note || "")) return status;
+      row.status = status; row.doneAt = now(); row.note = v.note || ""; return row.status;
+    }
+    if (action === "reopen") {
+      if (row.status === "open") return "open";
+      if (row.status !== "done" || !allText("decisions.reply.userDismissNote").includes(row.note || "")) fail("cli.roles.reopenNotPanel", { id: id! });
+      row.status = "open"; delete row.doneAt; row.note = ""; return "open";
     }
     if (action === "comment") { if (!Array.isArray(row.userComments)) row.userComments = []; row.userComments.push({ at: now(), note: v.note.trim() }); return row.userComments.length; }
     if (row.status !== "supervisor") fail("cli.roles.notSupervisor", { id: id!, status: row.status });
@@ -180,7 +188,7 @@ async function decide(action: string, id: string | undefined, v: Row) {
     const next = newId(rows); rows.push({ id: next, project: row.project, title: row.title, detail: stored("cli.roles.overturnDetail", { body }),
       blocking: Boolean(row.blocking), agentId: row.agentId, source: row.source || stored("cli.roles.sourceLeader"), createdAt: now(), status: "open" }); return next;
   });
-  console.log(action === "done" ? `closed ${id} ${result}` : action === "comment" ? `commented ${id} ${result}` : `overturned ${id}\nreopened ${result}`);
+  console.log(action === "done" ? `closed ${id} ${result}` : action === "reopen" ? `reopened ${id} ${result}` : action === "comment" ? `commented ${id} ${result}` : `overturned ${id}\nreopened ${result}`);
 }
 function paseo(...args: string[]): any {
   const out = spawnSync("paseo", args, { encoding: "utf8", env: { ...process.env, PATH: commandPath() }, timeout: 30_000 });
@@ -227,7 +235,7 @@ async function run(argv: string[]) {
   const options: Record<string, any> = Object.fromEntries([...stringOptions.map(k => [k, { type: "string" }]), ...booleanOptions.map(k => [k, { type: "boolean" }]), ["feature", { type: "string", multiple: true }], ["param", { type: "string", multiple: true }]]);
   const { values, positionals: [command, first, second, ...extra] } = parseArgs({ args: argv, options, allowPositionals: true, strict: true });
   const v: Row = values;
-  if (v.help || !command) { console.log("usage: roles ls | check | history | set <role> <provider>/<model> [options] | decide add|ls|done|comment|decided|overturn|stale|migrate [options] | pause|resume <project>"); return; }
+  if (v.help || !command) { console.log("usage: roles ls | check | history | set <role> <provider>/<model> [options] | decide add|ls|done|reopen|comment|decided|overturn|stale|migrate [options] | pause|resume <project>"); return; }
   if (extra.length) throw new Error("Unexpected positional arguments");
   if (command === "ls") { for (const line of await currentRoleLines()) console.log(line); return; }
   if (command === "history") { const path = join(STATE, "changes.log"); if (existsSync(path)) process.stdout.write(readFileSync(path, "utf8")); return; }

@@ -25,6 +25,7 @@ export function TagChip({ s, tag }: { s: Styles; tag: LeaderTag }) {
 }
 
 interface KeptChoice { item: Extract<AttentionItem, { kind: "decision" }>; chosen: ChosenState }
+interface HeldClose { item: Extract<AttentionItem, { kind: "decision" }>; closed: boolean }
 
 /** Rows already answered stay on screen even after the snapshot drops them, so the user sees the result and can change it. */
 function withKept(items: AttentionItem[], kept: ReadonlyMap<string, KeptChoice>): AttentionItem[] {
@@ -53,29 +54,36 @@ function mergeStored(stored: ReadonlyMap<string, KeptChoice>, session: ReadonlyM
 /** Everything that needs the user, across every <leader>: one line per item, most urgent first. */
 export function AttentionBlock({ s, data, nowMs, openAgent = null }: { s: Styles; data: BoardSnapshot; nowMs: number; openAgent?: OpenAgent }) {
   const [session, setKept] = useState<ReadonlyMap<string, KeptChoice>>(new Map());
+  const [held, setHeld] = useState<ReadonlyMap<string, HeldClose>>(new Map());
   const rows = data.supervisorPanel.rows.filter((row) => !isPausedProject(row.project, data.pausedProjects));
   const kept = useMemo(() => mergeStored(storedAttention(data, rows), session), [data, rows, session]);
-  const items = withKept(attentionItems(rows, data.supervisorPanel.details ?? [], data.decisions, nowMs), kept);
+  const openItems = withKept(attentionItems(rows, data.supervisorPanel.details ?? [], data.decisions, nowMs), kept);
+  const openKeys = new Set(openItems.map((item) => item.key));
+  const extras = [...held.values()].filter((entry) => !openKeys.has(entry.item.key));
+  const items = [...openItems, ...extras.map((entry) => entry.item)];
+  const closedKeys = new Set([...held.values()].filter((entry) => entry.closed).map((entry) => entry.item.key));
+  const activeCount = items.filter((item) => !closedKeys.has(item.key)).length;
   const note = (item: AttentionItem, message: ReplyMessage) => {
     if (item.kind === "decision" && message.chosen) setKept((prev) => new Map(prev).set(item.key, { item, chosen: message.chosen as ChosenState }));
+    if (item.kind === "decision" && (message.panelClosed || message.panelRestored)) setHeld((prev) => new Map(prev).set(item.key, { item, closed: message.panelClosed === true }));
   };
   return (
     <View style={[s.card, { gap: 0 }]}>
-      <Text style={[s.h2, { marginBottom: 4 }]}>{items.length > 0 ? t("leader.attention.headingCount", { count: items.length }) : t("leader.attention.heading")}</Text>
+      <Text style={[s.h2, { marginBottom: 4 }]}>{items.length > 0 ? t("leader.attention.headingCount", { count: activeCount }) : t("leader.attention.heading")}</Text>
       {items.length === 0 ? <Empty s={s} text={attentionEmpty()} /> : null}
       {items.map((item, index) => (
         <View key={item.key} style={[index > 0 ? { borderTopWidth: 1, borderTopColor: s.p.border } : null, { paddingVertical: 4, gap: 6 }]}>
-          <AttentionRow s={s} item={item} data={data} nowMs={nowMs} openAgent={openAgent} chosen={kept.get(item.key)?.chosen ?? null} onResult={(message) => note(item, message)} />
+          <AttentionRow s={s} item={item} data={data} nowMs={nowMs} openAgent={openAgent} chosen={kept.get(item.key)?.chosen ?? null} panelClosed={closedKeys.has(item.key)} onResult={(message) => note(item, message)} />
         </View>
       ))}
     </View>
   );
 }
 
-function AttentionRow({ s, item, data, nowMs, openAgent, chosen, onResult }: {
-  s: Styles; item: AttentionItem; data: BoardSnapshot; nowMs: number; openAgent: OpenAgent; chosen: ChosenState | null; onResult: (message: ReplyMessage) => void;
+function AttentionRow({ s, item, data, nowMs, openAgent, chosen, panelClosed, onResult }: {
+  s: Styles; item: AttentionItem; data: BoardSnapshot; nowMs: number; openAgent: OpenAgent; chosen: ChosenState | null; panelClosed: boolean; onResult: (message: ReplyMessage) => void;
 }) {
-  const kind = KIND_LABEL[item.kind];
+  const kind = panelClosed ? { label: "leader.ui.handled" as MessageKey, tone: "neutral" as Tone } : KIND_LABEL[item.kind];
   const [open, setOpen] = useState(false);
   const [reply, setReply] = useState(false);
   const sender = useLeaderSend(item.project);
@@ -91,11 +99,11 @@ function AttentionRow({ s, item, data, nowMs, openAgent, chosen, onResult }: {
             <Text style={{ fontWeight: "600" }}>{attentionTitle(item)}</Text>
           </Text>
         </Pressable>
-        {isDecision ? <DecideToggle s={s} code={item.code} open={open} chosen={chosen !== null} onPress={() => setOpen((value) => !value)} /> : null}
+        {isDecision ? <DecideToggle s={s} code={item.code} open={open} chosen={chosen !== null} panelClosed={panelClosed} onPress={() => setOpen((value) => !value)} /> : null}
         {urge ? <RemindAcceptance s={s} cards={cards} sender={sender} strong /> : null}
         {!isDecision ? <ReplyToggle s={s} item={item} open={reply} onPress={() => setReply((value) => !value)} /> : null}
       </View>
-      {open && item.kind === "decision" ? <DecisionCard s={s} d={item.decision as Decision} now={nowMs} openAgent={openAgent} chosen={chosen} onResult={onResult} /> : null}
+      {open && item.kind === "decision" ? <DecisionCard s={s} d={item.decision as Decision} now={nowMs} openAgent={openAgent} chosen={chosen} panelClosed={panelClosed} onResult={onResult} /> : null}
       {open && item.kind !== "decision" ? <AttentionDetail s={s} item={item} nowMs={nowMs} /> : null}
       {urge ? <SendNotice s={s} notice={sender.notice} /> : null}
       {reply ? <LeaderReplyBox s={s} project={item.project} label={item.kind === "question" ? t("leader.ui.replyToThis") : t("leader.ui.writeToLeader")} /> : null}
@@ -104,8 +112,8 @@ function AttentionRow({ s, item, data, nowMs, openAgent, chosen, onResult }: {
 }
 
 /** The only thing on a blocking-work row: opens the full card in place, so no letter is ever picked blind. */
-function DecideToggle({ s, code, open, chosen, onPress }: { s: Styles; code: string; open: boolean; chosen: boolean; onPress: () => void }) {
-  const label = open ? t("leader.ui.collapse") : chosen ? t("leader.attention.seeResult") : t("leader.attention.decide");
+function DecideToggle({ s, code, open, chosen, panelClosed, onPress }: { s: Styles; code: string; open: boolean; chosen: boolean; panelClosed: boolean; onPress: () => void }) {
+  const label = open ? t("leader.ui.collapse") : panelClosed ? t("leader.attention.undoClose") : chosen ? t("leader.attention.seeResult") : t("leader.attention.decide");
   return (
     <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={`${label} ${code}`} style={pressed([open ? s.ghost : s.button, { minHeight: 44, justifyContent: "center" }])} onPress={onPress}>
       <Text style={open ? s.ghostText : s.buttonText}>{label}</Text>

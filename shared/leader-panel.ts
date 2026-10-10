@@ -24,6 +24,8 @@ export const leaderActionSchema = z.object({
 export type LeaderAction = z.infer<typeof leaderActionSchema>;
 export const leaderDetailSchema = z.object({
   project: z.string(), agentId: z.string(), lastReplyAt: z.string().nullable(),
+  /** Latest assistant reply to the user. Absent on older snapshots. Null when none was seen. */
+  lastUserReplyAt: z.string().nullable().optional(),
   question: z.object({ text: z.string(), at: z.string() }).nullable(),
   busySince: z.string().nullable(), selfWorking: z.boolean(), selfWorkReason: z.string().nullable(),
   actions: z.array(leaderActionSchema), cards: z.array(leaderCardSchema),

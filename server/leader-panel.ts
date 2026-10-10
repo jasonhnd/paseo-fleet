@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import type { PaseoApi } from "./paseo-api";
-import { selfWorkSignal, unregisteredQuestion, type LeaderAction, type LeaderDetail, type LeaderReply, type RegisteredDecision } from "../shared/leader-panel";
+import { isAgentInput, selfWorkSignal, unregisteredQuestion, type LeaderAction, type LeaderDetail, type LeaderReply, type RegisteredDecision } from "../shared/leader-panel";
 import { t } from "../shared/i18n";
 import { isBusyStatusText, type SupervisorRow } from "../shared/supervisor-shift";
 import { claudeProjectDirName, weekStatsOver } from "../shared/leader-week";
@@ -12,7 +12,7 @@ import { cached } from "./util";
 
 export const LEADER_TIMELINE_LIMIT = 60;
 export const LEADER_TIMELINE_TIMEOUT_MS = 1500;
-interface Activity { latest: LeaderReply | null; latestUserAt: string | null; actions: LeaderAction[] }
+interface Activity { latest: LeaderReply | null; latestUserAt: string | null; lastUserReplyAt: string | null; actions: LeaderAction[] }
 const busyStarts = new Map<string, string>();
 const pending = new Map<string, Promise<Activity>>();
 
@@ -25,11 +25,16 @@ export function parseLeaderActivity(entries: readonly unknown[]): Activity {
     .sort((a, b) => Number(a.seqStart ?? 0) - Number(b.seqStart ?? 0));
   let latest: LeaderReply | null = null;
   let latestUserAt: string | null = null;
+  let lastUserReplyAt: string | null = null;
   let lastUserText: string | undefined;
   const actions: LeaderAction[] = [];
   for (const entry of sorted) {
     const item = object(entry.item), at = String(entry.timestamp);
-    if (item.type === "assistant_message" && typeof item.text === "string" && item.text.trim()) latest = {text:item.text,at,prompt:lastUserText};
+    if (item.type === "assistant_message" && typeof item.text === "string" && item.text.trim()) {
+      latest = {text:item.text,at,prompt:lastUserText};
+      // A missing prompt is treated as the user. Notices from other agents are not.
+      if (!isAgentInput(lastUserText)) lastUserReplyAt = at;
+    }
     if (item.type === "user_message") { latestUserAt = at; lastUserText = typeof item.text === "string" ? item.text.slice(0, 200) : undefined; }
     if (item.type !== "tool_call" || typeof item.name !== "string") continue;
     const detail = object(item.detail);
@@ -38,7 +43,7 @@ export function parseLeaderActivity(entries: readonly unknown[]): Activity {
     const file = typeof detail.filePath === "string" ? detail.filePath : "";
     actions.push({ at, name:item.name, detailType:String(detail.type ?? ""), command:command.slice(0, 4000), summary:`${item.name}${command || file ? ` · ${(command || file).replace(/\s+/g, " ").slice(0, 160)}` : ""}` });
   }
-  return { latest, latestUserAt, actions:actions.slice(-20) };
+  return { latest, latestUserAt, lastUserReplyAt, actions:actions.slice(-20) };
 }
 
 /** Tracks observed continuous running, never session age. Idle or a new registered id resets it. */
@@ -71,7 +76,7 @@ export async function readLeaderDetails(paseo: PaseoApi, rows: readonly Supervis
   return Promise.all(rows.map(async (row) => {
     const busy = isBusyStatusText(row.statusText);
     const busySince = observeBusy(row.agentId, busy, now);
-    let view: Activity = { latest:null,latestUserAt:null,actions:[] };
+    let view: Activity = { latest:null,latestUserAt:null,lastUserReplyAt:null,actions:[] };
     let activityWarning: string | null = null;
     try { view = await activity(paseo, row.agentId); }
     catch (error) { activityWarning = t("leader.server.activityWarning", { error: String(error).slice(0, 120) }); }
@@ -88,6 +93,7 @@ export async function readLeaderDetails(paseo: PaseoApi, rows: readonly Supervis
     const unanswered = view.latest && (!view.latestUserAt || Date.parse(view.latestUserAt) <= Date.parse(view.latest.at));
     return {
       project:row.project,agentId:row.agentId,lastReplyAt:view.latest?.at ?? null,
+      lastUserReplyAt: activityWarning ? null : view.lastUserReplyAt,
       question:unregisteredQuestion(row.project,unanswered ? view.latest : null,decisions),busySince,
       selfWorking:signal.selfWorking,selfWorkReason:signal.reason,actions:signal.actions,
       cards:cards.cards.filter((c) => c.project.toLowerCase() === row.project.toLowerCase()),
