@@ -8,6 +8,8 @@ import {
   ANTIGRAVITY_CLI,
   ANTIGRAVITY_FIVE_HOUR_WINDOW,
   ANTIGRAVITY_WEEK_WINDOW,
+  CURSOR_API,
+  type AdapterSwitches,
   adapterOf,
   baseAdapterOf,
   companyCatalog,
@@ -16,10 +18,12 @@ import {
 import type { UsagePlan, UsageWindow } from "../../shared/usage";
 import { windowsFor, type WindowContext, type WindowPlan } from "../adapters/windows";
 import { poolStatus } from "../pools-status";
+import { companyWindows } from "../usage-view";
 import { LIVE_READING_TTL_MS, POOL_REFRESH_MS } from "../quota-timing";
 import {
   AGY_USAGE_COMMAND,
   antigravityPlanWindows,
+  antigravityUsageRequested,
   parseAntigravityUsage,
   readAntigravityUsage,
   readingFromRun,
@@ -261,6 +265,8 @@ describe("same pool", () => {
     assert.equal(acp?.paceEligible, false);
     assert.equal(five?.usedPct, 100);
     assert.equal(five?.source, "screen");
+    assert.equal(five?.readingState, "live");
+    assert.equal(five?.sampledAt, new Date(NOW).toISOString());
     assert.equal(five?.startsAt, null);
     assert.equal(poolStatus([usage(windows)], { now: NOW })["gemini-pool"].dispatchable, true);
   });
@@ -270,6 +276,11 @@ describe("same pool", () => {
     const stale = antigravityPlanWindows({ id: "gemini-pool", antigravityBucket: "gemini" }, proven([sample("gemini", "week", 10)], old), NOW);
     assert.equal(stale[0]?.readingState, "stale");
     assert.equal(stale[0]?.usedPct, null);
+    const agedWeek = stale.find((row) => row.id === ANTIGRAVITY_WEEK_WINDOW);
+    assert.equal(agedWeek?.usedPct, 10);
+    assert.equal(agedWeek?.readingState, "stale");
+    assert.equal(agedWeek?.sampledAt, new Date(old).toISOString());
+    assert.equal(agedWeek?.staleUsedPct, 10);
     assert.equal(poolStatus([usage(stale)], { now: NOW })["gemini-pool"].reason, t("quota.setup.staleHold"));
     const aged = reading(PLENTIFUL);
     aged.readAt = new Date(old).toISOString();
@@ -286,11 +297,95 @@ describe("same pool", () => {
     assert.equal(poolStatus([usage(windows)], { now: NOW })["gemini-pool"].dispatchable, false);
   });
 
-  test("a switched-off plan is manual and ignores the CLI reading", () => {
-    const source = { id: "gemini-pool", adapter: ANTIGRAVITY_CLI, providers: ["antigravity"] };
-    assert.equal(adapterOf(source, { [ANTIGRAVITY_CLI]: false }), "manual");
-    const windows = windowsFor({ ...plan("gemini"), quotaCycle: undefined, manualOverride: undefined }, "manual", context(reading(PLENTIFUL)));
-    assert.equal(windows.some((row) => row.id === ANTIGRAVITY_ACP_WINDOW), false);
+  test("a closed or missing reader keeps the unknown ACP hold and does not launch agy", async () => {
+    const source = { id: "gemini-pool", adapter: ANTIGRAVITY_CLI, usageProvider: "antigravity", providers: ["antigravity"] };
+    const hand = { usedPct: 0, at: new Date(NOW).toISOString(), source: "manual", ttlSeconds: 86400 };
+    const cfg: WindowPlan = {
+      id: source.id,
+      providers: ["antigravity"],
+      priceUsdMonthly: null,
+      quotaCycle: { kind: "unknown" },
+      manualOverride: hand,
+      antigravityBucket: "gemini",
+    };
+    let launches = 0;
+    const runner: UsageRunner = async () => {
+      launches += 1;
+      return runOf(PLENTIFUL);
+    };
+    const readIfRequested = async (switches: Partial<AdapterSwitches>) => {
+      if (antigravityUsageRequested([source], switches)) await readAntigravityUsage({ now: NOW, force: true, runner });
+    };
+    for (const switches of [{ [ANTIGRAVITY_CLI]: false }, {}]) {
+      await readIfRequested(switches);
+      const adapter = adapterOf(source, switches);
+      assert.equal(adapter, ANTIGRAVITY_CLI);
+      const windows = windowsFor(cfg, adapter, context(null));
+      const acp = windows[0];
+      assert.equal(acp?.id, ANTIGRAVITY_ACP_WINDOW);
+      assert.equal(acp?.source, "none");
+      assert.equal(acp?.usedPct, null);
+      assert.equal(acp?.readingState, "unknown");
+      assert.equal(windows.some((row) => row.source === "manual"), false);
+      assert.equal(windows.some((row) => row.id === ANTIGRAVITY_WEEK_WINDOW), false);
+      const status = poolStatus([usage(windows, { adapter, dispatch: true, quotaProtection: "pause" })], { now: NOW })["gemini-pool"];
+      assert.equal(status.usedPct, null);
+      assert.equal(status.dispatchable, false);
+      assert.equal(status.reason, t("quota.setup.unknownHold"));
+    }
+    assert.equal(launches, 0);
+    assert.equal(antigravityUsageRequested([source], { [ANTIGRAVITY_CLI]: true }), true);
+    assert.equal(adapterOf({ id: "cursor-pool", adapter: CURSOR_API, providers: ["cursor"] }, { [CURSOR_API]: false }), "manual");
+    const manualWindows = windowsFor({ ...cfg, id: "hand-pool" }, "manual", context(null));
+    assert.equal(manualWindows[0]?.source, "manual");
+    assert.equal(manualWindows[0]?.usedPct, 0);
+    const manualStatus = poolStatus([usage(manualWindows, { id: "hand-pool", adapter: "manual", dispatch: true, quotaProtection: "pause" })], { now: NOW })["hand-pool"];
+    assert.equal(manualStatus.dispatchable, true);
+    assert.equal(manualStatus.usedPct, 0);
+  });
+
+  test("an expired CLI sample stays visible and is not a live ACP percent", () => {
+    const old = NOW - LIVE_READING_TTL_MS - 1000;
+    const aged = readingFromRun(runOf([
+      "Gemini Models\tWeekly Limit Remaining\t90%\t2028-06-08T00:00:00Z",
+      "Gemini Models\tFive Hour Limit Remaining\t50%\t2028-06-01T05:00:00Z",
+    ].join("\n")), old);
+    const windows = windowsFor(plan("gemini", "example-antigravity-gemini"), ANTIGRAVITY_CLI, context(aged));
+    const week = windows.find((row) => row.id === ANTIGRAVITY_WEEK_WINDOW);
+    const five = windows.find((row) => row.id === ANTIGRAVITY_FIVE_HOUR_WINDOW);
+    assert.equal(windows[0]?.readingState, "unknown");
+    assert.equal(windows[0]?.usedPct, null);
+    assert.equal(week?.usedPct, 10);
+    assert.equal(week?.readingState, "stale");
+    assert.equal(week?.sampledAt, aged.readAt);
+    assert.equal(five?.usedPct, 50);
+    assert.equal(five?.readingState, "stale");
+    assert.equal(five?.sampledAt, aged.readAt);
+    const source = { id: "example-antigravity-gemini", name: "Example Antigravity Gemini", adapter: ANTIGRAVITY_CLI, providers: ["antigravity"] };
+    const plans = [usage(windows, { id: source.id, name: source.name })];
+    const shown = companyWindows(plans, new Date(NOW).toISOString());
+    assert.equal(shown.find((row) => row.id === ANTIGRAVITY_WEEK_WINDOW)?.readAt, aged.readAt);
+    assert.notEqual(shown.find((row) => row.id === ANTIGRAVITY_WEEK_WINDOW)?.readAt, new Date(NOW).toISOString());
+    const card = buildCompanies({
+      companies: companyCatalog([source], { [ANTIGRAVITY_CLI]: true }),
+      windows: shown,
+      pools: poolStatus(plans, { now: NOW }),
+      profiles: [],
+      cursor: null,
+    })[0];
+    const local = new Date(Date.parse(aged.readAt) + 9 * 60 * 60 * 1000);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const when = `${local.getUTCMonth() + 1}/${local.getUTCDate()} ${pad(local.getUTCHours())}:${pad(local.getUTCMinutes())}`;
+    const cli = card?.windows.find((row) => row.id.endsWith(ANTIGRAVITY_WEEK_WINDOW));
+    const cliFive = card?.windows.find((row) => row.id.endsWith(ANTIGRAVITY_FIVE_HOUR_WINDOW));
+    assert.equal(card?.headline, companyRemainingText(null));
+    assert.equal(cli?.readAt, aged.readAt);
+    assert.equal(cli?.usedPct, 10);
+    assert.equal(cli?.tone, "yellow");
+    assert.equal(cli?.sourceText, t("quota.antigravity.cliStale", { when }));
+    assert.equal(cliFive?.tone, "yellow");
+    assert.equal(cliFive?.readAt, aged.readAt);
+    assert.equal(poolStatus(plans, { now: NOW })[source.id].dispatchable, false);
   });
 
   test("a missing bucket shows only the unknown ACP row", () => {

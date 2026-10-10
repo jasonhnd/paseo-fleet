@@ -115,7 +115,7 @@ export function companyWindows(plans: UsagePlan[], readAt: string): CompanyProvi
     usedPct: w.usedPct,
     resetsAt: w.resetsAt,
     source: w.source === "manual" || w.source === "none" || w.source === "provider" ? w.source : "screen",
-    readAt: w.manualAt ?? readAt,
+    readAt: w.sampledAt ?? w.manualAt ?? readAt,
     readError: w.readError ?? null,
     readingState: w.readingState,
   })));

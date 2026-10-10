@@ -5,8 +5,9 @@
 //   codex-cli   Codex's weekly window via Paseo; coupons and credits via `codex app-server`
 //   grok-cli    Grok's weekly window via Paseo, the `grok` /usage screen, or a hand copy
 //   cursor-api  Cursor's official usage API, the cursor-agent screen, or a hand copy (optional, off by default)
-//   antigravity-cli  local `agy /usage` table for display (optional, off by default). Not the Paseo ACP pool
-//                    unless both channels report the same version, tier and quota source. The reader does not.
+//   antigravity-cli  local `agy /usage` table for display (optional, off by default). The switch only starts
+//                    that reader. It does not turn the plan into `manual`. Not the Paseo ACP pool unless both
+//                    channels report the same version, tier and quota source. The reader does not.
 //   manual      a percent copied by hand from the vendor's dashboard
 // Copilot and a direct Gemini provider stay on `manual`: no percent can be read without a login.
 // `usageProvider` "gemini" does not select `antigravity-cli`.
@@ -108,7 +109,7 @@ interface SubWindowSpec {
 }
 
 interface AdapterSpec {
-  /** Off unless switched on. A plan on a switched-off adapter is read as `manual`. */
+  /** Off unless switched on. A switched-off plan is read as `manual`, except `antigravity-cli`: that switch only starts the reader. */
   optional: boolean;
   /**
    * Reads the windows Paseo reports for the plan's `usageProvider`. False (manual): only the hand copy decides the
@@ -364,10 +365,12 @@ export function baseAdapterOf(plan: PlanSource): AdapterId {
 
 /**
  * The adapter in force. With switches, a plan on a switched-off optional adapter is read by hand (`manual`).
- * Without switches (pure callers, tests) the plan's own adapter is used.
+ * `antigravity-cli` is the exception: off or unset only skips `agy`. The plan stays on that adapter so a hand
+ * copy cannot replace the unknown ACP hold. Without switches (pure callers, tests) the plan's own adapter is used.
  */
 export function adapterOf(plan: PlanSource, switches?: Partial<AdapterSwitches>): AdapterId {
   const base = baseAdapterOf(plan);
+  if (base === ANTIGRAVITY_CLI) return base;
   if (switches && specs()[base].optional && switches[base as OptionalAdapter] !== true) return MANUAL;
   return base;
 }

@@ -10,15 +10,24 @@ import { join } from "node:path";
 import { t } from "../../shared/i18n";
 import {
   ANTIGRAVITY_ACP_WINDOW,
+  ANTIGRAVITY_CLI,
   ANTIGRAVITY_FIVE_HOUR_WINDOW,
   ANTIGRAVITY_WEEK_WINDOW,
+  adapterOf,
+  type AdapterSwitches,
   type AntigravityBucket,
+  type PlanSource,
 } from "../../shared/quota-adapters";
 import { validPercent } from "../../shared/quota-cycle";
 import type { UsageWindow } from "../../shared/usage";
 import { LIVE_READING_TTL_MS, POOL_REFRESH_MS } from "../quota-timing";
 
 export const AGY_USAGE_COMMAND = { bin: "agy", args: ["-p", "/usage"] as const };
+
+/** True only when the reader switch is on and a plan still resolves to this adapter. Off or unset does not spawn agy. */
+export function antigravityUsageRequested(plans: readonly PlanSource[], switches?: Partial<AdapterSwitches>): boolean {
+  return switches?.[ANTIGRAVITY_CLI] === true && plans.some((plan) => adapterOf(plan, switches) === ANTIGRAVITY_CLI);
+}
 const OUTPUT_CAP = 64 * 1024;
 const AGY_TIMEOUT_MS = 20_000;
 const LOGIN = /not logged in|login required|sign in to|authentication required/i;
@@ -250,6 +259,8 @@ function blankWindow(input: {
   readError: string | null;
   apiUsd: number;
   planUsd: number | null;
+  sampledAt?: string | null;
+  staleUsedPct?: number | null;
 }): UsageWindow {
   return {
     id: input.id,
@@ -267,6 +278,8 @@ function blankWindow(input: {
     planUsd: input.planUsd,
     source: input.source,
     manualAt: null,
+    sampledAt: input.sampledAt ?? null,
+    staleUsedPct: input.staleUsedPct ?? null,
     readingState: input.readingState,
     readError: input.readError,
     cycleKind: input.cycleKind,
@@ -289,6 +302,7 @@ export interface AntigravityWindowPlan {
 /**
  * ACP row first. Its percent is copied from the weekly CLI sample only after `samePoolProven` is recomputed.
  * CLI rows stay display-only: source `screen`, no invented start, and they are not the primary window.
+ * A row older than the live-reading limit keeps its percent as an expired sample. It is not marked live.
  */
 export function antigravityPlanWindows(plan: AntigravityWindowPlan, reading: AntigravityReading | null, now: number, apiUsd = 0): UsageWindow[] {
   const planUsd = plan.priceUsdMonthly ?? null;
@@ -333,9 +347,11 @@ export function antigravityPlanWindows(plan: AntigravityWindowPlan, reading: Ant
     usedPct: sample.usedPct,
     resetsAt: sample.resetsAt,
     source: "screen",
-    readingState: "live",
+    readingState: live ? "live" : "stale",
     cycleKind: "unknown",
     readError: null,
+    sampledAt: reading.readAt,
+    staleUsedPct: live ? null : sample.usedPct,
     apiUsd,
     planUsd,
   })] : []);

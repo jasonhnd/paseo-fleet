@@ -8,7 +8,6 @@ import { activeDispatchPriority, type DispatchPriority, poolStatusPriority, reso
 import {
   type AdapterSwitches,
   adapterOf,
-  ANTIGRAVITY_CLI,
   CLAUDE_CLI,
   CODEX_CLI,
   CURSOR_API,
@@ -27,7 +26,7 @@ import { publishDispatch } from "./dispatch";
 import { deliverEarlyResetNotices, readEarlyResetLines } from "./early-reset";
 import { ledgerBuckets } from "./ledger";
 import { readCursorUsageFile, type CursorUsageReading } from "./cursor-usage";
-import { readAntigravityUsage, unavailableAntigravityReading, type AntigravityReading } from "./quota/antigravity-usage";
+import { antigravityUsageRequested, readAntigravityUsage, unavailableAntigravityReading, type AntigravityReading } from "./quota/antigravity-usage";
 import { settleSuperGrokChoice, type SuperGrokChoice } from "./grok-usage";
 import { configuredStopPct, type CursorReadMeta, MANUAL_STOP, oneMonthBefore, poolStatus, type PoolStatus, type SuperGrokReadMeta, writePoolStatus } from "./pools";
 import { textHidden } from "../shared/hidden-plans";
@@ -392,7 +391,7 @@ export async function assemble(paseo: PaseoApi, period: Period, options?: { capt
   const plansFile = await readPlans();
   const planConfigs = usablePlans(plansFile.plans).filter((p) => !providerBanned(p, banned));
   const auto = planConfigs.some(p => adapterSpec(adapterOf(p, switches)).readsProvider);
-  const wantAntigravity = switches[ANTIGRAVITY_CLI] === true && planConfigs.some(p => adapterOf(p, switches) === ANTIGRAVITY_CLI);
+  const wantAntigravity = antigravityUsageRequested(planConfigs, switches);
   const [{ rows: all, scannedAt, estimated }, usage, records, profiles, cursorReading, antigravityReading] = await Promise.all([
     allRows(),
     auto ? providerUsage(paseo) : Promise.resolve({ windows: new Map<string, Json[]>(), balances: new Map<string, Json[]>(), error: null }),

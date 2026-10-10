@@ -600,20 +600,26 @@ function antigravityCard(company: CompanyEntry, input: BuildCompaniesInput): Com
   const rows = input.windows.filter((row) => row.planId === company.planId);
   const acp = rows.find((row) => row.id === ANTIGRAVITY_ACP_WINDOW);
   const pool = input.pools[company.planId];
-  const cliRow = (row: CompanyProviderWindow | undefined, id: string, name: string) => windowBase({
-    id: `${company.key}-${id}`,
-    name,
-    usedPct: row?.usedPct ?? null,
-    resetsAt: row?.resetsAt ?? null,
-    source: "screen",
-    readAt: row?.readAt ?? null,
-    sourceKind: "screen",
-    sourceTextOverride: t("quota.antigravity.cliSource"),
-    who: "",
-    pool,
-    mode: "off",
-    showPace: false,
-  });
+  const cliRow = (row: CompanyProviderWindow | undefined, id: string, name: string) => {
+    const stale = row?.readingState === "stale";
+    const when = clock(row?.readAt ?? null);
+    return windowBase({
+      id: `${company.key}-${id}`,
+      name,
+      usedPct: row?.usedPct ?? null,
+      resetsAt: row?.resetsAt ?? null,
+      source: "screen",
+      readAt: row?.readAt ?? null,
+      sourceKind: stale ? "stale" : "screen",
+      sourceTextOverride: stale
+        ? t("quota.antigravity.cliStale", { when: when || row?.readAt || "" })
+        : t("quota.antigravity.cliSource"),
+      who: "",
+      pool,
+      mode: "off",
+      showPace: false,
+    });
+  };
   const week = rows.find((row) => row.id === ANTIGRAVITY_WEEK_WINDOW);
   const five = rows.find((row) => row.id === ANTIGRAVITY_FIVE_HOUR_WINDOW);
   const proven = acp?.source === "provider" && acp.usedPct !== null;

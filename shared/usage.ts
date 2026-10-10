@@ -29,6 +29,8 @@ const windowSchema = z.object({
   planUsd: z.number().nullable(),
   source: z.enum(["provider", "manual", "none", "screen", "official"]),
   manualAt: z.string().nullable(),
+  /** When this window's sample was taken. Omitted on windows that are not a stored sample. */
+  sampledAt: z.string().nullable().optional(),
   primary: z.boolean().optional(),
   /** Stable provider window id, retained when its displayed label is translated. */
   id: z.string().optional(),

@@ -18,7 +18,7 @@ No public release is declared by this document.
 
 ### Fixed
 
-- No released baseline yet.
+- An `antigravity-cli` plan keeps its unknown ACP hold when the reader switch is off or unset. A hand-copied percent does not replace that hold. An expired agy table is shown as a stale sample.
 
 ### Security
 
