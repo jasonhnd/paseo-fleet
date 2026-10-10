@@ -1,42 +1,77 @@
 # paseo-fleet
 
-Fleet Cockpit, a [Paseo](https://github.com/getpaseo/paseo) plugin for running a team of coding agents: roles, quota pacing across Claude, Codex and Grok subscriptions, and a decisions inbox.
+Roles, quota pacing and a decisions inbox for local coding agents in Paseo. A [Paseo](https://github.com/getpaseo/paseo) plugin.
+
+[Simplified Chinese](docs/zh-CN/README.md)
 
 | Package | Plugin id |
 |---|---|
 | `@jasonhnd/paseo-fleet-cockpit` | `agent-fleet-cockpit` |
 
-Its companion board, Kanban for Paseo (`@jasonhnd/paseo-kanban`), lives in its own repository, [jasonhnd/paseo-kanban](https://github.com/jasonhnd/paseo-kanban).
+> **Experimental, unreleased.** Sources and commands are included; clean-host installation, desktop mounting and first-card validation remain release gates. No stability or response-time commitment is made.
 
-> **Status: experimental, not released yet.** The plugin sources and standalone Node commands are imported. Version 0.1 targets Paseo 0.11 only; clean-host installation and desktop validation remain release prerequisites.
+## Choose a combination
 
-## Install (after the first release)
+| Installed | Capabilities |
+|---|---|
+| Fleet + Kanban | Roles, quota pacing, decisions and role-based task/review flow. |
+| Kanban only | Board, configured role profiles, basic ordering and local decisions; no Fleet quota guard. |
+| Fleet only | Roles, quota and decisions; no board dispatch. |
+
+Companion repositories: [Fleet](https://github.com/jasonhnd/paseo-fleet), [Kanban](https://github.com/jasonhnd/paseo-kanban). Integration uses [fleet-quota/v1](docs/CONTRACT.md) files, with independent package versions.
+
+## Requirements
+
+- Paseo daemon **and desktop app** `>=0.11.0 <0.12.0`; plugins enabled globally and individually.
+- Node >=22.13.0 for both plugins together. Kanban declares >=22.5 and requires working `node:sqlite`; Fleet declares >=22.13.0. These package floors do not certify every Node/OS combination.
+- Git for code cards and workspaces; npm for source builds and Kanban Git preparation on the daemon's PATH.
+- At least one user-installed/authenticated local provider for investigation; **two confirmed model families** for the current automatic executor/reviewer card flow.
+- macOS and Linux are initial release targets, subject to separate real-world validation. Native Windows is not initially supported; WSL2 must be checked separately. See the [evidence matrix](docs/COMPATIBILITY.md).
+
+## Five-minute setup: installation to the first finished card
+
+Five minutes describes configuration guidance when Paseo and authenticated local providers are already ready. Downloads, login, model startup and agent execution can take longer. This is an **experimental walkthrough awaiting clean-host acceptance**, not a promise that every installation works. Roles are currently preview-only/manual; same-family automatic self-check is not yet available.
+
+1. Run `paseo --version` and `node --version`; check the app version too. Meet [Requirements](#requirements). Log in through your provider yourself.
+2. After the first release, install the desired plugins:
+
+   ```sh
+   paseo plugin install npm:@jasonhnd/paseo-fleet-cockpit
+   paseo plugin install npm:@jasonhnd/paseo-kanban
+   paseo plugin ls
+   ```
+
+   In host Settings -> Plugins, enable the global switch and the individual plugins. Check their status **and open the desktop panels**. To evaluate source before publication, use a checkout and the build instructions below; do not assume these npm packages or release tags are already available.
+3. In Fleet Settings, choose English or Simplified Chinese and preview roles from the available provider/model catalog. Confirm model families and manually create the profiles in Paseo, preserving existing profiles. Configure `role`/`family` and model options from the preview, including a leader (`role=supervisor`), executor and reviewer from different families. Preview does not save profiles or verify login. With Kanban alone, manually configure the same role fields. With one family, stop at manual assessment until an independent reviewer is available; do not claim a completed automatic review cycle. Quota setup may be skipped, with no quota protection; add only your own pools when ready.
+4. Create a disposable Git repository/workspace named `demo` with an initial commit. In Kanban project settings, configure its workspace, short code and protected branches. In the project leader panel, choose the leader profile/workspace/language, preview and start the leader. Check protocol delivery. Selecting the same profile in an ordinary conversation is insufficient.
+5. In that leader session, call `kanban_supervise` for project `demo`, or run:
+
+   ```sh
+   node "$BOARD_INSTALL/bin/paseo-kanban.mjs" supervise --project demo
+   ```
+
+   `BOARD_INSTALL` is the current installed directory from `paseo plugin ls --json`. The session uses its own injected identity; do not paste tokens. Confirm registration in the panel. Hand over a live existing leader rather than replacing it.
+6. Ask the leader: "Create an L1 card to add hello.md containing exactly Hello and a newline in the demo repository. Verify the file and content. Commit, review and accept locally; do not push or publish." The executor commits and completes its handoff, an independent reviewer checks it, and the lead verifies evidence and accepts it. Check that the card is finished, the file is correct, the working tree is clean and managed cleanup has completed.
+7. On failure, use [Compatibility and troubleshooting](docs/COMPATIBILITY.md), plugin logs and the installed Node doctor. Missing protocol or registration blocks dispatch. Fleet alone can test roles/quota/decisions; a finished board card needs Kanban.
+
+Git installations use `paseo plugin install github:jasonhnd/paseo-fleet --ref vX.Y.Z` only after a published, validated tag exists. Always specify `--ref` on updates. Directory installation uses `paseo plugin install "$PLUGIN_CHECKOUT"` after the appropriate source build; a directory source does not select a Git tag. Read the [manual release/update checklist](docs/RELEASE.md) before replacing an existing source.
+
+## Documentation
+
+[Workflow](docs/WORKFLOW.md) · [Data and privacy](docs/DATA.md) · [Compatibility](docs/COMPATIBILITY.md) · [Release/update](docs/RELEASE.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md)
+
+## Standalone commands
+
+Run `npm run build:cli` in a Fleet checkout before using its Node launchers. Release Git commits must supply the command bundles or a proven preparation path; Fleet Git installation still needs clean-host validation. npm prepack rebuilds bundles. Commands need Node >=22.13.0, without Python or a TypeScript loader.
 
 ```sh
-paseo plugin install npm:@jasonhnd/paseo-fleet-cockpit
-paseo plugin install github:jasonhnd/paseo-fleet     # or straight from this repository
+node "$FLEET_INSTALL/bin/afc.mjs" --help
+node "$FLEET_INSTALL/bin/afc.mjs" roles ls
+node "$FLEET_INSTALL/bin/afc.mjs" decide ls
+node "$FLEET_INSTALL/bin/afc.mjs" doctor --json
 ```
 
-From a checkout, install the repository folder itself: `paseo plugin install /absolute/path/to/paseo-fleet`. The repository root is the plugin folder (`paseo-plugin.json`, `OVERVIEW.md`, `package.json`, the two entries, `client/`, `server/`, `shared/`).
-
-Each plugin works alone; together they share quota and board data through files (`docs/CONTRACT.md`):
-
-| Installed | Dispatch | Decisions | Board panel | Quota panel |
-|---|---|---|---|---|
-| Both | Quota pacing and the dispatch matrix | Fleet Cockpit's inbox | Yes | Yes |
-| Kanban only | Basic order | Kanban's built-in list | Yes | No |
-| Fleet Cockpit only | None | Fleet Cockpit's inbox | Hidden | Yes |
-
-## Repository layout
-
-```
-paseo-plugin.json, OVERVIEW.md, package.json   the plugin @jasonhnd/paseo-fleet-cockpit
-client/, server/, shared/, locales/, bin/      plugin code and standalone Node commands
-shared/contract/, server/contract/             fleet-quota/v1 source; paseo-kanban keeps a copy
-contract.manifest.json                         contract version and file hashes
-scripts/, .githooks/, .github/workflows/       gates, identical in paseo-kanban
-docs/                                          architecture, recommended workflow, contract, data
-```
+The default dispatch template is `shared/default-dispatch.example.json`. It is install data, separate from generated dispatch state. Model choices and optional integrations are configurable. See [DATA](docs/DATA.md) and [the import evidence](docs/IMPORT.md).
 
 ## Privacy gates
 
@@ -64,11 +99,11 @@ The private denylist lists everything that identifies you (login name, real name
 ### Checks
 
 ```sh
-npm run verify        # everything below plus gitleaks; exit 0 means the push gate will pass
+npm run verify        # required local gates including builds, plugin tests and gitleaks
 sh .githooks/pre-push </dev/null   # the push gate itself, without pushing anything
 npm run build:check   # compile actual plugin entries with the installed Paseo compiler (required)
 npm run typecheck     # tsc on the plugin
-npm test              # tests of the scripts themselves
+npm test              # shared gate-script tests; verify also runs plugin tests
 npm run test:plugin   # the plugin's own tests, including standalone CLI coverage
 npm run compat        # offline compilation, type check and plugin tests
 npm run scan          # check-private.mjs --all: whole tree, generic rules + private denylist
@@ -85,40 +120,7 @@ Two optional settings widen `npm run verify`:
 
 When the private denylist flags a word that is not personal in context (a short term), change the wording in the code; do not weaken the list.
 
+
 ## License
 
 [MIT](LICENSE)
-
-## Standalone commands and development
-
-Use Node 22.13 or newer. Build the commands with `npm run build:cli` before installing
-a Git checkout; release commits must include `bin/*.bundle.mjs`. `npm pack` rebuilds
-them with `prepack`. Published commands need only Node, without TypeScript loaders,
-Python, or development dependencies.
-
-```sh
-node bin/afc.mjs --help
-node bin/afc.mjs roles ls
-node bin/afc.mjs decide ls
-node bin/afc.mjs doctor --json
-node bin/afc.mjs migrate --help
-```
-
-The default dispatch template ships at `shared/default-dispatch.example.json`.
-It is install data, separate from generated dispatch state. Profile bindings and
-quota priority remain configurable. Model choices follow the host catalog and
-configured provider exclusions; installation imposes no personal model restrictions.
-
-Data defaults to `$PASEO_HOME/plugin-data/agent-fleet-cockpit`. `AFC_DATA_DIR`
-overrides it, and `ROLES_STATE_DIR` overrides roles-command state only. Legacy
-discovery checks `~/.config/fleet-roles`; set `AFC_LEGACY_DATA_DIR` for another
-previous state directory, or use migration's explicit `--from` path. The optional
-read-only sidebar adapter requires `AFC_SANDBOX_ROSTER_DIR` to select its persistence
-directory; it does not probe an owner's application directory by default. An access
-map plugin-listing check uses its explicit `pluginId` field; an unspecified id is
-reported as unknown.
-
-`npm run compat` is an offline compiler, type-check and regression gate. It does
-not contact a daemon or prove desktop mounting, provider authentication, migration
-against real data, or installation on another operating system. Those checks belong
-to the isolated release validation workflow.
