@@ -11,13 +11,13 @@ Unreleased 保留 Added、Changed、Fixed、Security、Notes。Notes 写 host �
 ## 发版前
 
 - 分拣变更，issue 对应自包含简报，共享问题一名主责；按复现验证实际修复。
-- npm ci 装依赖；看板 npm run build，Fleet npm run build:cli。
+- npm ci 装依赖；两仓均 npm run build，Fleet build:cli 是别名。
 - 两仓 npm run verify，PASEO_FLEET_SIBLING 指伴随仓，FLEET_CONTRACT_SOURCE 指 Fleet；保留命令、完整提交、退出码和摘要。12 闸含真实 Paseo 编译、插件测试、隐私/身份/泄漏/包清单，须本机全过。
 - npm pack --dry-run --json 核包清单、版本、CHANGELOG；真实包产物放仓外，解包后验证 Node 独立 CLI。
 - 独立审查、leader 验收、工作区干净，记录伴随完整提交/tag。
 - 隔离 home/data 用真实产品候选 npm 产物与 Git tag 验证安装、桌面、语言、角色、leader 协议/登记、首卡。测只 Fleet、只 Kanban、合装；只 Fleet 不要求首卡。
 - macOS/Linux 分别留证才能称支持，WSL2 单测；验失败恢复、设置恢复、provider 路径、受影响升级/降级。mock 或最小插件不是产品验收。
-- Fleet 的 Git 依赖准备与 CLI 须自行证明；看板 manifest build 运行 server/prepare.mjs，见[Git 安装](https://github.com/jasonhnd/paseo-kanban/blob/main/docs/GIT-INSTALL.md)。安装后不能依赖开发目录。
+- 两插件 manifest build 均运行各自的 server/prepare.mjs，见 [Fleet Git 安装](../GIT-INSTALL.md)、[Kanban Git 安装](https://github.com/jasonhnd/paseo-kanban/blob/main/docs/GIT-INSTALL.md)。Fleet Git 准备运行 npm ci --include=dev --ignore-scripts --no-audit --no-fund，再 npm run build。生成的 bin/*.bundle.mjs 和 Fleet server/paseo-client.bundle.mjs 不提交 Git；npm 产物包含预打包 bundle。干净环境验收仍是各插件的发版前提，不能以看板安装结果代替 Fleet 验证；安装后不能依赖开发目录。
 - 所有者启用并检查 GitHub Report a vulnerability；不虚构安全邮箱。
 - 获得所有者发版权限；首次公开若压历史，先完成再验证最终提交、打不可变正式 tag。
 

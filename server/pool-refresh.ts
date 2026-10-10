@@ -3,7 +3,8 @@
 // Plugin code only gets a Paseo handle inside RPC handlers and hooks, and a plugin reload or daemon restart
 // drops it. Until 09-27 the timer then skipped every run without a word and the snapshot stood still.
 // Now the timer falls back to its own connection to the local daemon and logs every failure.
-import { createPaseoClient, type PaseoApi } from "@getpaseo/client";
+import type { PaseoApi } from "./paseo-api";
+import { createPaseoClient } from "./paseo-client.bundle.mjs";
 import { stat } from "node:fs/promises";
 import { CONFIG, type Json, readJson } from "./util";
 import { POOL_STATUS } from "./pools";

@@ -20,7 +20,7 @@
 
 - daemon 与桌面 app 均 >=0.11.0 <0.12.0，全局及单插件开关启用。
 - 两插件合用 Node >=22.13.0；看板声明 >=22.5 且 node:sqlite 可用，Fleet >=22.13.0。版本下限不认证所有组合。
-- Git 用于代码卡/workspace；npm 用于源码构建、看板 Git preparation，须在 daemon PATH。
+- Git 用于代码卡/workspace；npm 用于源码构建、两个插件的 Git preparation，须在 daemon PATH。
 - 通读至少一已安装/登录的本地 provider；当前自动执行/审查卡流要两个已确认模型家族。
 - macOS/Linux 是首发目标，须分别真测；首发不支持原生 Windows，WSL2 单测。见 [兼容证据](COMPATIBILITY.md)。
 
@@ -56,7 +56,7 @@
 
 [工作流](WORKFLOW.md) · [数据](DATA.md) · [兼容](COMPATIBILITY.md) · [发布/更新](RELEASE.md) · [贡献](CONTRIBUTING.md) · [安全](SECURITY.md) · [变更](CHANGELOG.md)
 
-源码先 `npm run build:cli`。已打包命令使用 Node，不要求 Python/tsx。看板 npm prepack 带生成 bundle；只有看板的 manifest build 运行 server/prepare.mjs。Fleet 源码使用 npm run build:cli，Git 安装仍须单独证明准备路径和可用命令，不能借看板安装结果。独立 doctor：
+两仓源码先 `npm run build`（Fleet 的 build:cli 是别名）。两插件的 manifest build 均运行各自的 server/prepare.mjs；Fleet Git 准备先 npm ci --include=dev --ignore-scripts --no-audit --no-fund，再 npm run build。生成的 bin/*.bundle.mjs 和 Fleet server/paseo-client.bundle.mjs 不提交 Git，npm 产物含预打包 bundle。见 [Fleet Git 安装与切换](../GIT-INSTALL.md)、[Kanban Git 安装](https://github.com/jasonhnd/paseo-kanban/blob/main/docs/GIT-INSTALL.md)。已打包命令使用 Node，不要求 Python/tsx；干净环境验收仍是发版前提，不能以看板安装结果代替 Fleet 验证。独立 doctor：
 
 ```sh
 node "$FLEET_INSTALL/bin/afc.mjs" doctor --json
@@ -64,6 +64,8 @@ node "$BOARD_INSTALL/bin/paseo-kanban.mjs" doctor
 ```
 
 Fleet 的 shared/default-dispatch.example.json 是安装模板，不是生成的状态。模型与可选集成可配；见 [导入证据](../IMPORT.md)。
+
+数据默认位于 $PASEO_HOME/plugin-data/agent-fleet-cockpit；AFC_DATA_DIR 覆盖 Fleet 数据目录，ROLES_STATE_DIR 只覆盖角色命令状态。旧目录默认 ~/.config/fleet-roles，可用 AFC_LEGACY_DATA_DIR 或迁移 --from 显式指定。可选只读 sidebar 用 AFC_SANDBOX_ROSTER_DIR 指定状态目录，不默认探测个人应用目录。模型选择遵循 host 目录及用户配置的供应商排除，安装不施加个人模型限制。
 
 ## Leader 上下文提醒与换会话
 
@@ -90,7 +92,7 @@ swap 需要先获得会话中的确认；等旧会话空闲、交接、新会话
 
 ```sh
 npm ci
-npm run build:cli
+npm run build
 npm run hooks
 git config user.name "paseo-fleet contributors"
 git config user.email "noreply@example.invalid"

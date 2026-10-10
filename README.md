@@ -24,7 +24,7 @@ Companion repositories: [Fleet](https://github.com/jasonhnd/paseo-fleet), [Kanba
 
 - Paseo daemon **and desktop app** `>=0.11.0 <0.12.0`; plugins enabled globally and individually.
 - Node >=22.13.0 for both plugins together. Kanban declares >=22.5 and requires working `node:sqlite`; Fleet declares >=22.13.0. These package floors do not certify every Node/OS combination.
-- Git for code cards and workspaces; npm for source builds and Kanban Git preparation on the daemon's PATH.
+- Git for code cards and workspaces; npm for source builds and both plugins' Git preparation on the daemon's PATH.
 - At least one user-installed/authenticated local provider for investigation; **two confirmed model families** for the current automatic executor/reviewer card flow.
 - macOS and Linux are initial release targets, subject to separate real-world validation. Native Windows is not initially supported; WSL2 must be checked separately. See the [evidence matrix](docs/COMPATIBILITY.md).
 
@@ -56,26 +56,65 @@ Five minutes describes configuration guidance when Paseo and authenticated local
 
 Git installations use `paseo plugin install github:jasonhnd/paseo-fleet --ref vX.Y.Z` only after a published, validated tag exists. Always specify `--ref` on updates. Directory installation uses `paseo plugin install "$PLUGIN_CHECKOUT"` after the appropriate source build; a directory source does not select a Git tag. Read the [manual release/update checklist](docs/RELEASE.md) before replacing an existing source.
 
+## Git installation and updates
+
+Git installs run `node server/prepare.mjs` from the manifest's `build` field. It runs
+`npm ci --include=dev --ignore-scripts --no-audit --no-fund` against the committed
+lockfile, then `npm run build` before Paseo compiles and activates the plugin. Node
+and npm must be on the daemon's PATH. The SDK and UI libraries stay in development
+dependencies; Paseo supplies its host modules and Zod. The background client uses
+the locked production protocol, relay and Zod packages. Generated third-party
+bundles are ignored by Git and built at installation time. npm artifacts include
+prepacked bundles; preparation uses `npm install` when no lockfile is present and
+checks these bundles without calling repository-only builders.
+
+For an existing daily daemon, use the backup, switch and rollback checklist in
+[Git installation](docs/GIT-INSTALL.md).
+
 ## Documentation
 
 [Workflow](docs/WORKFLOW.md) · [Data and privacy](docs/DATA.md) · [Compatibility](docs/COMPATIBILITY.md) · [Release/update](docs/RELEASE.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md)
 
-## Standalone commands
+## Standalone commands and development
 
-Run `npm run build:cli` in a Fleet checkout before using its Node launchers. Release Git commits must supply the command bundles or a proven preparation path; Fleet Git installation still needs clean-host validation. npm prepack rebuilds bundles. Commands need Node >=22.13.0, without Python or a TypeScript loader.
+Use Node 22.13 or newer. Build the commands with `npm run build` when working in
+a checkout. Git installation builds `bin/*.bundle.mjs` and
+`server/paseo-client.bundle.mjs` during preparation; do not commit these generated
+files. The latter embeds the pinned Node client SDK for
+background connections before any RPC handler has supplied a host API. Its development
+input is `bin/daemon-client.ts`; the server imports only the generated local module and
+obtains API types through `PluginHandlerContext` from `@getpaseo/plugin/server`.
+Run `npm run build` after changing the SDK version or connection input. `npm pack`
+and `npm run pack:check` rebuild them through their lifecycle hooks. Published
+commands need only Node, without TypeScript loaders,
+Python, or development dependencies.
 
 ```sh
-node "$FLEET_INSTALL/bin/afc.mjs" --help
-node "$FLEET_INSTALL/bin/afc.mjs" roles ls
-node "$FLEET_INSTALL/bin/afc.mjs" decide ls
-node "$FLEET_INSTALL/bin/afc.mjs" doctor --json
+node bin/afc.mjs --help
+node bin/afc.mjs roles ls
+node bin/afc.mjs decide ls
+node bin/afc.mjs doctor --json
+node bin/afc.mjs migrate --help
 ```
 
-The default dispatch template is `shared/default-dispatch.example.json`. It is install data, separate from generated dispatch state. Model choices and optional integrations are configurable. See [DATA](docs/DATA.md) and [the import evidence](docs/IMPORT.md).
+The default dispatch template ships at `shared/default-dispatch.example.json`.
+It is install data, separate from generated dispatch state. Profile bindings and
+quota priority remain configurable. Model choices follow the host catalog and
+configured provider exclusions; installation imposes no personal model restrictions.
 
-An access
+Data defaults to `$PASEO_HOME/plugin-data/agent-fleet-cockpit`. `AFC_DATA_DIR`
+overrides it, and `ROLES_STATE_DIR` overrides roles-command state only. Legacy
+discovery checks `~/.config/fleet-roles`; set `AFC_LEGACY_DATA_DIR` for another
+previous state directory, or use migration's explicit `--from` path. The optional
+read-only sidebar adapter requires `AFC_SANDBOX_ROSTER_DIR` to select its persistence
+directory; it does not probe an owner's application directory by default. An access
 map plugin-listing check uses its explicit `pluginId` field; an unspecified id is
 reported as unknown.
+
+`npm run compat` is an offline compiler, type-check and regression gate. It does
+not contact a daemon or prove desktop mounting, provider authentication, migration
+against real data, or installation on another operating system. Those checks belong
+to the isolated release validation workflow.
 
 ## Leader context reminders and swaps
 
@@ -138,7 +177,7 @@ Nothing personal may ever reach this repository or a published package. Three ga
 
 ```sh
 npm ci                                       # install the locked development tools
-npm run build:cli                            # build the standalone Node commands
+npm run build                                # build CLI and background client bundles
 npm run hooks                                # git config core.hooksPath .githooks
 git config user.name "paseo-fleet contributors"
 git config user.email "<id>+<user>@users.noreply.github.com"   # or noreply@example.invalid

@@ -8,7 +8,7 @@ Both manifests declare Paseo `>=0.11.0 <0.12.0`. Check **both daemon and desktop
 |---|---|
 | Paseo | Daemon and app in the manifest range; global plugins switch and individual plugins enabled. |
 | Node | Fleet commands require >=22.13.0; Kanban declares >=22.5 with usable `node:sqlite`. Use >=22.13.0 for both. Test SQLite availability in the daemon's Node environment. |
-| npm | Needed for source development and Kanban Git preparation on the daemon's PATH. |
+| npm | Needed for source development and both plugins' Git preparation on the daemon's PATH. |
 | Git | Needed for coding cards, temporary workspaces and Git-source installations. |
 | Providers | User-installed and user-authenticated local providers. Discovery is not proof of login, quota or a successful request. |
 | Review | Two confirmed model families for the current automatic executor/reviewer cycle. |
@@ -55,4 +55,4 @@ paseo plugin update paseo-kanban --check --ref vX.Y.Z
 paseo plugin update paseo-kanban --ref vX.Y.Z
 ```
 
-Replace the id with `agent-fleet-cockpit` for Fleet. Use only a published tag with a recorded full commit. Fleet's Git installation/preparation path is still a release prerequisite; do not infer it from the companion's preparation. Back up data and plugin settings before changing sources. Code downgrade does not undo data writes. See [RELEASE](RELEASE.md).
+Replace the id with `agent-fleet-cockpit` for Fleet. Use only a published tag with a recorded full commit. Both plugins run their own `server/prepare.mjs` through manifest `build`. Fleet preparation installs locked dependencies with development tools included and lifecycle scripts disabled, then runs `npm run build`; see [Fleet Git installation](GIT-INSTALL.md). Clean-host validation remains a release prerequisite for each plugin; a successful Kanban installation does not validate Fleet. Back up data and plugin settings before changing sources. Code downgrade does not undo data writes. See [RELEASE](RELEASE.md).

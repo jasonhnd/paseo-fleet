@@ -10,7 +10,7 @@ import { setEarlyResetNotify } from "./server/early-reset";
 import { buildUsage, updatePlan } from "./server/usage";
 import { beginCursorConnect, disconnectCursor, startCursorUsage } from "./server/cursor-usage";
 import { requestPoolRefreshNow, startPoolRefresh } from "./server/pool-refresh";
-import type { PaseoApi } from "@getpaseo/client";
+import type { PaseoApi } from "./server/paseo-api";
 import { changesBoard, readBoardSnapshot, startSnapshotWarm } from "./server/snapshot-cache";
 import { readClosedDecision, submitChange } from "./server/decide-change";
 import { productionDecideDeps, submitDecision } from "./server/decide-reply";

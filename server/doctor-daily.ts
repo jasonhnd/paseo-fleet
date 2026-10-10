@@ -62,10 +62,12 @@ export function productionDailyDeps(): DailyDeps {
   };
 }
 
-async function sendNotice(deps: DailyDeps, text: string): Promise<void> {
+async function sendNotice(deps: DailyDeps, text: string): Promise<boolean> {
   const id = await deps.leaderId();
-  if (!id) throw new Error("no AFC <leader> id");
+  // Standalone and first-run installations can have no registered leader yet.
+  if (!id) return false;
   await deps.notify(id, text);
+  return true;
 }
 
 /**
@@ -78,7 +80,7 @@ export async function runDailyOnce(deps: DailyDeps): Promise<boolean> {
   const now = deps.now();
   const day = tokyoClock(now).day;
   if (state.pending && state.pending.day === day) {
-    await sendNotice(deps, state.pending.text);
+    if (!await sendNotice(deps, state.pending.text)) return false;
     await deps.saveState(recordNotified({ ...state, pending: null }, day, state.pending.keys));
     return true;
   }
@@ -95,7 +97,7 @@ export async function runDailyOnce(deps: DailyDeps): Promise<boolean> {
   }
   await deps.saveState({ ...done, pending: { day, text, keys } });
   try {
-    await sendNotice(deps, text);
+    if (!await sendNotice(deps, text)) return true;
   } catch (error) {
     console.error("[afc] doctor: notice not sent; only the notice is retried next minute:", String(error).slice(0, 200));
     return true;

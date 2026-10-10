@@ -2,7 +2,7 @@
 // What board.snapshot answers. Opening AFC used to wait for a full round (agent list, two `paseo` CLI
 // calls, files): 1–5 s measured on 2026-10-07. Now the last snapshot comes back at once and the next one
 // is built in the background; the panel asks again within seconds when what it got is old.
-import type { PaseoApi } from "@getpaseo/client";
+import type { PaseoApi } from "./paseo-api";
 import type { BoardSnapshot } from "../shared/board";
 import { withOwnDaemonClient } from "./pool-refresh";
 import { buildSnapshot } from "./snapshot";

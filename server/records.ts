@@ -96,7 +96,8 @@ export function modelIdOf(p: Profile): string {
 const isPlainObject = (value: unknown): value is Json => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
 /**
- * Every parseable JSON object under `<paseoDir>/agents/<dir>/*.json`. Null when the agents root cannot be read.
+ * Every parseable JSON object under `<paseoDir>/agents/<dir>/*.json`.
+ * A missing agents root (ENOENT) returns an empty list; other root read failures return null.
  * Unreadable sub-directories and files that are not JSON objects are skipped.
  */
 export async function readAgentRecordFiles(paseoDir: string = PASEO_DIR): Promise<Json[] | null> {
@@ -105,6 +106,8 @@ export async function readAgentRecordFiles(paseoDir: string = PASEO_DIR): Promis
   try {
     dirs = await readdir(root);
   } catch (error) {
+    // A new daemon has no records directory until its first agent is persisted.
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
     console.error("[afc] cannot read the agent records directory:", String(error).slice(0, 160));
     return null;
   }

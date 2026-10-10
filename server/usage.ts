@@ -2,7 +2,7 @@
 import { providerBanned } from "../shared/provider-policy";
 // "Am I using what I pay for?" — token usage per plan and model, valued at API list prices,
 // set against each plan's price and quota windows.
-import type { PaseoApi } from "@getpaseo/client";
+import type { PaseoApi } from "./paseo-api";
 import { join } from "node:path";
 import { activeDispatchPriority, type DispatchPriority, poolStatusPriority, resolveDispatchPriority } from "../shared/dispatch-priority";
 import {

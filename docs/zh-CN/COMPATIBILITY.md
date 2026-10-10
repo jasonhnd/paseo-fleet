@@ -8,7 +8,7 @@
 |---|---|
 | Paseo | daemon/app 均在范围内，全局和单插件开关启用。 |
 | Node | Fleet >=22.13.0；Kanban >=22.5 且 node:sqlite 可用；合装建议 >=22.13.0。须核对 daemon 的 Node 环境。 |
-| npm / Git | npm 用于源码开发和看板 Git preparation，须在 daemon PATH；Git 用于代码卡、临时 workspace、Git 安装。 |
+| npm / Git | npm 用于源码开发和两个插件的 Git preparation，须在 daemon PATH；Git 用于代码卡、临时 workspace、Git 安装。 |
 | Provider | 用户自己安装和登录；发现模型不证明登录、请求或额度成功。 |
 | 审查 | 当前自动执行/审查流程需要两个已确认模型家族。 |
 
@@ -45,4 +45,4 @@ paseo plugin update paseo-kanban --check --ref vX.Y.Z
 paseo plugin update paseo-kanban --ref vX.Y.Z
 ```
 
-Fleet 换 id 为 agent-fleet-cockpit；Fleet 自己的 Git preparation 仍需发版验证，不能借看板的成功证明。切来源前备份数据和设置，代码回退不撤销数据写入。见 [RELEASE](RELEASE.md)。
+Fleet 换 id 为 agent-fleet-cockpit。两插件 manifest build 均运行各自的 server/prepare.mjs；Fleet 准备依赖后运行 npm run build，见 [Fleet Git 安装](../GIT-INSTALL.md)。干净环境验收仍是各插件的发版前提，不能用看板的安装结果证明 Fleet。切来源前备份数据和设置，代码回退不撤销数据写入。见 [RELEASE](RELEASE.md)。

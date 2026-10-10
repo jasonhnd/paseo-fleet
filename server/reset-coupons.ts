@@ -9,7 +9,8 @@
 //
 // The pieces live in reset-coupons-*.ts beside this file; this one runs the rounds and re-exports
 // the public surface.
-import { createPaseoClient, type PaseoApi } from "@getpaseo/client";
+import type { PaseoApi } from "./paseo-api";
+import { createPaseoClient } from "./paseo-client.bundle.mjs";
 import {
   USED_DROP_POINTS,
   codexCompanyPatch,

@@ -50,13 +50,16 @@
     "node": ">=22.13.0"
   },
   "dependencies": {
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "@getpaseo/protocol": "0.11.0",
+    "@getpaseo/relay": "0.11.0"
   },
   "scripts": {
     "hooks": "git config core.hooksPath .githooks",
     "scan": "node scripts/check-private.mjs --all",
     "identity": "node scripts/check-identity.mjs --history",
     "pack:check": "node scripts/check-package-files.mjs",
+    "prepack:check": "npm run build",
     "contract:check": "node scripts/sync-contract.mjs --check",
     "contract:manifest": "node scripts/sync-contract.mjs --write-manifest",
     "shared:check": "node scripts/compare-scripts.mjs",
@@ -65,8 +68,8 @@
     "test:plugin": "node scripts/test-plugin.mjs",
     "verify": "node scripts/verify.mjs",
     "build:check": "node scripts/paseo-build-check.mjs --strict",
-    "build": "node bin/build-commands.mjs",
-    "build:cli": "node bin/build-commands.mjs",
+    "build": "node bin/build-daemon-client.mjs && node bin/build-commands.mjs",
+    "build:cli": "npm run build",
     "prepack": "npm run build",
     "pretest:plugin": "npm run build",
     "preverify": "npm run build",
@@ -75,7 +78,6 @@
   "devDependencies": {
     "@getpaseo/client": "0.11.0",
     "@getpaseo/plugin": "0.11.0",
-    "@getpaseo/protocol": "0.11.0",
     "@tanstack/react-query": "^5.90.11",
     "@types/node": "^24",
     "@types/react": "~19.2.0",

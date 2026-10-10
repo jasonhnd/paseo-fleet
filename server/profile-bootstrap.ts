@@ -1,4 +1,4 @@
-import type { PaseoApi } from "@getpaseo/client";
+import type { PaseoApi } from "./paseo-api";
 import { buildRolePreview, type Discovery, type RoleChoice, type RolePreview } from "../shared/profile-bootstrap";
 import type { Language } from "../shared/i18n";
 
