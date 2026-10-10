@@ -5,5 +5,9 @@
   "adapters": {
     "cursor-api": false,
     "keychain": false
+  },
+  "leaderUsage": {
+    "reminderTokens": 500000,
+    "warningTokens": 750000
   }
 }

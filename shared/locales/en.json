@@ -969,7 +969,7 @@
   "leader.group.parents": "Waiting on parent cards",
   "leader.group.rework": "In rework",
   "leader.help.hideA11y": "Hide help",
-  "leader.help.lamp": "The lamp follows context size: up to 250K is green, over 250K yellow, over 500K red. Nothing switches without a click.",
+  "leader.help.lamp": "The context dot follows the configured reminder and warning thresholds. Change them in Settings.",
   "leader.help.order": "One card per <leader>: blocked work and non-responding ones come first, those with nothing to handle come last; paused projects fold into one line at the bottom.",
   "leader.help.reply": "Click a letter when there is one; a line you write goes to this <leader>. Press \"Expand\" for decision details, cards, 7-day counts, the shift and the handover.",
   "leader.help.show": "Help",
@@ -2013,5 +2013,12 @@
   "doctor.platform.keychainSkipped": "Keychain checks are not applicable on this operating system and are skipped.",
   "doctor.platform.processSkipped": "Unix process inspection was skipped on this operating system; process findings are unverified.",
   "cursor.api.sandboxLabel": "Agent sandbox",
-  "access.detail.pluginUnconfigured": "No plugin id is configured for this status check"
+  "access.detail.pluginUnconfigured": "No plugin id is configured for this status check",
+  "settings.leaderUsage": "Leader context usage",
+  "settings.leaderUsageHint": "Token counts: reminder above the first threshold; red warning above the second. Warning must exceed reminder.",
+  "settings.leaderUsage.reminderTokens": "Reminder threshold (tokens)",
+  "settings.leaderUsage.warningTokens": "Warning threshold (tokens)",
+  "leader.usage.thresholds": "Context: reminder above {reminder}; red warning above {warning}.",
+  "leader.usage.reminder": "Context reminder: consider a leader swap.",
+  "leader.usage.warning": "Context warning: swap the leader soon."
 }

@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import { providerBanned } from "../shared/provider-policy";
-import { readBannedProviders } from "./adapters/config";
+import { readBannedProviders, readLeaderThresholds } from "./adapters/config";
 // Manual <leader> shift. The RPC calls requestSupervisorShift after the user confirms,
 // continues, or cancels. A queue saved on disk resumes from the next homepage snapshot.
 import { markProxies } from "../shared/leader-proxy";
@@ -313,9 +313,11 @@ export async function readSupervisorPanel(
     for (const [id, value] of usd) todayUsd[id] = value;
     await hydrateShiftJobs();
     if (paseo) scheduleQueueResume(paseo);
+    const thresholds = readLeaderThresholds();
     return {
+      thresholds,
       rows: markProxies(buildSupervisorRows({
-        slots, agents, todayUsd, now,
+        slots, agents, todayUsd, now, thresholds,
         acceptanceByProject: Object.fromEntries(slots.map((slot) => [slot.project, readAcceptanceCards(slot.project)])),
       }), new Map(records.map((rec) => [rec.id, { title: rec.title, cwd: rec.cwd }]))),
       tasks: currentShiftJobs(),

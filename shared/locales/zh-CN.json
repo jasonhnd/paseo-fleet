@@ -969,7 +969,7 @@
   "leader.group.parents": "等前置卡",
   "leader.group.rework": "返工中",
   "leader.help.hideA11y": "收起说明",
-  "leader.help.lamp": "状态灯看上下文：25 万及以下是绿灯，超过 25 万亮黄灯，超过 50 万亮红灯。没有点击不会换班。",
+  "leader.help.lamp": "上下文圆点按设置里的提醒和警告阈值显示颜色，可在设置页调整。",
   "leader.help.order": "每个 <leader> 一张卡，卡住开工、无响应的排最前，什么都不用处理的排后面；暂停的项目收成一行放最底。",
   "leader.help.reply": "有字母就点字母；写一句话会转给这个 <leader>。点「展开」看待拍板明细、卡片、7 天计数、换班和交接。",
   "leader.help.show": "说明",
@@ -2013,5 +2013,12 @@
   "doctor.platform.keychainSkipped": "此系统不适用钥匙串检查，已跳过。",
   "doctor.platform.processSkipped": "此系统已跳过 Unix 进程检查；进程状态尚未验证。",
   "cursor.api.sandboxLabel": "代理沙盒",
-  "access.detail.pluginUnconfigured": "此状态检查尚未配置插件 ID"
+  "access.detail.pluginUnconfigured": "此状态检查尚未配置插件 ID",
+  "settings.leaderUsage": "<leader> 上下文用量",
+  "settings.leaderUsageHint": "按 token 数填写：超过第一项提醒，超过第二项显示红色警告。警告值必须大于提醒值。",
+  "settings.leaderUsage.reminderTokens": "提醒阈值（token）",
+  "settings.leaderUsage.warningTokens": "警告阈值（token）",
+  "leader.usage.thresholds": "上下文：超过 {reminder} 提醒，超过 {warning} 红色警告。",
+  "leader.usage.reminder": "上下文用量提醒：建议换 <leader>。",
+  "leader.usage.warning": "上下文用量警告：请尽快换 <leader>。"
 }

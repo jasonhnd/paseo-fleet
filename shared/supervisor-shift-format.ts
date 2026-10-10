@@ -1,7 +1,8 @@
 // Pure text and lamp helpers for the homepage <leader> rows and the takeover message.
+import { DEFAULT_LEADER_THRESHOLDS, type LeaderThresholds } from "./leader-usage";
 import { TOKYO_OFFSET_MS } from "./dispatch";
 import { t, tAll } from "./i18n";
-import { HANDOVER_PREVIEW_LINES, RED_OVER, YELLOW_OVER, takenOverReply, type Lamp } from "./supervisor-shift-types";
+import { HANDOVER_PREVIEW_LINES, takenOverReply, type Lamp } from "./supervisor-shift-types";
 
 /** Joins card codes in a sentence. */
 export function joinList(items: readonly string[]): string {
@@ -16,10 +17,10 @@ export function shiftConfirmation(code: string, acceptanceCards: readonly string
   return `${question}\n${t("shift.confirm.cardsPending", { count: acceptanceCards.length, cards: joinList(acceptanceCards) })}`;
 }
 
-export function contextLamp(tokens: number | null): Lamp {
+export function contextLamp(tokens: number | null, thresholds: LeaderThresholds = DEFAULT_LEADER_THRESHOLDS): Lamp {
   if (tokens === null || !Number.isFinite(tokens) || tokens < 0) return "unknown";
-  if (tokens > RED_OVER) return "red";
-  if (tokens > YELLOW_OVER) return "yellow";
+  if (tokens > thresholds.warningTokens) return "red";
+  if (tokens > thresholds.reminderTokens) return "yellow";
   return "green";
 }
 

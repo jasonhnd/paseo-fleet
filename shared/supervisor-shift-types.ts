@@ -1,10 +1,11 @@
 // Constants and shapes shared by the supervisor-shift modules, plus the shift texts (looked up at call time).
+import type { LeaderThresholds } from "./leader-usage";
 import { t, tAll, type MessageKey } from "./i18n";
 
 /** At or below this, the row is green. Above it, yellow. */
-export const YELLOW_OVER = 250_000;
-/** Above this, the row is red. 500_000 itself stays yellow. */
-export const RED_OVER = 500_000;
+export const YELLOW_OVER = 500_000;
+/** Above this, the row is red. The boundary itself stays yellow. */
+export const RED_OVER = 750_000;
 export const HANDOVER_TIMEOUT_MS = 15 * 60 * 1000;
 export const TAKEOVER_TIMEOUT_MS = 15 * 60 * 1000;
 export const TAKEOVER_POLL_MS = 2_000;
@@ -212,6 +213,7 @@ export interface HandoffLogLine {
 }
 
 export interface SupervisorPanel {
+  thresholds?: LeaderThresholds;
   rows: SupervisorRow[];
   tasks: ShiftProgress[];
   handoffs: HandoffLogLine[];

@@ -1,3 +1,4 @@
+import { leaderThresholdsSchema } from "./leader-usage";
 import { defineRpc } from "@getpaseo/plugin";
 import { pausedProjectSchema } from "./paused";
 import { z } from "zod";
@@ -42,6 +43,7 @@ const shiftProgressSchema = z.object({
 });
 
 const supervisorPanelSchema = z.object({
+  thresholds: leaderThresholdsSchema.optional(),
   rows: z.array(supervisorRowSchema),
   details: z.array(leaderDetailSchema).optional(),
   tasks: z.array(shiftProgressSchema),
