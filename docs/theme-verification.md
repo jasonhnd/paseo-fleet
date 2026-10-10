@@ -1,7 +1,8 @@
 # Theme rework verification (2026-10-10)
 
 Code verified: `7280988` (retired preferences) and `304133b` (shared palette recipes,
-color gate, mounted tests and theme documentation). Execution evidence only;
+color gate, mounted tests and theme documentation), plus `1a62173` (identical
+Kanban neutral fallback). Execution evidence only;
 independent review and final acceptance remain separate.
 
 ## Local checks
@@ -22,7 +23,7 @@ independent review and final acceptance remain separate.
   private/identity/history/gitleaks/contract/shared gates/package checks passed.
   The shared-scripts gate reports no configured sibling. A separate read-only
   comparison compiled Kanban and Fleet adapters and found all 23 common semantic
-  outputs equal for light, dark and low-contrast themes.
+  outputs equal for light, dark and low-contrast themes, plus absent/null host themes.
 - The first full suite run failed two existing leader-swap assertions. The unchanged
   leader-swap file passed 21/21 in isolation, then the unchanged full verify passed.
   The first failure log is retained alongside the final passing log.
@@ -75,7 +76,7 @@ Browser runtime errors were empty. Browser and isolated daemon were stopped afte
 capture. Generated bundles are temporary build artifacts, not tracked sources;
 run `npm run build` before checks requiring them after cleanup.
 
-The missing-theme compatibility path uses only the neutral fallback via RoleBoard
+The missing-theme compatibility path uses the same neutral fallback as Kanban via RoleBoard
 and FleetSettings/useStyles; descendants receive styles. This path has pure tests
 and was not exercised by the current host, which supplies a full theme. Host theme
 changes may replace plugin DOM or close drawers as documented by Kanban; Fleet's

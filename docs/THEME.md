@@ -42,7 +42,7 @@ Fleet has two domain-specific additions; neither changes the shared recipes:
   Both arrays are derived in the shared adapter. Client components only read them.
 
 Only a completely absent host theme uses `shared/theme-fallback.ts`, a single
-neutral grayscale theme. The entry points are `RoleBoard` and `FleetSettings` via
+neutral grayscale theme identical to Kanban's `NEUTRAL_THEME`. The entry points are `RoleBoard` and `FleetSettings` via
 `useStyles`; their descendants receive the resulting styles without separate
 fallbacks. Actual SDK 0.11.2 supplies a theme, so this compatibility path is covered
 by pure tests rather than the isolated browser screenshots.
