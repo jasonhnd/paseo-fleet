@@ -2061,7 +2061,7 @@ var en_default = {
   "leader.swap.dryRun": "Dry run: write handover, open with the same settings and workspace, confirm takeover and registration, then archive the old session. No changes made.",
   "leader.swap.cancelled": "Tracking cancelled. Neither session was archived; check the leader registry before manual rollback.",
   "leader.swap.pending": "Finish or cancel the pending swap before starting another.",
-  "leader.cli.usage": "Usage: afc leader usage [--json] | swap <project> [--dry-run] [--again] [--json] | status <project> [--json]. Connection: [--host host:port] (defaults to PASEO_HOME daemon).",
+  "leader.cli.usage": "Usage: afc leader usage [--json] | swap <project> [--dry-run] [--again] [--json] | status <project> [--json] | cancel <project> [--dry-run] [--json]. Connection: [--host host:port] (defaults to PASEO_HOME daemon).",
   "leader.cli.progress": "{step}: {detail} (old={old}, new={new})",
   "leader.cli.failed": "Swap stopped at {step}: {reason}. State: old={old}, new={new}. Retry: afc leader swap {project}; inspect: afc leader status {project}. Cancel stops tracking only; keep both sessions until the registry is checked.",
   "leader.cli.disconnected": "Connection or RPC failed: {error}. The daemon may still be swapping. Inspect with afc leader status {project}, then rerun the same swap command to resume.",
@@ -2075,7 +2075,10 @@ var en_default = {
   "leader.cli.timeout": "Local daemon connection or RPC timed out.",
   "leader.cli.rejected": "Daemon handshake rejected: {reason}.",
   "leader.cli.transportError": "Local daemon connection failed.",
-  "leader.cli.transportClosed": "Local daemon connection closed."
+  "leader.cli.transportClosed": "Local daemon connection closed.",
+  "leader.swap.cancelDryRun": "Dry run: clear stopped swap tracking only. Neither session nor the leader registry would be changed.",
+  "leader.swap.cancelRunning": "The swap is still running. Wait for it to stop and inspect its status before cancelling tracking.",
+  "leader.cli.manual": "Swap stopped at {step}: {reason}. State: old={old}, new={new}. Automatic continuation is unavailable. Inspect: afc leader status {project}. After verifying which session is registered, clear stopped tracking with afc leader cancel {project}. To roll back, open the old session and register it with kanban supervise --project {project}; verify the registry before manually archiving any orphan new session. Neither session is archived by cancel."
 };
 
 // shared/locales/zh-CN.json
@@ -4109,7 +4112,7 @@ var zh_CN_default = {
   "leader.swap.dryRun": "\u6F14\u7EC3\uFF1A\u5199\u4EA4\u63A5\uFF0C\u5728\u540C\u4E00\u5DE5\u4F5C\u533A\u6309\u76F8\u540C\u914D\u7F6E\u5F00\u4F1A\u8BDD\uFF0C\u786E\u8BA4\u63A5\u624B\u5E76\u767B\u8BB0\u540E\u5F52\u6863\u65E7\u4F1A\u8BDD\u3002\u672A\u4F5C\u4EFB\u4F55\u4FEE\u6539\u3002",
   "leader.swap.cancelled": "\u5DF2\u53D6\u6D88\u8DDF\u8E2A\uFF0C\u4E24\u4E2A\u4F1A\u8BDD\u5747\u672A\u5F52\u6863\uFF1B\u624B\u52A8\u56DE\u6EDA\u524D\u8BF7\u6838\u5BF9 <leader> \u767B\u8BB0\u3002",
   "leader.swap.pending": "\u8BF7\u5148\u5B8C\u6210\u6216\u53D6\u6D88\u5F53\u524D\u6362\u73ED\uFF0C\u518D\u5F00\u59CB\u65B0\u6362\u73ED\u3002",
-  "leader.cli.usage": "\u7528\u6CD5\uFF1Aafc leader usage [--json] | swap <\u9879\u76EE> [--dry-run] [--again] [--json] | status <\u9879\u76EE> [--json]\u3002\u8FDE\u63A5\uFF1A[--host host:port]\uFF08\u9ED8\u8BA4 PASEO_HOME \u7684 daemon\uFF09\u3002",
+  "leader.cli.usage": "\u7528\u6CD5\uFF1Aafc leader usage [--json] | swap <\u9879\u76EE> [--dry-run] [--again] [--json] | status <\u9879\u76EE> [--json] | cancel <\u9879\u76EE> [--dry-run] [--json]\u3002\u8FDE\u63A5\uFF1A[--host host:port]\uFF08\u9ED8\u8BA4 PASEO_HOME \u7684 daemon\uFF09\u3002",
   "leader.cli.progress": "{step}\uFF1A{detail}\uFF08\u65E7={old}\uFF0C\u65B0={new}\uFF09",
   "leader.cli.failed": "\u6362\u73ED\u505C\u5728 {step}\uFF1A{reason}\u3002\u73B0\u72B6\uFF1A\u65E7={old}\uFF0C\u65B0={new}\u3002\u7EE7\u7EED\uFF1Aafc leader swap {project}\uFF1B\u67E5\u770B\uFF1Aafc leader status {project}\u3002\u53D6\u6D88\u53EA\u505C\u6B62\u8DDF\u8E2A\uFF0C\u6838\u5BF9\u767B\u8BB0\u524D\u8BF7\u4FDD\u7559\u4E24\u4E2A\u4F1A\u8BDD\u3002",
   "leader.cli.disconnected": "\u8FDE\u63A5\u6216 RPC \u5931\u8D25\uFF1A{error}\u3002daemon \u53EF\u80FD\u4ECD\u5728\u6362\u73ED\u3002\u5148\u7528 afc leader status {project} \u67E5\u770B\uFF0C\u518D\u8FD0\u884C\u76F8\u540C\u6362\u73ED\u547D\u4EE4\u7EE7\u7EED\u3002",
@@ -4123,7 +4126,10 @@ var zh_CN_default = {
   "leader.cli.timeout": "\u672C\u5730 daemon \u8FDE\u63A5\u6216 RPC \u8D85\u65F6\u3002",
   "leader.cli.rejected": "daemon \u62D2\u7EDD\u8FDE\u63A5\uFF1A{reason}\u3002",
   "leader.cli.transportError": "\u672C\u5730 daemon \u8FDE\u63A5\u5931\u8D25\u3002",
-  "leader.cli.transportClosed": "\u672C\u5730 daemon \u8FDE\u63A5\u5DF2\u5173\u95ED\u3002"
+  "leader.cli.transportClosed": "\u672C\u5730 daemon \u8FDE\u63A5\u5DF2\u5173\u95ED\u3002",
+  "leader.swap.cancelDryRun": "\u6F14\u7EC3\uFF1A\u53EA\u6E05\u9664\u5DF2\u505C\u6B62\u6362\u73ED\u7684\u8DDF\u8E2A\u72B6\u6001\uFF0C\u4E0D\u6539\u52A8\u4F1A\u8BDD\u6216 <leader> \u767B\u8BB0\u3002",
+  "leader.swap.cancelRunning": "\u6362\u73ED\u4ECD\u5728\u8FD0\u884C\uFF0C\u8BF7\u7B49\u5B83\u505C\u6B62\u5E76\u67E5\u770B\u72B6\u6001\u540E\u518D\u6E05\u9664\u8DDF\u8E2A\u3002",
+  "leader.cli.manual": "\u6362\u73ED\u505C\u5728 {step}\uFF1A{reason}\u3002\u73B0\u72B6\uFF1A\u65E7={old}\uFF0C\u65B0={new}\u3002\u65E0\u6CD5\u81EA\u52A8\u7EE7\u7EED\u3002\u67E5\u770B\uFF1Aafc leader status {project}\u3002\u6838\u5BF9\u5F53\u524D\u767B\u8BB0\u7684\u4F1A\u8BDD\u540E\uFF0C\u7528 afc leader cancel {project} \u6E05\u9664\u5DF2\u505C\u6B62\u7684\u8DDF\u8E2A\u3002\u56DE\u6EDA\u65F6\u6253\u5F00\u65E7\u4F1A\u8BDD\u5E76\u6267\u884C kanban supervise --project {project} \u91CD\u65B0\u767B\u8BB0\uFF1B\u6838\u5BF9\u767B\u8BB0\u540E\uFF0C\u624D\u624B\u52A8\u5F52\u6863\u5931\u53BB\u5173\u8054\u7684\u65B0\u4F1A\u8BDD\u3002cancel \u4E0D\u5F52\u6863\u4EFB\u4F55\u4F1A\u8BDD\u3002"
 };
 
 // shared/i18n.ts

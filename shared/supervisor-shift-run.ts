@@ -55,6 +55,7 @@ interface RowSpec {
 }
 
 interface FailSpec extends RowSpec {
+  step?: string;
   detail: string;
   result: string;
   resumeNext?: "open" | "wait" | null;
@@ -121,7 +122,7 @@ function rowFor(
 function fail(run: ShiftRun, agent: Pick<ShiftAgent, "id" | "contextTokens">, spec: FailSpec): ShiftOutcome {
   const base = rowFor(run, agent, "failed", spec.detail, spec);
   const row = spec.label ? { ...base, label: spec.label } : base;
-  row.step = run.steps.at(-1);
+  row.step = spec.step ?? run.steps.at(-1) ?? "preflight";
   run.tell(row);
   return { progress: row, result: spec.result, archived: false, steps: run.steps, resumeNext: spec.resumeNext ?? null };
 }
@@ -232,7 +233,7 @@ async function createSession(
   // Re-read after the old session's handover, including when continuing after a timeout.
   const acceptanceCards = (await run.ports.readAcceptanceCards?.(run.request.project).catch(() => null)) ?? null;
   return run.ports.createAgent({
-    idempotencyKey: `afc-leader-swap:${run.request.project}:${agent.id}`,
+    idempotencyKey: run.request.creationKey ?? `afc-leader-swap:${run.request.project}:${agent.id}`,
     labels: Object.fromEntries(Object.entries(agent.labels).filter(([key]) => key !== PARENT_LABEL)),
     workspaceId,
     cwd: agent.cwd,
@@ -255,10 +256,10 @@ async function createSession(
 async function openNewSession(run: ShiftRun, agent: ShiftAgent): Promise<Stage<NewSession>> {
   const workspaceId = agent.workspaceId;
   if (!workspaceId) {
-    return stop(fail(run, agent, { detail: t("shift.detail.noWorkspace"), result: t("shift.result.noWorkspace") }));
+    return stop(fail(run, agent, { step: "open", detail: t("shift.detail.noWorkspace"), result: t("shift.result.noWorkspace") }));
   }
   if (!agent.provider || !agent.model) {
-    return stop(fail(run, agent, { detail: t("shift.detail.noModel"), result: t("shift.result.noModel") }));
+    return stop(fail(run, agent, { step: "open", detail: t("shift.detail.noModel"), result: t("shift.result.noModel") }));
   }
   // A missing handover file only thins the takeover message; it must not stop the shift.
   const handover = agent.cwd ? await run.ports.readHandover(agent.cwd).catch(() => null) : null;

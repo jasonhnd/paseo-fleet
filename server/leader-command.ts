@@ -29,16 +29,18 @@ export async function leaderSwap(paseo: PaseoApi, input: LeaderSwapInput, ports?
   if (!slot) return result(false, t("shift.server.notRegistered"));
   if (!available && input.action !== "cancel") return result(false, t("leader.swap.noKanban"));
   if (input.action === "status") return result(job?.phase !== "failed", job?.detail ?? t("leader.swap.ready"));
+  if (input.dryRun && input.action === "cancel") return { ...result(true, t("leader.swap.cancelDryRun"), null), events: [], eventsOffset: 0 };
   if (input.dryRun) {
     const oldId = job && job.phase !== "done" ? job.oldId || slot.agentId : slot.agentId;
     const agent: ShiftAgent | null = await (ports?.getAgent(oldId) ?? loadShiftAgent(paseo, oldId));
     if (!agent) return result(false, t("shift.detail.notFound"));
     const { workspaceId, title, provider, model, modeId, thinkingOptionId, featureValues } = agent;
-    return result(Boolean(workspaceId && provider && model), t("leader.swap.dryRun"), job, { project: slot.project, agentId: oldId, workspaceId, title, provider, model, modeId, thinkingOptionId, featureValues });
+    return result(Boolean(workspaceId && provider && model), !workspaceId ? t("shift.detail.noWorkspace") : !provider || !model ? t("shift.detail.noModel") : t("leader.swap.dryRun"), job, { project: slot.project, agentId: oldId, workspaceId, title, provider, model, modeId, thinkingOptionId, featureValues });
   }
   if (input.action === "cancel") {
-    const next = await requestSupervisorShift(paseo, slot.project, "cancel", ports);
-    return result(true, t("leader.swap.cancelled"), next);
+    if (running) return result(false, t("leader.swap.cancelRunning"));
+    await requestSupervisorShift(paseo, slot.project, "cancel", ports);
+    return { ...result(true, t("leader.swap.cancelled"), null), events: [], eventsOffset: 0 };
   }
   if (running) return result(true, t("shift.server.alreadyRunning"));
   if (!input.again) {

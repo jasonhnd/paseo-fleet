@@ -2028,7 +2028,7 @@
   "leader.swap.dryRun": "Dry run: write handover, open with the same settings and workspace, confirm takeover and registration, then archive the old session. No changes made.",
   "leader.swap.cancelled": "Tracking cancelled. Neither session was archived; check the leader registry before manual rollback.",
   "leader.swap.pending": "Finish or cancel the pending swap before starting another.",
-  "leader.cli.usage": "Usage: afc leader usage [--json] | swap <project> [--dry-run] [--again] [--json] | status <project> [--json]. Connection: [--host host:port] (defaults to PASEO_HOME daemon).",
+  "leader.cli.usage": "Usage: afc leader usage [--json] | swap <project> [--dry-run] [--again] [--json] | status <project> [--json] | cancel <project> [--dry-run] [--json]. Connection: [--host host:port] (defaults to PASEO_HOME daemon).",
   "leader.cli.progress": "{step}: {detail} (old={old}, new={new})",
   "leader.cli.failed": "Swap stopped at {step}: {reason}. State: old={old}, new={new}. Retry: afc leader swap {project}; inspect: afc leader status {project}. Cancel stops tracking only; keep both sessions until the registry is checked.",
   "leader.cli.disconnected": "Connection or RPC failed: {error}. The daemon may still be swapping. Inspect with afc leader status {project}, then rerun the same swap command to resume.",
@@ -2042,5 +2042,8 @@
   "leader.cli.timeout": "Local daemon connection or RPC timed out.",
   "leader.cli.rejected": "Daemon handshake rejected: {reason}.",
   "leader.cli.transportError": "Local daemon connection failed.",
-  "leader.cli.transportClosed": "Local daemon connection closed."
+  "leader.cli.transportClosed": "Local daemon connection closed.",
+  "leader.swap.cancelDryRun": "Dry run: clear stopped swap tracking only. Neither session nor the leader registry would be changed.",
+  "leader.swap.cancelRunning": "The swap is still running. Wait for it to stop and inspect its status before cancelling tracking.",
+  "leader.cli.manual": "Swap stopped at {step}: {reason}. State: old={old}, new={new}. Automatic continuation is unavailable. Inspect: afc leader status {project}. After verifying which session is registered, clear stopped tracking with afc leader cancel {project}. To roll back, open the old session and register it with kanban supervise --project {project}; verify the registry before manually archiving any orphan new session. Neither session is archived by cancel."
 }

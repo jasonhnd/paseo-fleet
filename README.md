@@ -132,6 +132,7 @@ afc leader swap demo                    # confirmation was given in the conversa
 afc leader status demo --json           # inspect an interrupted or running swap
 afc leader swap demo                    # resume the same swap after a failure
 afc leader swap demo --again            # explicitly start another completed shift
+afc leader cancel demo                  # clear stopped tracking; keep both sessions
 ```
 
 The plugin must be running on the selected local daemon. Commands use
@@ -159,6 +160,10 @@ to stderr and the final result goes to stdout. Creation uses a stable host
 idempotency key and the new session id is saved before later mutations. Repeating
 a pending command continues it; repeating a completed command reports completion.
 `--again` is required to deliberately swap the next leader. Keep both sessions when
-a step fails and inspect the registry before manual rollback. If the CLI connection
+a step fails and inspect the registry before manual rollback. `leader cancel`
+refuses while a swap is running; once stopped, it clears tracking without touching
+either session or the registry. For manual rollback, open the old session, register
+it with `kanban supervise --project demo`, verify that registration, and only then
+archive an orphan new session. If the CLI connection
 is interrupted, the plugin may still be running the swap; inspect its status before
 rerunning. `--dry-run` performs reads only and does not start or resume a shift.

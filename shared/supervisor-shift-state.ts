@@ -36,10 +36,11 @@ export function parseShiftState(text: string): StoredShift[] {
   const rows: StoredShift[] = [];
   for (const item of raw) {
     if (!item || typeof item !== "object") continue;
-    const row = item as { eventsOffset?: unknown; events?: unknown[]; progress?: Partial<ShiftProgress>; resume?: unknown; queuedAt?: unknown };
+    const row = item as { creationKey?: unknown; eventsOffset?: unknown; events?: unknown[]; progress?: Partial<ShiftProgress>; resume?: unknown; queuedAt?: unknown };
     const progress = row.progress;
     if (!progress || !isPhase(progress.phase) || typeof progress.project !== "string" || !progress.project) continue;
     rows.push({
+      ...(typeof row.creationKey === "string" && row.creationKey ? { creationKey: row.creationKey } : {}),
       ...(typeof row.eventsOffset === "number" && Number.isSafeInteger(row.eventsOffset) && row.eventsOffset >= 0 ? { eventsOffset: row.eventsOffset } : {}),
       ...(Array.isArray(row.events) ? { events: parseShiftState(JSON.stringify(row.events.slice(-40).map(progress => ({ progress })))).map(row => row.progress) } : {}),
       progress: {

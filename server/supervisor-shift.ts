@@ -1,4 +1,5 @@
 /// <reference types="node" />
+import { randomUUID } from "node:crypto";
 import { providerBanned } from "../shared/provider-policy";
 import { readBannedProviders, readLeaderThresholds } from "./adapters/config";
 // Manual <leader> shift. The RPC calls requestSupervisorShift after the user confirms,
@@ -102,6 +103,7 @@ interface LiveBit {
 }
 
 interface JobMeta {
+  creationKey?: string;
   /** Absent only for legacy state that did not record the old session. */
   oldId?: string;
   resume: ShiftResume;
@@ -520,6 +522,7 @@ async function persistActive(): Promise<void> {
     const saved = meta.get(job.project);
     rows.push({
       progress: job,
+      creationKey: saved?.creationKey,
       events: events.get(job.project) ?? [],
       eventsOffset: eventOffsets.get(job.project) ?? 0,
       resume: storedResume(job, saved),
@@ -547,7 +550,7 @@ export async function hydrateShiftJobsFrom(path: string): Promise<ShiftProgress[
     tasks.set(row.progress.project, row.progress);
     events.set(row.progress.project, row.events ?? []);
     eventOffsets.set(row.progress.project, row.eventsOffset ?? 0);
-    meta.set(row.progress.project, { oldId: row.progress.oldId || undefined, resume: row.resume, newId: row.progress.newId, queuedAt: row.queuedAt });
+    meta.set(row.progress.project, { creationKey: row.creationKey, oldId: row.progress.oldId || undefined, resume: row.resume, newId: row.progress.newId, queuedAt: row.queuedAt });
   }
   return currentShiftJobs();
 }
@@ -659,8 +662,9 @@ export async function requestSupervisorShift(
   const oldId = action === "continue" && existingNewId && existingOldId === existingNewId
     ? recoverOldId({ code: slot.code, newId: existingNewId, queueOldId: saved?.oldId, handoffs: parseHandoffs(await readLogText(), Number.MAX_SAFE_INTEGER) }) ?? existingOldId
     : existingOldId;
+  const creationKey = action === "continue" ? saved?.creationKey ?? `afc-leader-swap:${slot.project}:${oldId}` : `afc-leader-swap:${randomUUID()}`;
   const queuedAt = queueStartedAt(action, saved, Date.now());
-  meta.set(project, { oldId, resume: saved?.resume === "queue" ? "queue" : resume, newId: existingNewId, queuedAt });
+  meta.set(project, { creationKey, oldId, resume: saved?.resume === "queue" ? "queue" : resume, newId: existingNewId, queuedAt });
   const starting: ShiftProgress = {
     phase: "handover",
     label: phaseLabel("handover"),
@@ -681,7 +685,7 @@ export async function requestSupervisorShift(
     releaseGate = resolve;
   });
   const run = runSupervisorShift(
-    { clicked: true, project: slot.project, code: slot.code, agentId: oldId, resume, existingNewId, queuedAt },
+    { clicked: true, project: slot.project, code: slot.code, agentId: oldId, resume, existingNewId, queuedAt, creationKey },
     { ...(ports ?? supervisorShiftPorts(paseo, project)), checkpoint: async row => {
       await ports?.checkpoint?.(row);
       await persistActive();
@@ -689,8 +693,8 @@ export async function requestSupervisorShift(
     (row) => {
       tasks.set(project, row);
       recordEvent(row);
-      if (row.phase === "queued") meta.set(project, { oldId, resume: "queue", newId: null, queuedAt });
-      else if (row.newId) meta.set(project, { oldId, resume: "wait", newId: row.newId, queuedAt: null });
+      if (row.phase === "queued") meta.set(project, { creationKey, oldId, resume: "queue", newId: null, queuedAt });
+      else if (row.newId) meta.set(project, { creationKey, oldId, resume: "wait", newId: row.newId, queuedAt: null });
       if (!announced) {
         announced = row;
         releaseGate();
@@ -706,8 +710,8 @@ export async function requestSupervisorShift(
       recordEvent(outcome.progress);
       if (outcome.progress.phase === "done") finishedAt.set(project, Date.now());
       else finishedAt.delete(project);
-      if (outcome.resumeNext) meta.set(project, { oldId, resume: outcome.resumeNext, newId: outcome.progress.newId, queuedAt: null });
-      else if (outcome.progress.canContinue) meta.set(project, { oldId, resume: "start", newId: null, queuedAt: null });
+      if (outcome.resumeNext) meta.set(project, { creationKey, oldId, resume: outcome.resumeNext, newId: outcome.progress.newId, queuedAt: null });
+      else if (outcome.progress.canContinue) meta.set(project, { creationKey, oldId, resume: "start", newId: null, queuedAt: null });
       else meta.delete(project);
     }
     await persistActive();
@@ -736,7 +740,7 @@ export async function requestSupervisorShift(
       canCancel: false,
       openAgentId: null,
     };
-    meta.set(project, { oldId, resume: latest.newId ? "wait" : latest.phase === "opening" ? "open" : "start", newId: latest.newId, queuedAt: null });
+    meta.set(project, { creationKey, oldId, resume: latest.newId ? "wait" : latest.phase === "opening" ? "open" : "start", newId: latest.newId, queuedAt: null });
     tasks.set(project, failed);
     recordEvent(failed);
     await persistActive().catch(() => undefined);

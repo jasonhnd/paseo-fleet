@@ -237,3 +237,26 @@ test("standalone bundled CLI exchanges Paseo 0.11 RPC frames with an isolated fa
     await new Promise<void>(resolve => server.close(() => resolve()));
   }
 });
+
+test("cancel refuses active swaps and clears stopped tracking without changing either session or registration", async () => {
+  const f = fixture(); f.fail("detach");
+  let release = () => {};
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const original = f.ports.sendAndWait;
+  f.ports.sendAndWait = async (...args) => { await gate; return original(...args); };
+  await leaderSwap({} as never, input(), f.ports);
+  assert.equal((await leaderSwap({} as never, input({ action: "cancel" }), f.ports)).ok, false);
+  release(); await settled();
+  const state = readFileSync(f.state, "utf8"), config = readFileSync(f.config, "utf8"), calls = [...f.calls];
+  assert.equal((await leaderSwap({} as never, input({ action: "cancel", dryRun: true }), f.ports)).ok, true);
+  assert.equal(readFileSync(f.state, "utf8"), state); assert.deepEqual(f.calls, calls);
+  const output: string[] = [];
+  assert.equal(await runLeaderCli(["cancel", "demo", "--json"], { call: async (_, raw) => leaderSwap({} as never, leaderSwapRpc.input.parse(raw), f.ports), write: value => output.push(value), progress: () => {}, sleep: async () => {} }), 0);
+  assert.equal(JSON.parse(output[0]).job, null);
+  assert.equal(existsSync(f.state), false);
+  assert.equal(readFileSync(f.config, "utf8"), config);
+  assert.deepEqual(f.calls, calls); assert.equal(f.archiveCount(), 0);
+  f.fail("");
+  await leaderSwap({} as never, input(), f.ports); await settled();
+  assert.equal(f.keys.size, 2, "A fresh swap after cancellation must not reuse the cancelled operation key");
+});

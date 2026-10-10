@@ -174,6 +174,7 @@ export interface ShiftPorts {
 }
 
 export interface ShiftRequest {
+  creationKey?: string;
   clicked: boolean;
   project: string;
   code: string;
@@ -230,6 +231,7 @@ export type ShiftResume = "queue" | "start" | "open" | "wait";
 
 /** One in-progress shift, written outside git so a plugin reload can show it again. */
 export interface StoredShift {
+  creationKey?: string;
   events?: ShiftProgress[];
   eventsOffset?: number;
   progress: ShiftProgress;

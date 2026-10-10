@@ -30,10 +30,10 @@ export async function runLeaderCli(args: string[], ports: LeaderCliPorts): Promi
     }
     return 0;
   }
-  if (!["swap", "status"].includes(command) || !project || positionals.length !== 2 || (command === "status" && (values["dry-run"] || values.again))) {
+  if (!["swap", "status", "cancel"].includes(command) || !project || positionals.length !== 2 || (command !== "swap" && values.again) || (command === "status" && values["dry-run"])) {
     ports.write(`${t("leader.cli.invalid")}\n${t("leader.cli.usage")}`); return 2;
   }
-  let result = leaderSwapRpc.output.parse(await ports.call(leaderSwapRpc.name, { project, action: command === "swap" ? "run" : "status", dryRun: values["dry-run"] === true, again: values.again === true }));
+  let result = leaderSwapRpc.output.parse(await ports.call(leaderSwapRpc.name, { project, action: command === "swap" ? "run" : command, dryRun: values["dry-run"] === true, again: values.again === true }));
   let last = "";
   let seen = 0;
   for (;;) {
@@ -42,14 +42,14 @@ export async function runLeaderCli(args: string[], ports: LeaderCliPorts): Promi
     const job = result.job;
     const detail = job ? t("leader.cli.progress", { step: job.step ?? job.phase, detail: job.detail, old: job.oldId, new: job.newId ?? "?" }) : result.message;
     if (detail !== last && result.events.length === 0) { ports.progress(detail); last = detail; }
-    if (command === "status" || values["dry-run"] || !result.running) break;
+    if (command !== "swap" || values["dry-run"] || !result.running) break;
     await ports.sleep(500);
     result = leaderSwapRpc.output.parse(await ports.call(leaderSwapRpc.name, { project, action: "status" }));
   }
   if (values.json) ports.write(JSON.stringify(result, null, 2));
   else if (values["dry-run"]) ports.write(JSON.stringify(result.plan, null, 2));
-  if (!result.ok || result.job?.phase === "failed") {
-    ports.progress(t("leader.cli.failed", { step: result.job?.step ?? result.job?.phase ?? command, reason: result.message, old: result.job?.oldId ?? "?", new: result.job?.newId ?? "?", project }));
+  if (!result.ok || (!values["dry-run"] && result.job?.phase === "failed")) {
+    ports.progress(t(result.job && !result.job.canContinue ? "leader.cli.manual" : "leader.cli.failed", { step: result.job?.step ?? result.job?.phase ?? command, reason: result.message, old: result.job?.oldId ?? "?", new: result.job?.newId ?? "?", project }));
     return 1;
   }
   return 0;
