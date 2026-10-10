@@ -990,7 +990,7 @@ var en_default = {
   "leader.group.parents": "Waiting on parent cards",
   "leader.group.rework": "In rework",
   "leader.help.hideA11y": "Hide help",
-  "leader.help.lamp": "The lamp follows context size: up to 250K is green, over 250K yellow, over 500K red. Nothing switches without a click.",
+  "leader.help.lamp": "The context dot follows the configured reminder and warning thresholds. Change them in Settings.",
   "leader.help.order": "One card per <leader>: blocked work and non-responding ones come first, those with nothing to handle come last; paused projects fold into one line at the bottom.",
   "leader.help.reply": 'Click a letter when there is one; a line you write goes to this <leader>. Press "Expand" for decision details, cards, 7-day counts, the shift and the handover.',
   "leader.help.show": "Help",
@@ -1650,6 +1650,8 @@ var en_default = {
   "shift.detail.takenNotRegistered": 'The new session said "{taken}", but the registry does not show the new id yet; the old session was not archived.',
   "shift.detail.waiting": 'Waiting for the new session to reply "{taken}" and for the registry to show the new id.',
   "shift.detail.wrongWorkspace": "The new session landed in another workspace ({workspace}); the old session was not archived and nothing else was created.",
+  "shift.detail.sessionUnreadable": "The existing new session ({newId}) cannot be read yet. Both sessions are kept; retry to check the same session again.",
+  "shift.detail.workspaceUnreadable": "The workspace of one of the sessions cannot be read yet. Both sessions are kept; retry to check the same new session ({newId}) again.",
   "shift.elapsed.days": "running {days} d",
   "shift.elapsed.daysHours": "running {days} d {hours} h",
   "shift.elapsed.hours": "running {hours} h",
@@ -2034,7 +2036,40 @@ var en_default = {
   "doctor.platform.keychainSkipped": "Keychain checks are not applicable on this operating system and are skipped.",
   "doctor.platform.processSkipped": "Unix process inspection was skipped on this operating system; process findings are unverified.",
   "cursor.api.sandboxLabel": "Agent sandbox",
-  "access.detail.pluginUnconfigured": "No plugin id is configured for this status check"
+  "access.detail.pluginUnconfigured": "No plugin id is configured for this status check",
+  "settings.leaderUsage": "Leader context usage",
+  "settings.leaderUsageHint": "Token counts: reminder above the first threshold; red warning above the second. Warning must exceed reminder.",
+  "settings.leaderUsage.reminderTokens": "Reminder threshold (tokens)",
+  "settings.leaderUsage.warningTokens": "Warning threshold (tokens)",
+  "settings.leaderUsage.invalidOrder": "Warning must exceed reminder.",
+  "leader.usage.thresholds": "Context: reminder above {reminder}; red warning above {warning}.",
+  "leader.usage.reminder": "Context reminder: consider a leader swap.",
+  "leader.usage.warning": "Context warning: swap the leader soon.",
+  "leader.swap.opened": "New session opened; saving its id before continuing.",
+  "leader.swap.archiving": "Takeover confirmed and registered; archiving the old session.",
+  "leader.swap.noKanban": "Kanban is unavailable; no session was changed.",
+  "leader.swap.ready": "No pending swap.",
+  "leader.swap.dryRun": "Dry run: write handover, open with the same settings and workspace, confirm takeover and registration, then archive the old session. No changes made.",
+  "leader.swap.cancelled": "Tracking cancelled. Neither session was archived; check the leader registry before manual rollback.",
+  "leader.swap.pending": "Finish or cancel the pending swap before starting another.",
+  "leader.cli.usage": "Usage: afc leader usage [--json] | swap <project> [--dry-run] [--again] [--json] | status <project> [--json] | cancel <project> [--dry-run] [--json]. Connection: [--host host:port] (defaults to PASEO_HOME daemon).",
+  "leader.cli.progress": "{step}: {detail} (old={old}, new={new})",
+  "leader.cli.failed": "Swap stopped at {step}: {reason}. State: old={old}, new={new}. Retry: afc leader swap {project}; inspect: afc leader status {project}. Cancel stops tracking only; keep both sessions until the registry is checked.",
+  "leader.cli.disconnected": "Connection or RPC failed: {error}. The daemon may still be swapping. Inspect with afc leader status {project}, then rerun the same swap command to resume.",
+  "leader.cli.usageRow": "{project}: {tokens} tokens, {level} (agent={agent})",
+  "leader.cli.level.normal": "normal",
+  "leader.cli.level.reminder": "reminder",
+  "leader.cli.level.warning": "warning",
+  "leader.cli.level.unknown": "unknown",
+  "leader.cli.invalid": "Invalid command or arguments.",
+  "leader.cli.localOnly": "Only local TCP daemon endpoints are supported (localhost, 127.0.0.1 or [::1]).",
+  "leader.cli.timeout": "Local daemon connection or RPC timed out.",
+  "leader.cli.rejected": "Daemon handshake rejected: {reason}.",
+  "leader.cli.transportError": "Local daemon connection failed.",
+  "leader.cli.transportClosed": "Local daemon connection closed.",
+  "leader.swap.cancelDryRun": "Dry run: clear stopped swap tracking only. Neither session nor the leader registry would be changed.",
+  "leader.swap.cancelRunning": "The swap is still running. Wait for it to stop and inspect its status before cancelling tracking.",
+  "leader.cli.manual": "Swap stopped at {step}: {reason}. State: old={old}, new={new}. Automatic continuation is unavailable. Inspect: afc leader status {project}. After verifying which session is registered, clear stopped tracking with afc leader cancel {project}. To roll back, open the old session and register it with kanban supervise --project {project}; verify the registry before manually archiving any orphan new session. Neither session is archived by cancel."
 };
 
 // shared/locales/zh-CN.json
@@ -3009,7 +3044,7 @@ var zh_CN_default = {
   "leader.group.parents": "\u7B49\u524D\u7F6E\u5361",
   "leader.group.rework": "\u8FD4\u5DE5\u4E2D",
   "leader.help.hideA11y": "\u6536\u8D77\u8BF4\u660E",
-  "leader.help.lamp": "\u72B6\u6001\u706F\u770B\u4E0A\u4E0B\u6587\uFF1A25 \u4E07\u53CA\u4EE5\u4E0B\u662F\u7EFF\u706F\uFF0C\u8D85\u8FC7 25 \u4E07\u4EAE\u9EC4\u706F\uFF0C\u8D85\u8FC7 50 \u4E07\u4EAE\u7EA2\u706F\u3002\u6CA1\u6709\u70B9\u51FB\u4E0D\u4F1A\u6362\u73ED\u3002",
+  "leader.help.lamp": "\u4E0A\u4E0B\u6587\u5706\u70B9\u6309\u8BBE\u7F6E\u91CC\u7684\u63D0\u9192\u548C\u8B66\u544A\u9608\u503C\u663E\u793A\u989C\u8272\uFF0C\u53EF\u5728\u8BBE\u7F6E\u9875\u8C03\u6574\u3002",
   "leader.help.order": "\u6BCF\u4E2A <leader> \u4E00\u5F20\u5361\uFF0C\u5361\u4F4F\u5F00\u5DE5\u3001\u65E0\u54CD\u5E94\u7684\u6392\u6700\u524D\uFF0C\u4EC0\u4E48\u90FD\u4E0D\u7528\u5904\u7406\u7684\u6392\u540E\u9762\uFF1B\u6682\u505C\u7684\u9879\u76EE\u6536\u6210\u4E00\u884C\u653E\u6700\u5E95\u3002",
   "leader.help.reply": "\u6709\u5B57\u6BCD\u5C31\u70B9\u5B57\u6BCD\uFF1B\u5199\u4E00\u53E5\u8BDD\u4F1A\u8F6C\u7ED9\u8FD9\u4E2A <leader>\u3002\u70B9\u300C\u5C55\u5F00\u300D\u770B\u5F85\u62CD\u677F\u660E\u7EC6\u3001\u5361\u7247\u30017 \u5929\u8BA1\u6570\u3001\u6362\u73ED\u548C\u4EA4\u63A5\u3002",
   "leader.help.show": "\u8BF4\u660E",
@@ -3669,6 +3704,8 @@ var zh_CN_default = {
   "shift.detail.takenNotRegistered": "\u65B0\u4F1A\u8BDD\u8BF4{taken}\uFF0C\u4F46\u767B\u8BB0\u8FD8\u4E0D\u662F\u65B0 id\uFF0C\u65E7\u4F1A\u8BDD\u6CA1\u6709\u5F52\u6863\u3002",
   "shift.detail.waiting": "\u7B49\u65B0\u4F1A\u8BDD\u56DE\u590D\u300C{taken}\u300D\uFF0C\u5E76\u7B49\u767B\u8BB0\u6539\u6210\u65B0 id\u3002",
   "shift.detail.wrongWorkspace": "\u65B0\u4F1A\u8BDD\u843D\u5728\u4E86\u522B\u7684 workspace\uFF08{workspace}\uFF09\uFF0C\u6CA1\u6709\u5F52\u6863\u65E7\u4F1A\u8BDD\uFF0C\u4E5F\u6CA1\u6709\u518D\u65B0\u5EFA\u3002",
+  "shift.detail.sessionUnreadable": "\u6682\u65F6\u8BFB\u4E0D\u5230\u5DF2\u521B\u5EFA\u7684\u65B0\u4F1A\u8BDD\uFF08{newId}\uFF09\u3002\u4E24\u4E2A\u4F1A\u8BDD\u5747\u4FDD\u7559\uFF1B\u91CD\u8BD5\u4F1A\u7EE7\u7EED\u590D\u67E5\u540C\u4E00\u4E2A\u65B0\u4F1A\u8BDD\u3002",
+  "shift.detail.workspaceUnreadable": "\u6682\u65F6\u8BFB\u4E0D\u5230\u5176\u4E2D\u4E00\u4E2A\u4F1A\u8BDD\u7684 workspace\u3002\u4E24\u4E2A\u4F1A\u8BDD\u5747\u4FDD\u7559\uFF1B\u91CD\u8BD5\u4F1A\u7EE7\u7EED\u590D\u67E5\u540C\u4E00\u4E2A\u65B0\u4F1A\u8BDD\uFF08{newId}\uFF09\u3002",
   "shift.elapsed.days": "\u5DF2 {days} \u5929",
   "shift.elapsed.daysHours": "\u5DF2 {days} \u5929 {hours} \u5C0F\u65F6",
   "shift.elapsed.hours": "\u5DF2 {hours} \u5C0F\u65F6",
@@ -4053,7 +4090,40 @@ var zh_CN_default = {
   "doctor.platform.keychainSkipped": "\u6B64\u7CFB\u7EDF\u4E0D\u9002\u7528\u94A5\u5319\u4E32\u68C0\u67E5\uFF0C\u5DF2\u8DF3\u8FC7\u3002",
   "doctor.platform.processSkipped": "\u6B64\u7CFB\u7EDF\u5DF2\u8DF3\u8FC7 Unix \u8FDB\u7A0B\u68C0\u67E5\uFF1B\u8FDB\u7A0B\u72B6\u6001\u5C1A\u672A\u9A8C\u8BC1\u3002",
   "cursor.api.sandboxLabel": "\u4EE3\u7406\u6C99\u76D2",
-  "access.detail.pluginUnconfigured": "\u6B64\u72B6\u6001\u68C0\u67E5\u5C1A\u672A\u914D\u7F6E\u63D2\u4EF6 ID"
+  "access.detail.pluginUnconfigured": "\u6B64\u72B6\u6001\u68C0\u67E5\u5C1A\u672A\u914D\u7F6E\u63D2\u4EF6 ID",
+  "settings.leaderUsage": "<leader> \u4E0A\u4E0B\u6587\u7528\u91CF",
+  "settings.leaderUsageHint": "\u6309 token \u6570\u586B\u5199\uFF1A\u8D85\u8FC7\u7B2C\u4E00\u9879\u63D0\u9192\uFF0C\u8D85\u8FC7\u7B2C\u4E8C\u9879\u663E\u793A\u7EA2\u8272\u8B66\u544A\u3002\u8B66\u544A\u503C\u5FC5\u987B\u5927\u4E8E\u63D0\u9192\u503C\u3002",
+  "settings.leaderUsage.reminderTokens": "\u63D0\u9192\u9608\u503C\uFF08token\uFF09",
+  "settings.leaderUsage.warningTokens": "\u8B66\u544A\u9608\u503C\uFF08token\uFF09",
+  "settings.leaderUsage.invalidOrder": "\u8B66\u544A\u503C\u5FC5\u987B\u5927\u4E8E\u63D0\u9192\u503C\u3002",
+  "leader.usage.thresholds": "\u4E0A\u4E0B\u6587\uFF1A\u8D85\u8FC7 {reminder} \u63D0\u9192\uFF0C\u8D85\u8FC7 {warning} \u7EA2\u8272\u8B66\u544A\u3002",
+  "leader.usage.reminder": "\u4E0A\u4E0B\u6587\u7528\u91CF\u63D0\u9192\uFF1A\u5EFA\u8BAE\u6362 <leader>\u3002",
+  "leader.usage.warning": "\u4E0A\u4E0B\u6587\u7528\u91CF\u8B66\u544A\uFF1A\u8BF7\u5C3D\u5FEB\u6362 <leader>\u3002",
+  "leader.swap.opened": "\u65B0\u4F1A\u8BDD\u5DF2\u6253\u5F00\uFF0C\u5148\u4FDD\u5B58\u4F1A\u8BDD\u7F16\u53F7\u518D\u7EE7\u7EED\u3002",
+  "leader.swap.archiving": "\u5DF2\u786E\u8BA4\u63A5\u624B\u5E76\u767B\u8BB0\uFF0C\u6B63\u5728\u5F52\u6863\u65E7\u4F1A\u8BDD\u3002",
+  "leader.swap.noKanban": "Kanban \u4E0D\u53EF\u7528\uFF0C\u672A\u6539\u52A8\u4EFB\u4F55\u4F1A\u8BDD\u3002",
+  "leader.swap.ready": "\u6CA1\u6709\u5F85\u5B8C\u6210\u7684\u6362\u73ED\u3002",
+  "leader.swap.dryRun": "\u6F14\u7EC3\uFF1A\u5199\u4EA4\u63A5\uFF0C\u5728\u540C\u4E00\u5DE5\u4F5C\u533A\u6309\u76F8\u540C\u914D\u7F6E\u5F00\u4F1A\u8BDD\uFF0C\u786E\u8BA4\u63A5\u624B\u5E76\u767B\u8BB0\u540E\u5F52\u6863\u65E7\u4F1A\u8BDD\u3002\u672A\u4F5C\u4EFB\u4F55\u4FEE\u6539\u3002",
+  "leader.swap.cancelled": "\u5DF2\u53D6\u6D88\u8DDF\u8E2A\uFF0C\u4E24\u4E2A\u4F1A\u8BDD\u5747\u672A\u5F52\u6863\uFF1B\u624B\u52A8\u56DE\u6EDA\u524D\u8BF7\u6838\u5BF9 <leader> \u767B\u8BB0\u3002",
+  "leader.swap.pending": "\u8BF7\u5148\u5B8C\u6210\u6216\u53D6\u6D88\u5F53\u524D\u6362\u73ED\uFF0C\u518D\u5F00\u59CB\u65B0\u6362\u73ED\u3002",
+  "leader.cli.usage": "\u7528\u6CD5\uFF1Aafc leader usage [--json] | swap <\u9879\u76EE> [--dry-run] [--again] [--json] | status <\u9879\u76EE> [--json] | cancel <\u9879\u76EE> [--dry-run] [--json]\u3002\u8FDE\u63A5\uFF1A[--host host:port]\uFF08\u9ED8\u8BA4 PASEO_HOME \u7684 daemon\uFF09\u3002",
+  "leader.cli.progress": "{step}\uFF1A{detail}\uFF08\u65E7={old}\uFF0C\u65B0={new}\uFF09",
+  "leader.cli.failed": "\u6362\u73ED\u505C\u5728 {step}\uFF1A{reason}\u3002\u73B0\u72B6\uFF1A\u65E7={old}\uFF0C\u65B0={new}\u3002\u7EE7\u7EED\uFF1Aafc leader swap {project}\uFF1B\u67E5\u770B\uFF1Aafc leader status {project}\u3002\u53D6\u6D88\u53EA\u505C\u6B62\u8DDF\u8E2A\uFF0C\u6838\u5BF9\u767B\u8BB0\u524D\u8BF7\u4FDD\u7559\u4E24\u4E2A\u4F1A\u8BDD\u3002",
+  "leader.cli.disconnected": "\u8FDE\u63A5\u6216 RPC \u5931\u8D25\uFF1A{error}\u3002daemon \u53EF\u80FD\u4ECD\u5728\u6362\u73ED\u3002\u5148\u7528 afc leader status {project} \u67E5\u770B\uFF0C\u518D\u8FD0\u884C\u76F8\u540C\u6362\u73ED\u547D\u4EE4\u7EE7\u7EED\u3002",
+  "leader.cli.usageRow": "{project}\uFF1A{tokens} token\uFF0C{level}\uFF08\u4F1A\u8BDD={agent}\uFF09",
+  "leader.cli.level.normal": "\u6B63\u5E38",
+  "leader.cli.level.reminder": "\u63D0\u9192",
+  "leader.cli.level.warning": "\u8B66\u544A",
+  "leader.cli.level.unknown": "\u672A\u77E5",
+  "leader.cli.invalid": "\u547D\u4EE4\u6216\u53C2\u6570\u65E0\u6548\u3002",
+  "leader.cli.localOnly": "\u53EA\u652F\u6301\u672C\u5730 TCP daemon \u5730\u5740\uFF08localhost\u3001127.0.0.1 \u6216 [::1]\uFF09\u3002",
+  "leader.cli.timeout": "\u672C\u5730 daemon \u8FDE\u63A5\u6216 RPC \u8D85\u65F6\u3002",
+  "leader.cli.rejected": "daemon \u62D2\u7EDD\u8FDE\u63A5\uFF1A{reason}\u3002",
+  "leader.cli.transportError": "\u672C\u5730 daemon \u8FDE\u63A5\u5931\u8D25\u3002",
+  "leader.cli.transportClosed": "\u672C\u5730 daemon \u8FDE\u63A5\u5DF2\u5173\u95ED\u3002",
+  "leader.swap.cancelDryRun": "\u6F14\u7EC3\uFF1A\u53EA\u6E05\u9664\u5DF2\u505C\u6B62\u6362\u73ED\u7684\u8DDF\u8E2A\u72B6\u6001\uFF0C\u4E0D\u6539\u52A8\u4F1A\u8BDD\u6216 <leader> \u767B\u8BB0\u3002",
+  "leader.swap.cancelRunning": "\u6362\u73ED\u4ECD\u5728\u8FD0\u884C\uFF0C\u8BF7\u7B49\u5B83\u505C\u6B62\u5E76\u67E5\u770B\u72B6\u6001\u540E\u518D\u6E05\u9664\u8DDF\u8E2A\u3002",
+  "leader.cli.manual": "\u6362\u73ED\u505C\u5728 {step}\uFF1A{reason}\u3002\u73B0\u72B6\uFF1A\u65E7={old}\uFF0C\u65B0={new}\u3002\u65E0\u6CD5\u81EA\u52A8\u7EE7\u7EED\u3002\u67E5\u770B\uFF1Aafc leader status {project}\u3002\u6838\u5BF9\u5F53\u524D\u767B\u8BB0\u7684\u4F1A\u8BDD\u540E\uFF0C\u7528 afc leader cancel {project} \u6E05\u9664\u5DF2\u505C\u6B62\u7684\u8DDF\u8E2A\u3002\u56DE\u6EDA\u65F6\u6253\u5F00\u65E7\u4F1A\u8BDD\u5E76\u6267\u884C kanban supervise --project {project} \u91CD\u65B0\u767B\u8BB0\uFF1B\u6838\u5BF9\u767B\u8BB0\u540E\uFF0C\u624D\u624B\u52A8\u5F52\u6863\u5931\u53BB\u5173\u8054\u7684\u65B0\u4F1A\u8BDD\u3002cancel \u4E0D\u5F52\u6863\u4EFB\u4F55\u4F1A\u8BDD\u3002"
 };
 
 // shared/i18n.ts
@@ -10703,6 +10773,23 @@ function duration2(params) {
   return _isoDuration(ZodISODuration, params);
 }
 
+// shared/leader-usage.ts
+var leaderThresholdsSchema = object({
+  reminderTokens: number2().int().positive().max(Number.MAX_SAFE_INTEGER),
+  warningTokens: number2().int().positive().max(Number.MAX_SAFE_INTEGER)
+}).refine((value) => value.warningTokens > value.reminderTokens, { error: () => t("settings.leaderUsage.invalidOrder") });
+var leaderUsageReportSchema = object({
+  generatedAt: string2(),
+  thresholds: leaderThresholdsSchema,
+  rows: array(object({
+    project: string2(),
+    code: string2(),
+    agentId: string2(),
+    contextTokens: number2().nullable(),
+    level: _enum(["normal", "reminder", "warning", "unknown"])
+  }))
+});
+
 // node_modules/@getpaseo/plugin/dist/rpc.js
 var RPC_NAME = /^[a-z][a-z0-9._-]*$/;
 function defineRpc(definition) {
@@ -11348,6 +11435,7 @@ var supervisorRowSchema = object({
   proxyOf: string2().optional()
 });
 var shiftProgressSchema = object({
+  step: string2().optional(),
   phase: _enum(["queued", "handover", "opening", "detaching", "waiting", "done", "failed"]),
   label: string2(),
   detail: string2(),
@@ -11361,6 +11449,7 @@ var shiftProgressSchema = object({
   openAgentId: string2().nullable()
 });
 var supervisorPanelSchema = object({
+  thresholds: leaderThresholdsSchema.optional(),
   rows: array(supervisorRowSchema),
   details: array(leaderDetailSchema).optional(),
   tasks: array(shiftProgressSchema),

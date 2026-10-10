@@ -1,4 +1,5 @@
 // Which sessions the homepage lists, and the row each one gets.
+import type { LeaderThresholds } from "./leader-usage";
 import { tokyoDayStart } from "./dispatch";
 import { t } from "./i18n";
 import { contextLamp, formatContextTokens, formatStarted, formatTodayUsd, isBusy } from "./supervisor-shift-format";
@@ -41,6 +42,7 @@ export function supervisorSlots(config: SupervisorConfig, kanbanProject = "paseo
 }
 
 export function buildSupervisorRows(input: {
+  thresholds?: LeaderThresholds;
   slots: SupervisorSlot[];
   agents: SupervisorAgentView[];
   todayUsd: Record<string, number | null>;
@@ -51,7 +53,7 @@ export function buildSupervisorRows(input: {
   return input.slots.map((slot) => {
     const agent = byId.get(slot.agentId);
     const tokens = agent?.contextTokens ?? null;
-    const lamp = contextLamp(tokens);
+    const lamp = contextLamp(tokens, input.thresholds);
     const found = agent?.found === true;
     return {
       project: slot.project,
@@ -63,7 +65,7 @@ export function buildSupervisorRows(input: {
       todayText: formatTodayUsd(input.todayUsd[slot.agentId] ?? null),
       statusText: !found ? t("leader.status.notListed") : isBusy(agent?.status ?? "") ? t("leader.status.busy") : t("leader.status.idle"),
       lamp,
-      lampText: lamp === "yellow" || lamp === "red" ? t("shift.lamp.suggest") : null,
+      lampText: lamp === "red" ? t("leader.usage.warning") : lamp === "yellow" ? t("leader.usage.reminder") : null,
       highlight: lamp === "yellow" || lamp === "red",
       handoverPath: agent?.handoverPath ?? null,
       handoverPreview: agent?.handoverPreview ?? null,

@@ -65,6 +65,25 @@ node "$BOARD_INSTALL/bin/paseo-kanban.mjs" doctor
 
 Fleet 的 shared/default-dispatch.example.json 是安装模板，不是生成的状态。模型与可选集成可配；见 [导入证据](../IMPORT.md)。
 
+## Leader 上下文提醒与换会话
+
+已安装且在所选本地 daemon 上运行的 Fleet 插件提供这些命令：
+
+```sh
+afc leader usage --json
+afc leader swap demo --dry-run
+afc leader swap demo
+afc leader status demo --json
+afc leader swap demo --again
+afc leader cancel demo
+```
+
+usage 是只读报告，不恢复挂起的换会话；unknown 不等于 0。Settings 在 afc.config.json 保存 leaderUsage.reminderTokens 和 leaderUsage.warningTokens，默认 500,000/750,000；warning 必须大于 reminder，严格超过才显示黄/红，非法设置退默认。
+
+swap 需要先获得会话中的确认；等旧会话空闲、交接、新会话接手回复和 Kanban 登记后才归档旧会话。失败保留两个会话；重跑同一 `afc leader swap demo` 继续未完成步骤，完成后再次主动换用 --again。连接中断时先 `afc leader status demo --json`，插件可能仍在执行；--json 把进度发 stderr、最终结果发 stdout。cancel 拒绝运行中的 swap，停止后仅清除跟踪，不动会话或登记。人工回退先在旧会话运行 `kanban supervise --project demo` 并核登记，再归档孤立新会话。--dry-run 只读，不启动或恢复换会话。
+
+命令默认使用 $PASEO_HOME/config.json 的 daemon listener，可用 --host 127.0.0.1:PORT 指本地 TCP；IPv6 用 `--host '[::1]:PORT'`，daemon 地址也须同样括号。受保护 endpoint 可拒绝握手，命令不读登录凭证。Access map 的插件检查使用显式 pluginId，未指定则报 unknown。完整行为见[英文 README](../../README.md#leader-context-reminders-and-swaps)。
+
 ## 隐私闸与贡献者设置
 
 三闸：pre-commit 扫 staged 文件（通用规则和仓外私有 denylist）、核作者/提交者，装有 gitleaks 则运行；pre-push 本机 verify 扫全树/历史、类型、脚本/插件测试、CLI/Paseo 构建、契约、共用闸、包清单；npm files 白名单和 pack 检查。GitHub Actions 可关闭，本机检查是必需记录。

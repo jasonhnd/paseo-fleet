@@ -7,8 +7,8 @@ import { fileURLToPath } from "node:url";
 
 const bin = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
-const routes = { roles: ["roles", []], decide: ["roles", ["decide"]], doctor: ["doctor", []], migrate: ["migrate", []], coupon: ["coupon", []] };
-const usage = "usage: afc roles ls|check|set|history|pause|resume [args] | decide add|ls|done|comment|decided|overturn|stale|migrate [args] | doctor [--json] | migrate [--help] | coupon [--help]";
+const routes = { leader: ["leader", []], roles: ["roles", []], decide: ["roles", ["decide"]], doctor: ["doctor", []], migrate: ["migrate", []], coupon: ["coupon", []] };
+const usage = "usage: afc roles ls|check|set|history|pause|resume [args] | decide add|ls|done|comment|decided|overturn|stale|migrate [args] | doctor [--json] | migrate [--help] | coupon [--help] | leader usage|swap|status|cancel [args]";
 const command = args[0];
 if (!command || ["--help", "-h", "help"].includes(command)) {
   console.log(usage); process.exitCode = command ? 0 : 1;

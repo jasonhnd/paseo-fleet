@@ -1,10 +1,7 @@
 // Constants and shapes shared by the supervisor-shift modules, plus the shift texts (looked up at call time).
+import type { LeaderThresholds } from "./leader-usage";
 import { t, tAll, type MessageKey } from "./i18n";
 
-/** At or below this, the row is green. Above it, yellow. */
-export const YELLOW_OVER = 250_000;
-/** Above this, the row is red. 500_000 itself stays yellow. */
-export const RED_OVER = 500_000;
 export const HANDOVER_TIMEOUT_MS = 15 * 60 * 1000;
 export const TAKEOVER_TIMEOUT_MS = 15 * 60 * 1000;
 export const TAKEOVER_POLL_MS = 2_000;
@@ -109,6 +106,7 @@ export type ShiftPhase = "queued" | "handover" | "opening" | "detaching" | "wait
 
 export interface ShiftProgress {
   phase: ShiftPhase;
+  step?: string;
   label: string;
   detail: string;
   project: string;
@@ -140,6 +138,8 @@ export interface ShiftAgent {
 }
 
 export interface ShiftCreateInput {
+  idempotencyKey?: string;
+  labels?: Record<string, string>;
   workspaceId: string;
   cwd: string;
   title: string;
@@ -152,6 +152,8 @@ export interface ShiftCreateInput {
 }
 
 export interface ShiftPorts {
+  /** Persist the stage before the next host mutation. */
+  checkpoint?(progress: ShiftProgress): Promise<void>;
   now(): number;
   getAgent(id: string): Promise<ShiftAgent | null>;
   sendAndWait(id: string, prompt: string, timeoutMs: number): Promise<{ timedOut: boolean; reply: string | null; error: string | null }>;
@@ -168,6 +170,7 @@ export interface ShiftPorts {
 }
 
 export interface ShiftRequest {
+  creationKey?: string;
   clicked: boolean;
   project: string;
   code: string;
@@ -212,6 +215,7 @@ export interface HandoffLogLine {
 }
 
 export interface SupervisorPanel {
+  thresholds?: LeaderThresholds;
   rows: SupervisorRow[];
   tasks: ShiftProgress[];
   handoffs: HandoffLogLine[];
@@ -223,6 +227,9 @@ export type ShiftResume = "queue" | "start" | "open" | "wait";
 
 /** One in-progress shift, written outside git so a plugin reload can show it again. */
 export interface StoredShift {
+  creationKey?: string;
+  events?: ShiftProgress[];
+  eventsOffset?: number;
   progress: ShiftProgress;
   resume: ShiftResume;
   queuedAt: number | null;

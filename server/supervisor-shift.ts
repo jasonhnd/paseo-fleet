@@ -1,6 +1,7 @@
 /// <reference types="node" />
+import { randomUUID } from "node:crypto";
 import { providerBanned } from "../shared/provider-policy";
-import { readBannedProviders } from "./adapters/config";
+import { readBannedProviders, readLeaderThresholds } from "./adapters/config";
 // Manual <leader> shift. The RPC calls requestSupervisorShift after the user confirms,
 // continues, or cancels. A queue saved on disk resumes from the next homepage snapshot.
 import { markProxies } from "../shared/leader-proxy";
@@ -102,6 +103,7 @@ interface LiveBit {
 }
 
 interface JobMeta {
+  creationKey?: string;
   /** Absent only for legacy state that did not record the old session. */
   oldId?: string;
   resume: ShiftResume;
@@ -110,12 +112,15 @@ interface JobMeta {
 }
 
 const tasks = new Map<string, ShiftProgress>();
+const eventOffsets = new Map<string, number>();
+const events = new Map<string, ShiftProgress[]>();
 const meta = new Map<string, JobMeta>();
 const finishedAt = new Map<string, number>();
 const inflight = new Set<string>();
 const cancelFlags = new Set<string>();
 const resumeStarted = new Set<string>();
 let hydrated = false;
+let hydration: Promise<void> | null = null;
 let statePath = SHIFT_STATE;
 let configPath = KANBAN_CONFIG;
 let handoffLogPath = HANDOFF_LOG;
@@ -143,10 +148,13 @@ export function resetShiftClaimsForTests(): void {
   inflight.clear();
   tasks.clear();
   meta.clear();
+  events.clear();
+  eventOffsets.clear();
   finishedAt.clear();
   cancelFlags.clear();
   resumeStarted.clear();
   hydrated = false;
+  hydration = null;
 }
 
 /** Plant a job without talking to Paseo. Tests use this to prove a second click does not start another queue. */
@@ -276,12 +284,13 @@ export async function readSupervisorPanel(
   records: AgentRecord[],
   now: number,
 ): Promise<SupervisorPanel> {
+  const thresholds = readLeaderThresholds();
   try {
     // Shifts belong to Kanban's leader registry: without Kanban there are no rows to shift and no queue to resume.
     // Saved tasks stay listed so a leftover queue can still be cancelled.
     if (shiftsOff()) {
       const tasks = currentShiftJobs().map((job) => ({ ...job, canContinue: false }));
-      return { ...EMPTY_SUPERVISOR_PANEL, tasks, handoffs: await readHandoffs(10) };
+      return { ...EMPTY_SUPERVISOR_PANEL, thresholds, tasks, handoffs: await readHandoffs(10) };
     }
     const config = await readJson<Json>(configPath, {});
     const slots = supervisorSlots(config, kanbanProjectName());
@@ -314,8 +323,9 @@ export async function readSupervisorPanel(
     await hydrateShiftJobs();
     if (paseo) scheduleQueueResume(paseo);
     return {
+      thresholds,
       rows: markProxies(buildSupervisorRows({
-        slots, agents, todayUsd, now,
+        slots, agents, todayUsd, now, thresholds,
         acceptanceByProject: Object.fromEntries(slots.map((slot) => [slot.project, readAcceptanceCards(slot.project)])),
       }), new Map(records.map((rec) => [rec.id, { title: rec.title, cwd: rec.cwd }]))),
       tasks: currentShiftJobs(),
@@ -323,11 +333,11 @@ export async function readSupervisorPanel(
     };
   } catch (error) {
     console.error("[afc] supervisor panel:", String(error).slice(0, 200));
-    return { ...EMPTY_SUPERVISOR_PANEL, tasks: currentShiftJobs(), handoffs: await readHandoffs(10).catch(() => []) };
+    return { ...EMPTY_SUPERVISOR_PANEL, thresholds, tasks: currentShiftJobs(), handoffs: await readHandoffs(10).catch(() => []) };
   }
 }
 
-async function loadAgent(paseo: PaseoApi, id: string): Promise<ShiftAgent | null> {
+export async function loadShiftAgent(paseo: PaseoApi, id: string): Promise<ShiftAgent | null> {
   const records = await readAgentRecords().catch(() => []);
   const rec = records.find((row) => row.id === id) ?? null;
   const handle = paseo.agents.ref(id);
@@ -407,14 +417,14 @@ async function permitPending(agentId: string): Promise<boolean> {
   }
 }
 
-function shiftPorts(paseo: PaseoApi, project: string): ShiftPorts {
+export function supervisorShiftPorts(paseo: PaseoApi, project: string, hasPermit = permitPending): ShiftPorts {
   return {
     now: () => Date.now(),
     cancelled: () => cancelFlags.has(project),
     getAgent: async (id) => {
-      const agent = await loadAgent(paseo, id);
+      const agent = await loadShiftAgent(paseo, id);
       if (!agent || agent.pendingApproval || isBusy(agent.status)) return agent;
-      const pending = await permitPending(id);
+      const pending = await hasPermit(id);
       return pending ? { ...agent, pendingApproval: true } : agent;
     },
     sendAndWait: async (id, prompt, timeoutMs) => {
@@ -430,6 +440,8 @@ function shiftPorts(paseo: PaseoApi, project: string): ShiftPorts {
     createAgent: async (input) => {
       // Same workspace only. This path does not call workspaces.create.
       const handle = await paseo.workspaces.ref(input.workspaceId).agents.create({
+        idempotencyKey: input.idempotencyKey,
+        labels: input.labels,
         title: input.title,
         prompt: input.prompt,
         config: {
@@ -451,10 +463,12 @@ function shiftPorts(paseo: PaseoApi, project: string): ShiftPorts {
       await paseo.agents.ref(id).detach();
     },
     archive: async (id) => {
-      await paseo.agents.ref(id).archive();
+      const handle = paseo.agents.ref(id);
+      await handle.refresh();
+      if (!handle.archivedAt) await handle.archive();
     },
     registeredSupervisor: async (project) => {
-      const config = await readJson<Json>(KANBAN_CONFIG, {});
+      const config = await readJson<Json>(configPath, {});
       const supers = config.supervisors;
       if (supers && typeof supers === "object" && !Array.isArray(supers)) {
         const id = (supers as Json)[project];
@@ -506,10 +520,12 @@ async function persistActive(): Promise<void> {
   const rows: StoredShift[] = [];
   for (const job of tasks.values()) {
     if (job.phase === "done") continue;
-    if (job.phase === "failed" && !job.canContinue) continue;
     const saved = meta.get(job.project);
     rows.push({
       progress: job,
+      creationKey: saved?.creationKey,
+      events: events.get(job.project) ?? [],
+      eventsOffset: eventOffsets.get(job.project) ?? 0,
       resume: storedResume(job, saved),
       queuedAt: saved?.queuedAt ?? null,
     });
@@ -533,15 +549,17 @@ export async function hydrateShiftJobsFrom(path: string): Promise<ShiftProgress[
   for (const row of restoreShiftForDisplay(parseShiftState(text))) {
     if (tasks.has(row.progress.project)) continue;
     tasks.set(row.progress.project, row.progress);
-    meta.set(row.progress.project, { oldId: row.progress.oldId || undefined, resume: row.resume, newId: row.progress.newId, queuedAt: row.queuedAt });
+    events.set(row.progress.project, row.events ?? []);
+    eventOffsets.set(row.progress.project, row.eventsOffset ?? 0);
+    meta.set(row.progress.project, { creationKey: row.creationKey, oldId: row.progress.oldId || undefined, resume: row.resume, newId: row.progress.newId, queuedAt: row.queuedAt });
   }
   return currentShiftJobs();
 }
 
 export async function hydrateShiftJobs(): Promise<void> {
   if (hydrated) return;
-  hydrated = true;
-  await hydrateShiftJobsFrom(SHIFT_STATE);
+  hydration ??= hydrateShiftJobsFrom(statePath).then(() => { hydrated = true; });
+  try { await hydration; } finally { hydration = null; }
 }
 
 function scheduleQueueResume(paseo: PaseoApi): void {
@@ -564,6 +582,7 @@ export async function requestSupervisorShift(
   /** Offline tests supply mock ports; normal callers use the Paseo adapter. */
   ports?: ShiftPorts,
 ): Promise<ShiftProgress> {
+  await hydrateShiftJobs();
   if (action === "cancel") {
     cancelFlags.add(project);
     const existing = tasks.get(project);
@@ -629,6 +648,14 @@ export async function requestSupervisorShift(
     }
   }
   cancelFlags.delete(project);
+  if (action === "start") { events.set(project, []); eventOffsets.set(project, 0); }
+  const recordEvent = (row: ShiftProgress) => {
+    const history = events.get(project) ?? [];
+    const key = (item: ShiftProgress | undefined) => item ? [item.phase, item.step, item.detail, item.oldId, item.newId].join("|") : "";
+    if (key(history.at(-1)) !== key(row)) history.push(row);
+    eventOffsets.set(project, (eventOffsets.get(project) ?? 0) + Math.max(0, history.length - 40));
+    events.set(project, history.slice(-40));
+  };
   const resume = action === "continue" && saved?.resume === "open" ? "open" : action === "continue" && saved?.resume === "wait" ? "wait" : "start";
   const existingNewId = action === "continue" && saved ? saved.newId : null;
   const existingOldId = action === "continue" ? saved?.oldId || slot.agentId : slot.agentId;
@@ -636,8 +663,9 @@ export async function requestSupervisorShift(
   const oldId = action === "continue" && existingNewId && existingOldId === existingNewId
     ? recoverOldId({ code: slot.code, newId: existingNewId, queueOldId: saved?.oldId, handoffs: parseHandoffs(await readLogText(), Number.MAX_SAFE_INTEGER) }) ?? existingOldId
     : existingOldId;
+  const creationKey = action === "continue" ? saved?.creationKey ?? `afc-leader-swap:${slot.project}:${oldId}` : `afc-leader-swap:${randomUUID()}`;
   const queuedAt = queueStartedAt(action, saved, Date.now());
-  if (queuedAt !== null) meta.set(project, { oldId, resume: saved?.resume === "queue" ? "queue" : resume, newId: existingNewId, queuedAt });
+  meta.set(project, { creationKey, oldId, resume: saved?.resume === "queue" ? "queue" : resume, newId: existingNewId, queuedAt });
   const starting: ShiftProgress = {
     phase: "handover",
     label: phaseLabel("handover"),
@@ -658,12 +686,16 @@ export async function requestSupervisorShift(
     releaseGate = resolve;
   });
   const run = runSupervisorShift(
-    { clicked: true, project: slot.project, code: slot.code, agentId: oldId, resume, existingNewId, queuedAt },
-    ports ?? shiftPorts(paseo, project),
+    { clicked: true, project: slot.project, code: slot.code, agentId: oldId, resume, existingNewId, queuedAt, creationKey },
+    { ...(ports ?? supervisorShiftPorts(paseo, project)), checkpoint: async row => {
+      await ports?.checkpoint?.(row);
+      await persistActive();
+    } },
     (row) => {
       tasks.set(project, row);
-      if (row.phase === "queued") meta.set(project, { oldId, resume: "queue", newId: null, queuedAt });
-      void persistActive().catch((error) => console.error("[afc] supervisor shift state:", String(error).slice(0, 160)));
+      recordEvent(row);
+      if (row.phase === "queued") meta.set(project, { creationKey, oldId, resume: "queue", newId: null, queuedAt });
+      else if (row.newId) meta.set(project, { creationKey, oldId, resume: "wait", newId: row.newId, queuedAt: null });
       if (!announced) {
         announced = row;
         releaseGate();
@@ -676,12 +708,14 @@ export async function requestSupervisorShift(
       meta.delete(project);
     } else {
       tasks.set(project, outcome.progress);
+      recordEvent(outcome.progress);
       if (outcome.progress.phase === "done") finishedAt.set(project, Date.now());
       else finishedAt.delete(project);
-      if (outcome.resumeNext) meta.set(project, { oldId, resume: outcome.resumeNext, newId: outcome.progress.newId, queuedAt: null });
+      if (outcome.resumeNext) meta.set(project, { creationKey, oldId, resume: outcome.resumeNext, newId: outcome.progress.newId, queuedAt: null });
+      else if (outcome.progress.canContinue) meta.set(project, { creationKey, oldId, resume: "start", newId: null, queuedAt: null });
       else meta.delete(project);
     }
-    await persistActive().catch((error) => console.error("[afc] supervisor shift state:", String(error).slice(0, 160)));
+    await persistActive();
     if (isCancelledLabel(outcome.result)) return;
     await appendHandoff({
       at: new Date().toISOString(),
@@ -690,28 +724,32 @@ export async function requestSupervisorShift(
       newId: outcome.progress.newId,
       contextTokens: outcome.progress.contextTokens,
       result: outcome.result,
-    }).catch((error) => console.error("[afc] supervisor handoff log:", String(error).slice(0, 160)));
+    });
   }).catch(async (error) => {
+    const latest = tasks.get(project) ?? starting;
     const failed: ShiftProgress = {
+      step: latest.step,
       phase: "failed",
       label: phaseLabel("failed"),
       detail: t("shift.server.interrupted", { error: String(error).slice(0, 160) }),
       project: slot.project,
       code: slot.code,
       oldId,
-      newId: existingNewId,
-      contextTokens: null,
-      canContinue: false,
+      newId: latest.newId,
+      contextTokens: latest.contextTokens,
+      canContinue: true,
       canCancel: false,
       openAgentId: null,
     };
+    meta.set(project, { creationKey, oldId, resume: latest.newId ? "wait" : latest.phase === "opening" ? "open" : "start", newId: latest.newId, queuedAt: null });
     tasks.set(project, failed);
+    recordEvent(failed);
     await persistActive().catch(() => undefined);
     await appendHandoff({
       at: new Date().toISOString(),
       project: slot.code,
       oldId,
-      newId: existingNewId,
+      newId: latest.newId,
       contextTokens: null,
       result: failed.detail,
     }).catch(() => undefined);
@@ -732,4 +770,13 @@ export async function requestSupervisorShift(
   } finally {
     if (!handedOff) releaseShiftProject(project);
   }
+}
+
+/** Read-only inspection never resumes a queue or mutates disk state. */
+export async function inspectSupervisorShift(project: string) {
+  await hydrateShiftJobs();
+  const config = await readJson<Json>(configPath, {});
+  const slot = supervisorSlots(config, kanbanProjectName()).find(row => row.project === project || row.code.toLowerCase() === project.toLowerCase());
+  const job = slot ? currentShiftJobs().find(row => row.project === slot.project) ?? null : null;
+  return { slot: slot ?? null, job, running: slot ? inflight.has(slot.project) : false, available: !shiftsOff(), eventsOffset: slot ? eventOffsets.get(slot.project) ?? 0 : 0, events: slot ? events.get(slot.project) ?? [] : [] };
 }
