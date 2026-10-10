@@ -35,8 +35,8 @@ export interface DataDirChoice {
 type Exists = (path: string) => boolean;
 
 /** The legacy state directory. Kept only so existing installs keep working until they migrate. */
-export function legacyStateDir(home: string = homedir()): string {
-  return join(home, ".config", "fleet-roles");
+export function legacyStateDir(home: string = homedir(), env: Env = process.env): string {
+  return env.AFC_LEGACY_DATA_DIR?.trim() || join(home, ".config", "fleet-roles");
 }
 
 function hasAny(dir: string, names: readonly string[], exists: Exists): boolean {
@@ -45,7 +45,7 @@ function hasAny(dir: string, names: readonly string[], exists: Exists): boolean 
 
 /** Pure decision for the cockpit's data directory. `exists` is injectable for tests. */
 export function chooseDataDir(env: Env = process.env, home: string = homedir(), exists: Exists = existsSync): DataDirChoice {
-  const legacyDir = legacyStateDir(home);
+  const legacyDir = legacyStateDir(home, env);
   const dataDir = pluginDataDir(PLUGIN_IDS.cockpit, env, home);
   if (env.AFC_DATA_DIR?.trim()) return { dir: dataDir, source: "override", dataDir, legacyDir };
   if (hasAny(dataDir, STATE_MARKERS, exists)) return { dir: dataDir, source: "data-dir", dataDir, legacyDir };

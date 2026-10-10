@@ -55,7 +55,7 @@ interface ScanFile {
   b?: Record<string, number[]>;
 }
 
-const BASE_MATRIX_FILE = "shared/default-dispatch.json";
+const BASE_MATRIX_FILE = "shared/default-dispatch.example.json";
 
 /** The base matrix ships with the plugin, so it lives in the install directory, not the data directory. */
 export function baseMatrixPath(): string | null {

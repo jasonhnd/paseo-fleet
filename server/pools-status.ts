@@ -695,7 +695,7 @@ export async function writePoolStatus(
   const priorityLine = poolStatusPriority(priority);
   await writeJson(POOL_STATUS, {
     generatedAt: new Date(now).toISOString(),
-    rules: "PROTOCOL.md §6",
+    rules: "the configured quota policy",
     priority: priorityLine,
     pools: held,
     ...(cursorRead ? { cursorRead } : {}),

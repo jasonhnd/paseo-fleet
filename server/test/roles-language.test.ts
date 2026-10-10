@@ -8,9 +8,8 @@ import { test } from "node:test";
 import { parseSetOutput, failureText } from "../roles-page";
 import { setLanguage, tIn } from "../../shared/i18n";
 
-const root = resolve(import.meta.dirname, "../../..");
-const roles = join(root, "bin/roles");
-const plugin = join(root, "agent-fleet-cockpit");
+const plugin = resolve(import.meta.dirname, "../..");
+const roles = join(plugin, "bin/roles.mjs");
 const supervisor = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const keys = ["supervisor", "executor", "reviewer", "reader", "decision", "batch", "ops_vercel", "ops_cloudflare", "ops_github", "ops_notion"];
 
@@ -49,7 +48,7 @@ else:
     LANG: "C.UTF-8", LC_ALL: "", LC_MESSAGES: "", PYTHONIOENCODING: "utf-8", AFC_LANGUAGE: "",
     PATH: `${fakebin}:${process.env.PATH}` };
   function run(args: string[], override: NodeJS.ProcessEnv = {}) {
-    const out = spawnSync(roles, args, { env: { ...env, ...override }, encoding: "utf8", timeout: 30_000 });
+    const out = spawnSync(process.execPath, [roles, ...args], { env: { ...env, ...override }, encoding: "utf8", timeout: 30_000 });
     assert.equal(out.status, 0, `${args.join(" ")}: ${out.stderr}\n${out.stdout}`);
     return out.stdout;
   }
@@ -114,7 +113,7 @@ test("override, explicit system, invalid config and direct Node entry", () => {
   assert.ok(d.run(["ls"], { LANG: "C.UTF-8", LC_ALL: "" }).includes("Executor:"));
   for (const lang of ["zh-CN", "en"] as const) {
     d.write("afc.config.json", { language: lang });
-    const out = spawnSync(process.execPath, [join(plugin, "node_modules/tsx/dist/cli.mjs"), join(plugin, "scripts/role-lineup.ts")], {
+    const out = spawnSync(process.execPath, [roles, "ls"], {
       env: { ...d.env, AFC_DATA_DIR: d.state }, encoding: "utf8", timeout: 30_000,
     });
     assert.equal(out.status, 0, out.stderr);

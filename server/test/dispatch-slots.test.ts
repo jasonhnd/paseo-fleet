@@ -7,7 +7,7 @@ import { dispatchSlotLabel, resolveProfileToken } from "../../shared/dispatch-sl
 import { setLanguage, tIn } from "../../shared/i18n";
 import { orderLines } from "../../shared/roles-page";
 
-const shipped = JSON.parse(readFileSync(new URL("../../shared/default-dispatch.json", import.meta.url), "utf8")) as DispatchMatrix;
+const shipped = JSON.parse(readFileSync(new URL("../../shared/default-dispatch.example.json", import.meta.url), "utf8")) as DispatchMatrix;
 
 function profile(partial: Partial<DispatchProfile> & Pick<DispatchProfile, "name">): DispatchProfile {
   return { provider: "", notes: "", ...partial };

@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { buildCli, ENTRIES } from "./build-cli.mjs";
+import { buildCli, ENTRIES, FLEET_ENTRIES } from "./build-cli.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const temps = [];
@@ -78,4 +78,40 @@ test("prepack builds the commands without contaminating npm's JSON output", () =
   const parsed = JSON.parse(out.stdout);
   const result = Array.isArray(parsed) ? parsed[0] : Object.values(parsed)[0];
   assert.ok(result.files.some(file => file.path === "bin/cli.bundle.mjs"));
+});
+
+// Each plugin has a distinct source layout; both must produce complete standalone command sets.
+test("Fleet commands build atomically and run without a runtime loader", async () => {
+  const root = fixture();
+  mkdirSync(join(root, "bin"));
+  for (const [name, source] of Object.entries(FLEET_ENTRIES)) {
+    writeFileSync(join(root, source), `console.log("${name}", ...process.argv.slice(2));\n`);
+  }
+  await buildCli(root);
+  for (const name of Object.keys(FLEET_ENTRIES)) {
+    const out = spawnSync(process.execPath, [join(root, "bin", `${name}.bundle.mjs`), "--help"], { encoding: "utf8" });
+    assert.equal(out.status, 0, out.stderr);
+    assert.equal(out.stdout.trim(), `${name} --help`);
+  }
+  assert.equal(existsSync(join(root, "node_modules")), false);
+  const partial = fixture();
+  writeFileSync(join(partial, FLEET_ENTRIES.roles), "export {};\n");
+  await assert.rejects(buildCli(partial), /incomplete CLI source set/);
+  assert.equal(existsSync(join(partial, "bin/roles.bundle.mjs")), false);
+});
+
+test("bundled schema validation keeps only used Zod exports", async () => {
+  const root = fixture();
+  symlinkSync(join(ROOT, "node_modules"), join(root, "node_modules"), "dir");
+  for (const name of ENTRIES) writeFileSync(join(root, "server", `${name}.ts`), `
+import { z } from "zod";
+console.log(z.object({ text: z.string() }).safeParse({ text: 42 }).error.issues[0].message);
+`);
+  await buildCli(root);
+  rmSync(join(root, "node_modules"));
+  const out = spawnSync(process.execPath, [join(root, "bin/cli.bundle.mjs")], { encoding: "utf8" });
+  assert.equal(out.status, 0, out.stderr);
+  assert.match(out.stdout, /expected string/);
+  const bundle = readFileSync(join(root, "bin/cli.bundle.mjs"), "utf8");
+  assert.doesNotMatch(bundle, /locales\/de\.js|classic\/from-json-schema\.js/);
 });

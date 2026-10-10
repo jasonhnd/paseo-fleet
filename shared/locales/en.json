@@ -987,8 +987,8 @@
   "leader.lamp.normal": "OK",
   "leader.lastReply.ago": "last reply {elapsed} ago",
   "leader.lastReply.unreadable": "last reply not readable right now",
-  "leader.prompt.acceptanceReminder": "Please handle the cards waiting for acceptance first: {codes}. Per the ★ section of PROTOCOL.md, accept on the spot what you can, and rework what needs rework.",
-  "leader.prompt.delegationReminder": "Please follow PROTOCOL.md ★ \"<leader> only dispatches, never does the work\": a <leader> only splits work into cards, dispatches, accepts, registers decisions and communicates. Writing code, changing config, running tests, investigating, reading through, tidying docs and merging all go on cards for the roles; merging goes on a batch card (--role batch). First handle this batch of cards: waiting for acceptance, blocked, and those whose dependencies are done. Register anything the user must answer with roles decide add as A/B/C plus a recommendation.",
+  "leader.prompt.acceptanceReminder": "Please review the cards waiting for acceptance: {codes}. Accept deliveries supported by evidence and return those requiring changes.",
+  "leader.prompt.delegationReminder": "Follow the repository instructions and the Kanban leader protocol. Coordinate work through cards, review delivery evidence, register decisions requiring human input, and communicate progress. Handle pending acceptance, blocked work and completed dependencies. Use the operations role for authorized merges.",
   "leader.prompt.statusRequest": "Please report the current state in plain words: which cards you hold, where each one is, and what you are waiting for me to decide. Register anything I must decide with roles decide add as A/B/C plus a recommendation; do not leave it only in the chat.",
   "leader.question.optionMarks": ".:)",
   "leader.question.recommend": "Recommend",
@@ -1533,11 +1533,11 @@
   "roles.page.patrol": "Patrol",
   "roles.page.paused": " (paused)",
   "roles.policy.cursorNotUsed": "Dispatch is disabled for this provider",
-  "roles.policy.refuseFast": "Fast models are not used (including grok-4.7-build-fast) (user rule, 2026-10-03)",
-  "roles.policy.refuseOpenai": "OpenAI allows only {only}; cannot switch to {model} (user rule, 2026-10-03)",
+  "roles.policy.refuseFast": "This model is excluded by the configured model policy",
+  "roles.policy.refuseOpenai": "The configured model policy allows {only}; cannot select {model}",
   "roles.policy.refuseBannedProvider": "Provider {provider} is excluded by bannedProviders in afc.config.json",
   "roles.policy.refuseProvider": "Cannot switch to an empty provider",
-  "roles.policy.refuseUltra": "The ultra thinking level is not used (user rule, 2026-10-03)",
+  "roles.policy.refuseUltra": "This thinking level is excluded by the configured model policy",
   "roles.policy.unknownProvider": "unknown provider",
   "roles.policy.viaCursor": " (via Cursor)",
   "roles.server.cannotUndo": "Cannot undo: {reason}",
@@ -2018,5 +2018,6 @@
   "doctor.platform.unverified": "This operating system is unverified; native Windows is not a release target.",
   "doctor.platform.keychainOptional": "Keychain presence checks are macOS-only and optional.",
   "doctor.platform.keychainSkipped": "Keychain checks are not applicable on this operating system and are skipped.",
-  "doctor.platform.processSkipped": "Unix process inspection was skipped on this operating system; process findings are unverified."
+  "doctor.platform.processSkipped": "Unix process inspection was skipped on this operating system; process findings are unverified.",
+  "cursor.api.sandboxLabel": "Agent sandbox"
 }

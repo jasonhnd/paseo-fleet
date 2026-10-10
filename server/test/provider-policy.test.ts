@@ -37,11 +37,11 @@ let dispatch: typeof import("../dispatch");
 let config: typeof import("../adapters/config");
 
 before(async () => {
-  for (const dir of [data, paseoDir, plugin, join(paseoDir, "agents", "demo")]) mkdirSync(dir, { recursive: true });
+  for (const dir of [data, paseoDir, join(plugin, "shared"), plugin, join(paseoDir, "agents", "demo")]) mkdirSync(dir, { recursive: true });
   Object.assign(process.env, { HOME: home, PASEO_HOME: paseoDir, AFC_DATA_DIR: data, AFC_HOME: plugin, KANBAN_DATA_DIR: join(home, "kanban"), AFC_LANGUAGE: "en" });
   delete process.env.KANBAN_HOME;
   put(join(paseoDir, "config.json"), { daemon: { agentProfiles: profiles } });
-  put(join(plugin, "shared/default-dispatch.json"), base);
+  put(join(plugin, "shared/default-dispatch.example.json"), base);
   put(join(data, "plans.json"), { plans, prices: Object.fromEntries(profiles.map((profile) => [profile.model, { input: 1, output: 1 }])) });
   put(join(data, "usage-ledger.json"), { version: 2, turns: profiles.map((profile, index) => ({
     at, agentId: `agent-${index}`, provider: profile.provider, model: profile.model, input: 1_000_000, cached: 0, output: 0,
@@ -192,7 +192,7 @@ test("explicit bans scrub old matrices even when another slot is unresolved", as
   const previous = JSON.parse(readFileSync(legacyPath, "utf8"));
   const before = readFileSync(legacyPath);
   const missingBase = { ...base, roles: { executor: { L2: [...(base.roles.executor as { L2: unknown[] }).L2, { profile: "reviewer", effort: "high" }] } } };
-  put(join(plugin, "shared/default-dispatch.json"), missingBase);
+  put(join(plugin, "shared/default-dispatch.example.json"), missingBase);
   await dispatch.publishDispatch({}, now, []);
   assert.deepEqual(readFileSync(legacyPath), before, "empty policy preserves existing bytes");
   put(join(data, "afc.config.json"), { bannedProviders: banned });

@@ -67,7 +67,7 @@ describe("dispatch-matrix export", () => {
   });
 
   test("the shipped base matrix fits the contract", () => {
-    const base = JSON.parse(readFileSync(join(import.meta.dirname, "..", "..", "shared/default-dispatch.json"), "utf8")) as LegacyMatrix;
+    const base = JSON.parse(readFileSync(join(import.meta.dirname, "..", "..", "shared/default-dispatch.example.json"), "utf8")) as LegacyMatrix;
     assert.doesNotThrow(() => DispatchMatrix.parse(buildDispatchMatrixExport(base, "0", NOW)));
   });
 });

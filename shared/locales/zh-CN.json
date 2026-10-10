@@ -987,8 +987,8 @@
   "leader.lamp.normal": "正常",
   "leader.lastReply.ago": "最后回复 {elapsed}前",
   "leader.lastReply.unreadable": "最后回复暂时读不到",
-  "leader.prompt.acceptanceReminder": "请先处理待验收的卡：{codes}。按 PROTOCOL.md ★ 节，能验收的当场验收，需要返工的 rework。",
-  "leader.prompt.delegationReminder": "请遵守 PROTOCOL.md ★『<leader> 只派活、不干活』：<leader> 只拆卡派活、验收、登记待拍板和沟通。写代码、改配置、跑测试、排查、通读、整理文档及合并操作一律建卡交给角色；合并操作建杂活卡（--role batch）。请先处理待验收、卡住和依赖已完成的这一批卡。要用户回答的事用 roles decide add 登记 A／B／C＋推荐。",
+  "leader.prompt.acceptanceReminder": "请审阅待验收卡片：{codes}。有证据支持的交付予以验收，需要修改的退回。",
+  "leader.prompt.delegationReminder": "遵循仓库说明和 Kanban 负责人协议。通过卡片协调工作、审阅交付证据、登记需人决定的事项并沟通进度。处理待验收、卡住和依赖已完成的工作。已授权的合并由杂活角色执行。",
   "leader.prompt.statusRequest": "请用大白话汇报现状：手上有哪些卡、各卡在哪、在等我定什么。要我定的事用 roles decide add 登记 A／B／C＋推荐，不要只写在对话里。",
   "leader.question.optionMarks": "．、：）",
   "leader.question.recommend": "推荐",
@@ -1533,11 +1533,11 @@
   "roles.page.patrol": "巡检",
   "roles.page.paused": "（暂停）",
   "roles.policy.cursorNotUsed": "此提供方已关闭派活",
-  "roles.policy.refuseFast": "不用 fast 型号（含 grok-4.7-build-fast）（用户 2026-10-03 要求）",
-  "roles.policy.refuseOpenai": "OpenAI 只允许 {only}，不能换成 {model}（用户 2026-10-03 要求）",
+  "roles.policy.refuseFast": "此模型被配置的模型策略排除",
+  "roles.policy.refuseOpenai": "配置的模型策略允许 {only}，无法选择 {model}",
   "roles.policy.refuseBannedProvider": "afc.config.json 的 bannedProviders 已禁用提供商 {provider}",
   "roles.policy.refuseProvider": "不能切换到空提供商",
-  "roles.policy.refuseUltra": "不用 ultra 思考档（用户 2026-10-03 要求）",
+  "roles.policy.refuseUltra": "此思考档位被配置的模型策略排除",
   "roles.policy.unknownProvider": "未知服务商",
   "roles.policy.viaCursor": "（经 Cursor）",
   "roles.server.cannotUndo": "不能撤销：{reason}",
@@ -2018,5 +2018,6 @@
   "doctor.platform.unverified": "此系统尚未验证；原生 Windows 不在首发目标内。",
   "doctor.platform.keychainOptional": "钥匙串存在性检查仅限 macOS，可选开启。",
   "doctor.platform.keychainSkipped": "此系统不适用钥匙串检查，已跳过。",
-  "doctor.platform.processSkipped": "此系统已跳过 Unix 进程检查；进程状态尚未验证。"
+  "doctor.platform.processSkipped": "此系统已跳过 Unix 进程检查；进程状态尚未验证。",
+  "cursor.api.sandboxLabel": "代理沙盒"
 }

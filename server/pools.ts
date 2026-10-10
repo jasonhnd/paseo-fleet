@@ -1,13 +1,10 @@
 /// <reference types="node" />
 // Quota snapshot for other tools (Paseo Kanban's dispatcher reads it to pick a pool).
-// Keys are the `pool` values used in Paseo agent profiles: the plan ids of plans.json (shared/quota-adapters.ts). The dispatch rules of PROTOCOL.md §6 are applied here,
+// Keys are the `pool` values used in Paseo agent profiles: the plan ids of plans.json (shared/quota-adapters.ts). The configured dispatch rules are applied here,
 // so readers only need `dispatchable`, `deprioritize`, `prefer`, and optional `onlyRoles` (docs/KANBAN-CONTRACT.md §1).
 //
 // Split by progress line (pools-pace.ts), status (pools-status.ts, with window stops, unread reads, and the
 // reviewer exception beside it), and alerts (pools-alerts.ts).
-// DEMO_0070: the Codex pool stays neverPrefer (its adapter default, shared/quota-adapters.ts). Do not force prefer when a coupon is in hand,
-// except inside a codex `burnWeek` window in plans.json while the coupon is still in hand (DEMO_0116);
-// that removed block is marked DEMO_0070 in pools-status.ts.
 
 export {
   PACE_AHEAD,

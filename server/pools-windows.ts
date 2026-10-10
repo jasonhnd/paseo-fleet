@@ -8,11 +8,11 @@ import type { UsageWindow } from "../shared/usage";
 import { t } from "../shared/i18n";
 import { tokyoLabel } from "./pools-pace";
 
-/** PROTOCOL.md §6: keep 25% of the supervisor pool's week for the supervisor; pause new work at 70% of its 5-hour window. */
+/** the configured quota policy: keep 25% of the supervisor pool's week for the supervisor; pause new work at 70% of its 5-hour window. */
 export const SUPERVISOR_WEEKLY_RESERVE = 75;
 export const SUPERVISOR_SESSION_PAUSE = NORMAL_CLAUDE_SESSION_PCT;
 /**
- * PROTOCOL.md §6: a percentage copied by hand stops taking work at 80%.
+ * the configured quota policy: a percentage copied by hand stops taking work at 80%.
  * A cursor-api plan falls back to its plans.json `manual.usedPct` only when `/usage` could not be read.
  * Paseo's listUsage balance is total spend across both blocks and is shown for reference only;
  * `overageBilling` is display only. Neither decides dispatch.

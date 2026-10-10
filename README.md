@@ -8,7 +8,7 @@ Fleet Cockpit, a [Paseo](https://github.com/getpaseo/paseo) plugin for running a
 
 Its companion board, Kanban for Paseo (`@jasonhnd/paseo-kanban`), lives in its own repository, [jasonhnd/paseo-kanban](https://github.com/jasonhnd/paseo-kanban).
 
-> **Status: experimental, not released yet.** This repository holds the skeleton and the privacy gates; the plugin code is imported next. Version 0.1 will target Paseo 0.11 only.
+> **Status: experimental, not released yet.** The plugin sources and standalone Node commands are imported. Version 0.1 targets Paseo 0.11 only; clean-host installation and desktop validation remain release prerequisites.
 
 ## Install (after the first release)
 
@@ -31,7 +31,7 @@ Each plugin works alone; together they share quota and board data through files 
 
 ```
 paseo-plugin.json, OVERVIEW.md, package.json   the plugin @jasonhnd/paseo-fleet-cockpit
-client/, server/, shared/, locales/, bin/      plugin code (imported next)
+client/, server/, shared/, locales/, bin/      plugin code and standalone Node commands
 shared/contract/, server/contract/             fleet-quota/v1 source; paseo-kanban keeps a copy
 contract.manifest.json                         contract version and file hashes
 scripts/, .githooks/, .github/workflows/       gates, identical in paseo-kanban
@@ -49,7 +49,8 @@ Nothing personal may ever reach this repository or a published package. Three ga
 ### Contributor setup
 
 ```sh
-npm install                                  # the dev tools (TypeScript, Paseo's plugin types)
+npm ci                                       # install the locked development tools
+npm run build:cli                            # build the standalone Node commands
 npm run hooks                                # git config core.hooksPath .githooks
 git config user.name "paseo-fleet contributors"
 git config user.email "<id>+<user>@users.noreply.github.com"   # or noreply@example.invalid
@@ -66,9 +67,10 @@ The private denylist lists everything that identifies you (login name, real name
 npm run verify        # everything below plus gitleaks; exit 0 means the push gate will pass
 sh .githooks/pre-push </dev/null   # the push gate itself, without pushing anything
 npm run build:check   # compile actual plugin entries with the installed Paseo compiler (required)
-npm run typecheck     # tsc on the plugin; with no TypeScript yet it passes with a note
+npm run typecheck     # tsc on the plugin
 npm test              # tests of the scripts themselves
-npm run test:plugin   # the plugin's own tests
+npm run test:plugin   # the plugin's own tests, including standalone CLI coverage
+npm run compat        # offline compilation, type check and plugin tests
 npm run scan          # check-private.mjs --all: whole tree, generic rules + private denylist
 npm run identity      # check-identity.mjs --history: every commit's author and committer
 npm run pack:check    # check-package-files.mjs: what npm would publish
@@ -86,3 +88,35 @@ When the private denylist flags a word that is not personal in context (a short 
 ## License
 
 [MIT](LICENSE)
+
+## Standalone commands and development
+
+Use Node 22.13 or newer. Build the commands with `npm run build:cli` before installing
+a Git checkout; release commits must include `bin/*.bundle.mjs`. `npm pack` rebuilds
+them with `prepack`. Published commands need only Node, without TypeScript loaders,
+Python, or development dependencies.
+
+```sh
+node bin/afc.mjs --help
+node bin/afc.mjs roles ls
+node bin/afc.mjs decide ls
+node bin/afc.mjs doctor --json
+node bin/afc.mjs migrate --help
+```
+
+The default dispatch template ships at `shared/default-dispatch.example.json`.
+It is install data, separate from generated dispatch state. Profile bindings and
+quota priority remain configurable. Model choices follow the host catalog and
+configured provider exclusions; installation imposes no personal model restrictions.
+
+Data defaults to `$PASEO_HOME/plugin-data/agent-fleet-cockpit`. `AFC_DATA_DIR`
+overrides it, and `ROLES_STATE_DIR` overrides roles-command state only. Legacy
+discovery checks `~/.config/fleet-roles`; set `AFC_LEGACY_DATA_DIR` for another
+previous state directory, or use migration's explicit `--from` path. The optional
+read-only sidebar adapter requires `AFC_SANDBOX_ROSTER_DIR` to select its persistence
+directory; it does not probe an owner's application directory by default.
+
+`npm run compat` is an offline compiler, type-check and regression gate. It does
+not contact a daemon or prove desktop mounting, provider authentication, migration
+against real data, or installation on another operating system. Those checks belong
+to the isolated release validation workflow.

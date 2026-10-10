@@ -4,8 +4,6 @@ import { providerBanned } from "./provider-policy";
 import { t } from "./i18n";
 import { CURSOR_PROVIDER, PROVIDER_COMPANIES } from "./quota-adapters";
 
-export const OPENAI_ONLY_MODEL = "gpt-6.1-sol";
-export const BLOCKED_THINKING = "ultra";
 
 /** Stable display order for known companies; other configured providers follow it. */
 export const COMPANIES = ["Anthropic", "OpenAI", "xAI"] as const;
@@ -48,22 +46,16 @@ export function routeSuffix(provider: string): string {
 /** A reason this provider/model/thinking combination is never allowed, or null. */
 export function swapRefusal(provider: string, model: string, thinking: string | null | undefined, bannedProviders: readonly string[] = []): string | null {
   if (providerBanned({ provider, model, company: companyName(provider, model) }, bannedProviders)) return t("roles.policy.refuseBannedProvider", { provider });
-  if (provider === CURSOR_PROVIDER) return cursorNotUsed();
   if (!provider.trim()) return t("roles.policy.refuseProvider", { provider: provider || t("roles.policy.unknownProvider") });
-  if ((thinking ?? "").toLowerCase() === BLOCKED_THINKING) return t("roles.policy.refuseUltra");
-  const id = model.toLowerCase();
-  if (id.includes("fast") || /fast/i.test(thinking ?? "")) return t("roles.policy.refuseFast");
-  if ((provider === "codex" || id.includes("gpt")) && id !== OPENAI_ONLY_MODEL) return t("roles.policy.refuseOpenai", { only: OPENAI_ONLY_MODEL, model });
   return null;
 }
 
-/** Models the picker may show: only allowed ones, each with its ultra thinking level removed. */
+/** Models the picker may show, filtered only by configured provider exclusions. */
 export function pickableModels<T extends PickableModel>(models: readonly T[], bannedProviders: readonly string[] = []): T[] {
   const out: T[] = [];
   for (const model of models) {
     if (swapRefusal(model.provider, model.id, null, bannedProviders)) continue;
-    const thinking = model.thinking.filter((level) => level.toLowerCase() !== BLOCKED_THINKING);
-    out.push({ ...model, thinking });
+    out.push({ ...model, thinking: [...model.thinking] });
   }
   return out;
 }

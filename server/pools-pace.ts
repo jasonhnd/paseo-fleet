@@ -29,15 +29,12 @@ const DAY_MS = 24 * 60 * 60_000;
 // Pools that can stand in for each other: shared/quota-adapters.ts paceSiblings (every other main pool).
 
 /**
- * PROTOCOL.md §6 "dispatch by quota", the old projection rule kept as a pure helper.
+ * the configured quota policy "dispatch by quota", the old projection rule kept as a pure helper.
  * The snapshot itself now uses the progress line (`paceOf`), not this projection.
  */
 const PREFER_BELOW = 60;
 const PREFER_MIN_ELAPSED = 20;
-// Pools that are never preferred: the adapter default (Claude and Codex, shared/quota-adapters.ts), or plans.json
-// `neverPrefer` on the plan. 2026-10-02 user: GPT burns too fast, so the Codex pool is a fallback (DEMO_0070).
-// A user-authorised burnWeek on the codex coupon (plans.json, DEMO_0116) lifts this for that window only (allowPrefer in pools-status.ts).
-// To restore the coupon-driven prefer: set `neverPrefer: false` on the Codex plan and restore the block marked DEMO_0070 in poolStatus.
+// Plans may disable preference with `neverPrefer`; an explicit burn window can override it.
 
 export type PaceState = "ahead" | "behind" | "steady" | "stopped" | "closed" | "unknown";
 

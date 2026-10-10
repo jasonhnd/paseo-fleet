@@ -74,7 +74,7 @@ test("non-macOS keychain adapter never starts a probe, even when enabled", () =>
 });
 
 test("roles overrides do not change doctor or migration data paths", () => {
-  for (const entry of [null, resolve(plugin, "../bin/afc.mjs")]) {
+  for (const entry of [null, resolve(plugin, "bin/afc.mjs")]) {
     const f = fixture();
     const roles = join(f.root, "roles-state");
     mkdirSync(roles);

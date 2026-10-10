@@ -402,7 +402,7 @@ function cursorWindows(company: CompanyEntry, read: CompanyCursorRead | null, po
       const grok = /grok/i.test(row.label);
       extras.push(windowBase({
         id: `${key}-${row.label.trim().toLowerCase().replace(/\s+/g, "-")}`,
-        name: grok ? "Agent sandbox" : row.label.trim(),
+        name: grok ? t("cursor.api.sandboxLabel") : row.label.trim(),
         usedPct: row.usedPct,
         resetsAt: grok ? (row.resetsAt ?? null) : whenOf(row, false),
         source: via,
@@ -419,7 +419,7 @@ function cursorWindows(company: CompanyEntry, read: CompanyCursorRead | null, po
   const hasGrok = extras.some((w) => w.id.slice(key.length + 1).includes("grok")) || [...byLabel.keys()].some((k) => k.includes("grok"));
   const sandboxAgents = hasGrok ? null : windowBase({
     id: `${key}-grok-bot`,
-    name: "Agent sandbox",
+    name: t("cursor.api.sandboxLabel"),
     usedPct: null,
     resetsAt: null,
     source: "unread",

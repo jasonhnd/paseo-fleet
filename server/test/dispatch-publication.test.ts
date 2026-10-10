@@ -30,7 +30,8 @@ before(async () => {
   for (const dir of [data, plugin, join(home, ".paseo")]) mkdirSync(dir, { recursive: true });
   Object.assign(process.env, { HOME: home, PASEO_HOME: join(home, ".paseo"), AFC_DATA_DIR: data, AFC_HOME: plugin, KANBAN_DATA_DIR: join(home, "kanban"), AFC_LANGUAGE: "zh-CN" });
   delete process.env.KANBAN_HOME;
-  writeFileSync(join(plugin, "shared/default-dispatch.json"), JSON.stringify(base));
+  mkdirSync(join(plugin, "shared"), { recursive: true });
+  writeFileSync(join(plugin, "shared/default-dispatch.example.json"), JSON.stringify(base));
   dispatch = await import("../dispatch");
 });
 after(() => {
@@ -89,7 +90,7 @@ test("resolved publication matches legacy names; unreadable or partial config pr
 });
 
 test("every shipped slot matches the demo name and effort in a named legacy base", () => {
-  const shipped = JSON.parse(readFileSync(new URL("../../shared/default-dispatch.json", import.meta.url), "utf8")) as DispatchMatrix;
+  const shipped = JSON.parse(readFileSync(new URL("../../shared/default-dispatch.example.json", import.meta.url), "utf8")) as DispatchMatrix;
   const demo: DispatchProfile[] = Object.keys(PROFILE_SLOTS).map((slot) => ({ name: `Demo ${slot}`, provider: "demo", notes: "", dispatchId: slot }));
   // Model the old base with names, preserving list order and effort.
   const legacy = JSON.parse(JSON.stringify(shipped), (key, value) => key === "profile" ? `Demo ${value}` : value) as DispatchMatrix;

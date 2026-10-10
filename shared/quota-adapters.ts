@@ -108,7 +108,7 @@ interface AdapterSpec {
   /** Default for plans.json `neverPrefer`: being behind the progress line does not make the pool preferred. */
   neverPrefer: boolean;
   /**
-   * The leader's own pool (PROTOCOL.md §6): its week stops at 75% so the leader keeps 25%, new work pauses at
+   * The leader's own pool (the configured quota policy): its week stops at 75% so the leader keeps 25%, new work pauses at
    * 70% of the 5-hour window, and Claude's reset coupons (burn and double weeks) and the reviewer exception apply.
    */
   leaderPool: boolean;

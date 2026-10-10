@@ -7,7 +7,7 @@ import { dispatchOverridesSchema, dispatchSettingRows } from "../../shared/dispa
 import { readThinkingCatalog } from "../dispatch-settings";
 import { orderLines } from "../../shared/roles-page";
 
-const base: DispatchMatrix = JSON.parse(readFileSync(new URL("../../shared/default-dispatch.json", import.meta.url), "utf8"));
+const base: DispatchMatrix = JSON.parse(readFileSync(new URL("../../shared/default-dispatch.example.json", import.meta.url), "utf8"));
 function slots(node: unknown): string[] {
   if (Array.isArray(node)) return node.flatMap(row => typeof row.profile === "string" ? [row.profile] : slots(row));
   return node && typeof node === "object" ? Object.values(node).flatMap(slots) : [];

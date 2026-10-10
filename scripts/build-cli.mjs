@@ -8,29 +8,37 @@ import { build } from "esbuild";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const ENTRIES = ["cli", "local-decisions", "migrate", "check-missing-cwd"];
+export const FLEET_ENTRIES = { roles: "server/roles-cli.ts", doctor: "server/doctor-cli.ts", migrate: "server/migrate-command.ts", coupon: "bin/coupon.ts" };
 
 export async function buildCli(root = ROOT) {
   root = realpathSync(root);
-  const present = ENTRIES.filter(name => existsSync(join(root, "server", `${name}.ts`)));
-  if (!present.includes("cli")) {
+  const fleet = existsSync(join(root, FLEET_ENTRIES.roles));
+  const sources = fleet ? FLEET_ENTRIES : Object.fromEntries(ENTRIES.map(name => [name, `server/${name}.ts`]));
+  const present = Object.keys(sources).filter(name => existsSync(join(root, sources[name])));
+  if (!fleet && !present.includes("cli")) {
     console.error("build:cli: no command sources yet, nothing to build");
     return;
   }
-  if (present.length !== ENTRIES.length) throw new Error("incomplete CLI source set");
+  if (present.length !== Object.keys(sources).length) throw new Error("incomplete CLI source set");
   // Build in memory so a failed compilation cannot leave a partially updated bundle set.
-  const results = await Promise.all(ENTRIES.map(name => build({
-    entryPoints: [join(root, "server", `${name}.ts`)],
+  const results = await Promise.all(Object.entries(sources).map(([name, source]) => build({
+    entryPoints: [join(root, source)],
     outfile: join(root, "bin", `${name}.bundle.mjs`),
     bundle: true, platform: "node", format: "esm", target: "node22.5", write: false,
     // Bundling gives every module the command's import.meta.url. Disable command-only
     // guards in imported modules, otherwise importing one CLI can run another CLI's main.
     plugins: [{ name: "entry-guards", setup(builder) {
-      builder.onLoad({ filter: /\.tsx?$/ }, args => {
-        if (args.path === join(root, "server", `${name}.ts`) || !args.path.startsWith(join(root, "server") + sep)) return;
-        const source = readFileSync(args.path, "utf8");
-        const contents = source.replace(/if\s*\(\s*import\.meta\.url\s*===\s*invoked\s*\)/g, "if (false)");
-        if (contents === source) return;
-        return { contents, loader: args.path.endsWith(".tsx") ? "tsx" : "ts" };
+      builder.onLoad({ filter: /\.[cm]?[jt]sx?$/ }, args => {
+        const text = readFileSync(args.path, "utf8");
+        // Zod's named namespace alias retains every export in esbuild, including unused
+        // locales and JSON converters. A real namespace import preserves static member
+        // access and lets the bundler omit unused library code, including in host types.
+        let contents = text.replace(/import\s*\{\s*z\s*\}\s*from\s*(["'])zod\1/g, 'import * as z from "zod"');
+        if (args.path !== join(root, source) && args.path.startsWith(join(root, "server") + sep)) {
+          contents = contents.replace(/if\s*\(\s*import\.meta\.url\s*===\s*invoked\s*\)/g, "if (false)");
+        }
+        if (contents === text) return;
+        return { contents, loader: /\.tsx?$/.test(args.path) ? (args.path.endsWith(".tsx") ? "tsx" : "ts") : "js" };
       });
     } }],
     // Bundled CommonJS dependencies may use require() for Node built-ins.
