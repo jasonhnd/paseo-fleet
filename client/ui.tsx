@@ -64,9 +64,9 @@ function buildStyles(p: ThemeColors, f: ReturnType<typeof fontSizes>, breakpoint
     item: { borderTopWidth: 1, borderTopColor: p.border, paddingTop: 12, paddingBottom: 12, gap: 6 },
     tabBar: { flexDirection: "row" as const, flexWrap: "nowrap" as const, borderBottomWidth: 1, borderBottomColor: p.border },
     tab: { minHeight: 44, paddingHorizontal: compact ? 12 : 6, paddingVertical: 10, justifyContent: "center" as const, alignItems: "center" as const, borderBottomWidth: 2, borderBottomColor: p.transparent },
-    tabActive: { minHeight: 44, paddingHorizontal: compact ? 12 : 6, paddingVertical: 10, justifyContent: "center" as const, alignItems: "center" as const, borderBottomWidth: 2, borderBottomColor: p.blue, backgroundColor: p.raised },
+    tabActive: { minHeight: 44, paddingHorizontal: compact ? 12 : 6, paddingVertical: 10, justifyContent: "center" as const, alignItems: "center" as const, borderBottomWidth: 2, borderBottomColor: p.blue, backgroundColor: p.primaryBg },
     tabText: { ...sans, color: p.textSecondary, fontSize: f.tab, lineHeight: Math.round(f.tab * 1.3) },
-    tabTextActive: { ...sans, ...nums, color: p.blue, fontSize: f.tab, lineHeight: Math.round(f.tab * 1.3), fontWeight: "600" as const },
+    tabTextActive: { ...sans, ...nums, color: p.primaryFg, fontSize: f.tab, lineHeight: Math.round(f.tab * 1.3), fontWeight: "600" as const },
     button: { minHeight: 44, justifyContent: "center" as const, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, backgroundColor: p.primaryBg },
     buttonText: { ...sans, color: p.primaryFg, fontSize: f.body, lineHeight: bodyLine, fontWeight: "600" as const },
     ghost: { minHeight: 44, justifyContent: "center" as const, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: p.border, backgroundColor: p.transparent },
@@ -97,7 +97,7 @@ function buildStyles(p: ThemeColors, f: ReturnType<typeof fontSizes>, breakpoint
     red: { ...sans, color: p.red, fontSize: f.small, lineHeight: Math.round(f.small * 1.45), fontWeight: "600" as const },
     yellow: { ...sans, color: p.amber, fontSize: f.small, lineHeight: Math.round(f.small * 1.45), fontWeight: "600" as const },
     green: { ...sans, color: p.green, fontSize: f.small, lineHeight: Math.round(f.small * 1.45), fontWeight: "600" as const },
-    blue: { ...sans, color: p.blue, fontSize: f.small, lineHeight: Math.round(f.small * 1.45), fontWeight: "600" as const },
+    blue: { ...sans, color: p.link, fontSize: f.small, lineHeight: Math.round(f.small * 1.45), fontWeight: "600" as const },
     bar: { height: 5, borderRadius: 3, backgroundColor: p.track, overflow: "hidden" as const },
   };
 }
@@ -126,7 +126,7 @@ export function toneColor(s: Styles, tone: Tone): string {
   if (tone === "green") return s.p.green;
   if (tone === "yellow") return s.p.amber;
   if (tone === "red") return s.p.red;
-  if (tone === "blue") return s.p.blue;
+  if (tone === "blue") return s.p.link;
   return s.p.hint;
 }
 
@@ -134,7 +134,7 @@ function tonePair(s: Styles, tone: Tone): { bg: string; fg: string } {
   if (tone === "green") return { bg: s.p.greenBg, fg: s.p.green };
   if (tone === "yellow") return { bg: s.p.amberBg, fg: s.p.amber };
   if (tone === "red") return { bg: s.p.redBg, fg: s.p.red };
-  if (tone === "blue") return { bg: s.p.blueBg, fg: s.p.blue };
+  if (tone === "blue") return { bg: s.p.primaryBg, fg: s.p.primaryFg };
   return { bg: s.p.raised, fg: s.p.textSecondary };
 }
 

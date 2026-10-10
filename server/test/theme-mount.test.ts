@@ -120,6 +120,11 @@ test("homepage, all panel tabs and settings repaint from two complete host theme
         for (const [index, tab] of PANEL_TABS.entries()) {
           mounted.container.querySelectorAll('[role="tab"]')[index].click(); await tick(); await tick();
           assert.equal(mounted.container.querySelectorAll('[role="tab"]')[index].getAttribute("aria-selected"), "true", tab.id);
+          const selected = mounted.container.querySelectorAll('[role="tab"]')[index];
+          assert.equal(dom.window.getComputedStyle(selected).backgroundColor, normalize(theme.colors.accent));
+          const label = [...selected.querySelectorAll("*")].find((element: any) => element.textContent === tab.label);
+          assert.ok(label, "Selected tab label must render");
+          assert.equal(dom.window.getComputedStyle(label).color, normalize(theme.colors.accentForeground));
           for (const color of sample(theme)) aggregate.add(color);
         }
         return aggregate;

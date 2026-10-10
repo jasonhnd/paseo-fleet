@@ -57,6 +57,7 @@ export function themeColors(theme: PluginTheme | null | undefined) {
     red: c.statusDanger,
     redBg: mix(c.surface1, c.statusDanger, 0.1),
     blue: c.accent,
+    link: mix(c.accent, c.foreground, 0.3),
     blueBg: mix(c.surface1, c.accent, 0.1),
     transparent: withAlpha(c.surface0, 0),
   };

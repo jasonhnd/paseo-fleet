@@ -62,7 +62,7 @@ function Context({ s, title, detail }: { s: Styles; title: string; detail: strin
       <Text style={s.secondary} numberOfLines={foldable && !open ? 3 : undefined}>{context}</Text>
       {foldable ? (
         <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={open ? t("decisions.cardView.showLess") : t("decisions.cardView.showAll")} style={pressed({ minHeight: 44, justifyContent: "center", alignSelf: "flex-start" })} onPress={() => setOpen((v) => !v)}>
-          <Text style={[s.ghostText, { color: s.p.blue }]}>{open ? t("decisions.cardView.showLess") : t("decisions.cardView.showAll")}</Text>
+          <Text style={[s.ghostText, { color: s.p.link }]}>{open ? t("decisions.cardView.showLess") : t("decisions.cardView.showAll")}</Text>
         </Pressable>
       ) : null}
     </View>
