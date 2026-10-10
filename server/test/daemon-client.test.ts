@@ -2,8 +2,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { appendFile, copyFile, mkdir, mkdtemp, rm, symlink } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { build } from "esbuild";
+import type { createPaseoClient } from "../paseo-client.bundle.mjs";
 
 // Exercise the shipped module outside the checkout, with only its production dependencies.
 test("the background client can initialize without installed SDK packages", async () => {
@@ -35,4 +39,18 @@ test("the background client can initialize without installed SDK packages", asyn
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("the generated client loads after a host compiler clears import.meta.url", async () => {
+  const result = await build({
+    entryPoints: [fileURLToPath(new URL("../paseo-client.bundle.mjs", import.meta.url))],
+    bundle: true, format: "cjs", platform: "node", target: "node20", write: false,
+    external: ["zod", "@getpaseo/protocol", "@getpaseo/relay"], logLevel: "silent",
+  });
+  const module = { exports: {} as { createPaseoClient: typeof createPaseoClient } };
+  const evaluate = new Function("require", "module", "exports", result.outputFiles[0].text);
+  evaluate(createRequire(import.meta.url), module, module.exports);
+  const client = module.exports.createPaseoClient({ url: "ws://127.0.0.1:0/ws", clientId: "wrapper-test", reconnect: { enabled: false } });
+  assert.equal(typeof client.providers.listUsage, "function");
+  await client.close();
 });

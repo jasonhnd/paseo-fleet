@@ -15,9 +15,9 @@ const result = await build({
   format: "esm",
   target: "node22.5",
   write: false,
-  // Anchor ESM require to this module. The plugin compiler removes this unused shim
-  // when converting the current dependency graph to its CommonJS wrapper.
-  banner: { js: 'import { createRequire } from "node:module"; const require = /* @__PURE__ */ createRequire(import.meta.url);' },
+  // Anchor ESM require to this module. Paseo clears import.meta.url in its CommonJS
+  // wrapper; the current dependency graph uses ESM imports that the host recompiles.
+  banner: { js: 'import { createRequire } from "node:module"; const require = typeof import.meta.url === "string" ? createRequire(import.meta.url) : undefined;' },
   minifyIdentifiers: true,
   legalComments: "eof",
 });
