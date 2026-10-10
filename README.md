@@ -142,3 +142,50 @@ reported as unknown.
 not contact a daemon or prove desktop mounting, provider authentication, migration
 against real data, or installation on another operating system. Those checks belong
 to the isolated release validation workflow.
+
+Leader context reminders and swaps are available through the installed plugin:
+
+```sh
+afc leader usage --json                 # read-only report for a heartbeat
+afc leader swap demo --dry-run          # inspect settings and planned steps
+afc leader swap demo                    # confirmation was given in the conversation
+afc leader status demo --json           # inspect an interrupted or running swap
+afc leader swap demo                    # resume the same swap after a failure
+afc leader swap demo --again            # explicitly start another completed shift
+afc leader cancel demo                  # clear stopped tracking; keep both sessions
+```
+
+The plugin must be running on the selected local daemon. Commands use
+`$PASEO_HOME/config.json`'s daemon listen address; `--host 127.0.0.1:PORT`
+selects a different local TCP endpoint. IPv6 loopback requires brackets, for example
+`--host '[::1]:PORT'`; the daemon listen address must use the same bracketed form.
+No login credentials are read. A protected
+endpoint can reject the handshake; the command reports the rejection.
+
+Settings stores `leaderUsage.reminderTokens` and `leaderUsage.warningTokens` in
+`afc.config.json`, using the existing revision check. Defaults are 500,000 and
+750,000 tokens. The warning value must exceed the reminder value. A value strictly
+above the reminder is yellow; strictly above the warning is red. Missing or invalid
+file settings fall back to both defaults. Home displays the effective thresholds.
+`leader usage --json` returns `generatedAt`, `thresholds` and one row per registered
+project with `contextTokens` and `level` (`normal`, `reminder`, `warning`, `unknown`).
+A heartbeat can report rows whose level is `reminder` or `warning`; `unknown` means
+usage could not be read, and must not be treated as zero. This report never resumes
+pending shifts.
+
+The CLI invokes `leader.swap` in the plugin, which uses the homepage's shift
+runner and state file. It waits for the old session to become idle, requests its
+handover, opens a session with the same title, workspace and model settings,
+detaches any parent link, waits for the takeover reply **and** Kanban registration,
+then archives the old session. Each stage is printed; with `--json`, progress goes
+to stderr and the final result goes to stdout. Creation uses a stable host
+idempotency key and the new session id is saved before later mutations. Repeating
+a pending command continues it; repeating a completed command reports completion.
+`--again` is required to deliberately swap the next leader. Keep both sessions when
+a step fails and inspect the registry before manual rollback. `leader cancel`
+refuses while a swap is running; once stopped, it clears tracking without touching
+either session or the registry. For manual rollback, open the old session, register
+it with `kanban supervise --project demo`, verify that registration, and only then
+archive an orphan new session. If the CLI connection
+is interrupted, the plugin may still be running the swap; inspect its status before
+rerunning. `--dry-run` performs reads only and does not start or resume a shift.

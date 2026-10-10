@@ -9,6 +9,7 @@ import { bannedProviderTerms } from "../../shared/provider-policy";
 // Only a literal true or false counts. A file that cannot be read is treated as missing.
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { leaderThresholds, type LeaderThresholds } from "../../shared/leader-usage";
 import { hiddenPlanTerms } from "../../shared/hidden-plans";
 import { ADAPTERS_OFF, type AdapterSwitches, CURSOR_API, KEYCHAIN, OPTIONAL_ADAPTERS, type OptionalAdapter } from "../../shared/quota-adapters";
 import { STATE_DIR } from "../util";
@@ -58,4 +59,9 @@ export function readHiddenPlans(dir: string = STATE_DIR): string[] {
 /** Provider/company exclusion list. Missing, invalid or unreadable means allow all. */
 export function readBannedProviders(dir: string = STATE_DIR): string[] {
   return bannedProviderTerms(readConfig(dir));
+}
+
+/** Context thresholds for homepage rows and read-only inspections. */
+export function readLeaderThresholds(dir: string = STATE_DIR): LeaderThresholds {
+  return leaderThresholds(readConfig(dir));
 }

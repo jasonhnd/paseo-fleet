@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
-const BUNDLES = ["roles", "doctor", "migrate", "coupon"].map(name => `bin/${name}.bundle.mjs`);
+const BUNDLES = ["roles", "doctor", "migrate", "coupon", "leader"].map(name => `bin/${name}.bundle.mjs`);
 BUNDLES.push("server/paseo-client.bundle.mjs");
 
 function run(command, args, cwd) {
@@ -17,7 +17,7 @@ function run(command, args, cwd) {
 export function preparePlugin(root = ROOT, execute = run) {
   // Source builds need the locked SDK and compiler tools even under NODE_ENV=production.
   execute("npm", [existsSync(join(root, "package-lock.json")) ? "ci" : "install", "--include=dev", "--ignore-scripts", "--no-audit", "--no-fund"], root);
-  const builders = ["bin/build-daemon-client.mjs", "scripts/build-cli.mjs"].map(file => existsSync(join(root, file)));
+  const builders = ["bin/build-daemon-client.mjs", "bin/build-commands.mjs", "scripts/build-cli.mjs"].map(file => existsSync(join(root, file)));
   if (builders.some(Boolean)) {
     if (!builders.every(Boolean)) throw new Error("Incomplete source build tools");
     execute("npm", ["run", "build"], root);

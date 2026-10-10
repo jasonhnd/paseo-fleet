@@ -8,7 +8,7 @@ import { afterEach, test } from "node:test";
 import { preparePlugin } from "../prepare.mjs";
 
 const roots: string[] = [];
-const bundles = ["bin/roles.bundle.mjs", "bin/doctor.bundle.mjs", "bin/migrate.bundle.mjs", "bin/coupon.bundle.mjs", "server/paseo-client.bundle.mjs"];
+const bundles = ["bin/roles.bundle.mjs", "bin/doctor.bundle.mjs", "bin/migrate.bundle.mjs", "bin/coupon.bundle.mjs", "bin/leader.bundle.mjs", "server/paseo-client.bundle.mjs"];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 function fixture(prepacked = true) {
   const root = mkdtempSync(join(tmpdir(), "afc-preparation-")); roots.push(root);
@@ -21,7 +21,7 @@ test("Git preparation installs locked development tools and generates every bund
   const root = fixture(false);
   writeFileSync(join(root, "package-lock.json"), "{}");
   mkdirSync(join(root, "scripts"));
-  for (const file of ["bin/build-daemon-client.mjs", "scripts/build-cli.mjs"]) writeFileSync(join(root, file), "");
+  for (const file of ["bin/build-daemon-client.mjs", "bin/build-commands.mjs", "scripts/build-cli.mjs"]) writeFileSync(join(root, file), "");
   const calls: string[][] = [];
   preparePlugin(root, (command: string, args: string[], cwd: string) => {
     assert.equal(cwd, root); calls.push([command, ...args]);
@@ -47,6 +47,19 @@ test("dependency failures stop before the source build", () => {
   let calls = 0;
   assert.throws(() => preparePlugin(fixture(), () => { calls++; throw new Error("dependency installation failed"); }), /dependency installation failed/);
   assert.equal(calls, 1);
+});
+
+test("preparation refuses an artifact missing the leader command", () => {
+  const root = fixture();
+  rmSync(join(root, "bin/leader.bundle.mjs"));
+  assert.throws(() => preparePlugin(root, () => {}), /Missing prepared bundle: bin\/leader\.bundle\.mjs/);
+});
+
+test("source preparation requires the Fleet command registration builder", () => {
+  const root = fixture();
+  mkdirSync(join(root, "scripts"));
+  for (const file of ["bin/build-daemon-client.mjs", "scripts/build-cli.mjs"]) writeFileSync(join(root, file), "");
+  assert.throws(() => preparePlugin(root, () => {}), /Incomplete source build tools/);
 });
 
 test("the plain Node preparation entry runs through a symlink", () => {

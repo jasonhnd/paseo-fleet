@@ -55,6 +55,7 @@ interface RowSpec {
 }
 
 interface FailSpec extends RowSpec {
+  step?: string;
   detail: string;
   result: string;
   resumeNext?: "open" | "wait" | null;
@@ -121,6 +122,7 @@ function rowFor(
 function fail(run: ShiftRun, agent: Pick<ShiftAgent, "id" | "contextTokens">, spec: FailSpec): ShiftOutcome {
   const base = rowFor(run, agent, "failed", spec.detail, spec);
   const row = spec.label ? { ...base, label: spec.label } : base;
+  row.step = spec.step ?? run.steps.at(-1) ?? "preflight";
   run.tell(row);
   return { progress: row, result: spec.result, archived: false, steps: run.steps, resumeNext: spec.resumeNext ?? null };
 }
@@ -138,6 +140,13 @@ function notFound(run: ShiftRun): ShiftOutcome {
     result: t("shift.result.notFound"),
     newId: run.request.existingNewId,
   });
+}
+
+/** Await durable state before sending, opening, detaching or archiving. */
+async function checkpoint(run: ShiftRun, row: ShiftProgress, step: string): Promise<void> {
+  row.step = step;
+  run.tell(row);
+  await run.ports.checkpoint?.(row);
 }
 
 // ---- queue ----
@@ -163,7 +172,7 @@ async function waitInQueue(run: ShiftRun, first: ShiftAgent): Promise<Stage<Shif
   while (isShiftBlocked(agent)) {
     const stopped = queueStop(run, agent, queuedAt, marked);
     if (stopped) return stop(stopped);
-    run.tell(rowFor(run, agent, "queued", queueDetail(), { canCancel: true }));
+    await checkpoint(run, rowFor(run, agent, "queued", queueDetail(), { canCancel: true }), "queue");
     if (!marked) {
       run.steps.push("queued");
       marked = true;
@@ -188,12 +197,12 @@ async function queueIfBusy(run: ShiftRun, agent: ShiftAgent): Promise<Stage<Shif
 // ---- handover ----
 
 function sendFailed(run: ShiftRun, agent: ShiftAgent, why: string): ShiftOutcome {
-  return fail(run, agent, { detail: t("shift.detail.sendFailed", { why }), result: t("shift.result.sendFailed") });
+  return fail(run, agent, { detail: t("shift.detail.sendFailed", { why }), result: t("shift.result.sendFailed"), canContinue: true });
 }
 
 /** Ask the old session to write the handover. Null means it replied with the handover-done phrase. */
 async function requestHandover(run: ShiftRun, agent: ShiftAgent): Promise<ShiftOutcome | null> {
-  run.tell(rowFor(run, agent, "handover", t("shift.detail.askingHandover", { done: handoverDoneReply() })));
+  await checkpoint(run, rowFor(run, agent, "handover", t("shift.detail.askingHandover", { done: handoverDoneReply() })), "handover");
   run.steps.push("handover");
   let sent: Awaited<ReturnType<ShiftPorts["sendAndWait"]>>;
   try {
@@ -224,6 +233,8 @@ async function createSession(
   // Re-read after the old session's handover, including when continuing after a timeout.
   const acceptanceCards = (await run.ports.readAcceptanceCards?.(run.request.project).catch(() => null)) ?? null;
   return run.ports.createAgent({
+    idempotencyKey: run.request.creationKey ?? `afc-leader-swap:${run.request.project}:${agent.id}`,
+    labels: Object.fromEntries(Object.entries(agent.labels).filter(([key]) => key !== PARENT_LABEL)),
     workspaceId,
     cwd: agent.cwd,
     title: agent.title,
@@ -245,21 +256,22 @@ async function createSession(
 async function openNewSession(run: ShiftRun, agent: ShiftAgent): Promise<Stage<NewSession>> {
   const workspaceId = agent.workspaceId;
   if (!workspaceId) {
-    return stop(fail(run, agent, { detail: t("shift.detail.noWorkspace"), result: t("shift.result.noWorkspace") }));
+    return stop(fail(run, agent, { step: "open", detail: t("shift.detail.noWorkspace"), result: t("shift.result.noWorkspace") }));
   }
   if (!agent.provider || !agent.model) {
-    return stop(fail(run, agent, { detail: t("shift.detail.noModel"), result: t("shift.result.noModel") }));
+    return stop(fail(run, agent, { step: "open", detail: t("shift.detail.noModel"), result: t("shift.result.noModel") }));
   }
   // A missing handover file only thins the takeover message; it must not stop the shift.
   const handover = agent.cwd ? await run.ports.readHandover(agent.cwd).catch(() => null) : null;
-  run.tell(rowFor(run, agent, "opening", t("shift.detail.opening")));
+  await checkpoint(run, rowFor(run, agent, "opening", t("shift.detail.opening")), "open");
   run.steps.push("open");
   let created: Awaited<ReturnType<ShiftPorts["createAgent"]>>;
   try {
     created = await createSession(run, agent, workspaceId, handover);
   } catch (error) {
-    return stop(fail(run, agent, { detail: t("shift.detail.openFailed", { error: errorText(error) }), result: t("shift.result.openFailed") }));
+    return stop(fail(run, agent, { detail: t("shift.detail.openFailed", { error: errorText(error) }), result: t("shift.result.openFailed"), canContinue: true, resumeNext: "open" }));
   }
+  await checkpoint(run, rowFor(run, agent, "opening", t("leader.swap.opened"), { newId: created.id }), "open");
   if (created.workspaceId !== workspaceId) {
     const detail = t("shift.detail.wrongWorkspace", { workspace: created.workspaceId });
     return stop(fail(run, agent, { detail, result: t("shift.result.wrongWorkspace"), newId: created.id }));
@@ -270,9 +282,19 @@ async function openNewSession(run: ShiftRun, agent: ShiftAgent): Promise<Stage<N
 /** resume "wait": the new session already exists, only its labels are needed. */
 async function reattachSession(run: ShiftRun, agent: ShiftAgent): Promise<Stage<NewSession>> {
   const newId = run.request.existingNewId;
-  if (!newId) return stop(fail(run, agent, { detail: t("shift.detail.noNewSession"), result: t("shift.result.noNewSession") }));
+  if (!newId) return stop(fail(run, agent, { step: "wait", detail: t("shift.detail.noNewSession"), result: t("shift.result.noNewSession") }));
+  await checkpoint(run, rowFor(run, agent, "waiting", t("shift.detail.waiting", { taken: takenOverReply() }), { newId }), "wait");
   const fresh = await run.ports.getAgent(newId);
-  return { ok: true, value: { newId, labels: fresh?.labels ?? {} } };
+  if (!fresh || !fresh.workspaceId || !agent.workspaceId) return stop(fail(run, agent, {
+    step: "wait",
+    detail: t(!fresh ? "shift.detail.sessionUnreadable" : "shift.detail.workspaceUnreadable", { newId }),
+    result: t("shift.result.recheckFailed"),
+    newId,
+    canContinue: true,
+    resumeNext: "wait",
+  }));
+  if (fresh.workspaceId !== agent.workspaceId) return stop(fail(run, agent, { step: "wait", detail: t("shift.detail.wrongWorkspace", { workspace: fresh.workspaceId }), result: t("shift.result.wrongWorkspace"), newId }));
+  return { ok: true, value: { newId, labels: fresh.labels } };
 }
 
 // ---- detach, takeover, archive ----
@@ -281,9 +303,7 @@ async function reattachSession(run: ShiftRun, agent: ShiftAgent): Promise<Stage<
 async function detachIfParented(run: ShiftRun, agent: ShiftAgent, session: NewSession): Promise<ShiftOutcome | null> {
   if (session.labels[PARENT_LABEL] !== agent.id) return null;
   const { newId } = session;
-  run.tell(
-    rowFor(run, agent, "detaching", t("shift.detail.detaching"), { newId }),
-  );
+  await checkpoint(run, rowFor(run, agent, "detaching", t("shift.detail.detaching"), { newId }), "detach");
   run.steps.push("detach");
   try {
     await run.ports.detach(newId);
@@ -317,7 +337,7 @@ function notTakenOutcome(run: ShiftRun, agent: ShiftAgent, newId: string, replie
 
 /** Poll until the new session says it has taken over and the registry points at it. Null means taken over. */
 async function awaitTakeover(run: ShiftRun, agent: ShiftAgent, newId: string): Promise<ShiftOutcome | null> {
-  run.tell(rowFor(run, agent, "waiting", t("shift.detail.waiting", { taken: takenOverReply() }), { newId }));
+  await checkpoint(run, rowFor(run, agent, "waiting", t("shift.detail.waiting", { taken: takenOverReply() }), { newId }), "wait");
   run.steps.push("wait");
   const polls = run.request.maxPolls ?? Math.ceil(TAKEOVER_TIMEOUT_MS / TAKEOVER_POLL_MS);
   const sleep = run.ports.sleep ?? defaultSleep;
@@ -342,6 +362,7 @@ async function awaitTakeover(run: ShiftRun, agent: ShiftAgent, newId: string): P
 }
 
 async function archiveOld(run: ShiftRun, agent: ShiftAgent, newId: string): Promise<ShiftOutcome> {
+  await checkpoint(run, rowFor(run, agent, "waiting", t("leader.swap.archiving"), { newId }), "archive");
   run.steps.push("archive");
   try {
     await run.ports.archive(agent.id);
@@ -355,6 +376,7 @@ async function archiveOld(run: ShiftRun, agent: ShiftAgent, newId: string): Prom
     });
   }
   const done = rowFor(run, agent, "done", t("shift.detail.done"), { newId });
+  done.step = "archive";
   run.tell(done);
   return { progress: done, result: t("shift.result.done"), archived: true, steps: run.steps, resumeNext: null };
 }

@@ -5,6 +5,8 @@ import { Pressable, Text, View } from "react-native";
 import { type BoardSnapshot, supervisorShiftRpc } from "../shared/board";
 import { sortLeaderRows, unresponsiveCards } from "../shared/leader-panel";
 import { foldProxies, proxyLine, type ProxyLine } from "../shared/leader-proxy";
+import { DEFAULT_LEADER_THRESHOLDS } from "../shared/leader-usage";
+import { formatContextTokens } from "../shared/supervisor-shift-format";
 import { shiftTag, tagsFor } from "../shared/leader-attention";
 import {
   cancelOptimistic,
@@ -158,6 +160,7 @@ export function LeaderBlock({ s, data, openAgent, onShiftLine }: {
   const view: BoardSnapshot = { ...data, decisions: folded.decisions, supervisorPanel: { ...panel, details: folded.details } };
   return (
     <Section s={s} title={"<leader>"} extra={<HelpToggle s={s} open={help} onPress={() => setHelp((value) => !value)} />}>
+      <Text style={s.muted}>{t("leader.usage.thresholds", { reminder: formatContextTokens(panel.thresholds?.reminderTokens ?? DEFAULT_LEADER_THRESHOLDS.reminderTokens), warning: formatContextTokens(panel.thresholds?.warningTokens ?? DEFAULT_LEADER_THRESHOLDS.warningTokens) })}</Text>
       {help ? <LeaderHelp s={s} data={data} /> : null}
       <AttentionBlock s={s} data={data} nowMs={nowMs} openAgent={openAgent} />
       {data.supervisorPanel.rows.length === 0 ? <Text style={s.muted}>{t("leader.ui.noRegistry")}</Text> : null}

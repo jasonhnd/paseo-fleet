@@ -5,6 +5,8 @@ import { ADAPTER_IDS } from "./quota-adapters";
 import { dispatchOverridesSchema, dispatchSettingRowSchema } from "./dispatch-overrides";
 import { copiedQuotaSchema, quotaCycleSchema } from "./quota-cycle";
 
+import { leaderThresholdsSchema } from "./leader-usage";
+
 const strings = z.array(z.string().trim().min(1));
 export const planSchema = z.object({
   id: z.string().trim().min(1), name: z.string().trim().min(1),
@@ -32,6 +34,7 @@ export const afcSettingsSchema = z.object({
   bannedProviders: z.array(z.string()).transform(values => [...new Set(values.map(value => value.trim()).filter(Boolean))]).optional(),
   adapters: z.object({ "cursor-api": z.boolean().optional(), keychain: z.boolean().optional() }).passthrough().optional(),
   dispatchOverrides: dispatchOverridesSchema.optional(),
+  leaderUsage: leaderThresholdsSchema.optional(),
 }).passthrough();
 export type PlansDocument = z.infer<typeof plansSchema>;
 export type ConfigDocument = z.infer<typeof afcSettingsSchema>;

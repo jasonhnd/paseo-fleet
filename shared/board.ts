@@ -1,3 +1,4 @@
+import { leaderThresholdsSchema } from "./leader-usage";
 import { defineRpc } from "@getpaseo/plugin";
 import { pausedProjectSchema } from "./paused";
 import { z } from "zod";
@@ -27,7 +28,8 @@ const supervisorRowSchema = z.object({
   proxyOf: z.string().optional(),
 });
 
-const shiftProgressSchema = z.object({
+export const shiftProgressSchema = z.object({
+  step: z.string().optional(),
   phase: z.enum(["queued", "handover", "opening", "detaching", "waiting", "done", "failed"]),
   label: z.string(),
   detail: z.string(),
@@ -42,6 +44,7 @@ const shiftProgressSchema = z.object({
 });
 
 const supervisorPanelSchema = z.object({
+  thresholds: leaderThresholdsSchema.optional(),
   rows: z.array(supervisorRowSchema),
   details: z.array(leaderDetailSchema).optional(),
   tasks: z.array(shiftProgressSchema),
@@ -375,7 +378,7 @@ export const overturnDecisionRpc = defineRpc({
   output: z.object({ ok: z.boolean(), notified: z.boolean(), message: z.string() }),
 });
 
-/** Start or continue a <leader> shift. Nothing calls this except the homepage button. */
+/** Start or continue the homepage <leader> shift. */
 export const supervisorShiftRpc = defineRpc({
   name: "board.supervisor-shift",
   input: z.object({

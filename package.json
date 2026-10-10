@@ -68,7 +68,7 @@
     "test:plugin": "node scripts/test-plugin.mjs",
     "verify": "node scripts/verify.mjs",
     "build:check": "node scripts/paseo-build-check.mjs --strict",
-    "build": "node bin/build-daemon-client.mjs && node scripts/build-cli.mjs",
+    "build": "node bin/build-daemon-client.mjs && node bin/build-commands.mjs",
     "build:cli": "npm run build",
     "prepack": "npm run build",
     "pretest:plugin": "npm run build",

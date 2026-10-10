@@ -2,6 +2,7 @@ import type { PluginSurfaceProps } from "@getpaseo/plugin/client";
 import { useRpc } from "@getpaseo/plugin/client";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { DEFAULT_LEADER_THRESHOLDS } from "../shared/leader-usage";
 import { configReadRpc, configWriteRpc, type SettingsFile, type SettingsSnapshot } from "../shared/settings";
 import { ADAPTER_IDS, OPTIONAL_ADAPTERS, providerOf } from "../shared/quota-adapters";
 import { CYCLE_KINDS } from "../shared/quota-cycle";
@@ -80,6 +81,9 @@ export function SettingsEditor({ s, file, read, write, onLanguage }: { s: Styles
   return <View style={s.card}>
     <Text style={s.h2}>{t(file === "config" ? "settings.general" : "settings.plans")}</Text>
     {!snapshot ? <Text style={s.muted}>{t("settings.loading")}</Text> : file === "config" ? <>
+      <Text style={s.h2}>{t("settings.leaderUsage")}</Text>
+      <Text style={s.muted}>{t("settings.leaderUsageHint")}</Text>
+      <View style={s.row}>{(["reminderTokens", "warningTokens"] as const).map(key => <Field key={key} s={s} label={t(`settings.leaderUsage.${key}`)} value={String(object(draft.leaderUsage)[key] ?? DEFAULT_LEADER_THRESHOLDS[key])} onChange={value => patch("leaderUsage", { ...DEFAULT_LEADER_THRESHOLDS, ...object(draft.leaderUsage), [key]: value.trim() ? Number(value) : 0 })} />)}</View>
       <Text style={s.muted}>{t("settings.language")}</Text>
       <View style={s.row}>{LANGUAGE_SETTINGS.map(value => <Action key={value} s={s} label={t(`settings.lang.${value}`)} onPress={() => patch("language", value)} disabled={(draft.language ?? "system") === value} />)}</View>
       <Field s={s} label={t("settings.hidden")} value={list(draft.hiddenPlans)} onChange={value => patch("hiddenPlans", terms(value))} />

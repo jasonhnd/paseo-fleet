@@ -19,6 +19,10 @@ third-party code, so they are ignored by Git and never committed. Rebuild locall
 after changing their inputs or the pinned SDK. Plugin IDs, surfaces and registration
 stay the same.
 
+The build produces five CLI bundles (roles, doctor, migrate, coupon and leader)
+through `bin/build-commands.mjs`, plus the background client. Preparation requires
+all six files; npm packages include the same six prebuilt bundles.
+
 Paseo supplies Zod and its supported SDK runtime entries to plugin bundles. Ordinary
 Node modules still need their declared dependencies. Shared code must stay runtime
 neutral, including type imports. The same rules apply to other plugins: an offline
@@ -53,7 +57,7 @@ explicitly with `--host`; do not combine `--host` and `--home`.
 
 The release check must cover a temporary tag through `file://`, status `running`,
 ID `agent-fleet-cockpit`, backend logs, the actual cockpit and settings screens,
-installed `node bin/afc.mjs --help` and `roles ls`, `update --check --ref`, and a
+installed `node bin/afc.mjs --help`, `leader --help` and `roles ls`, `update --check --ref`, and a
 plugin-data marker surviving removal. Delete only the test tags afterwards. A fresh
 daemon can have no agent records or role profiles; unresolved dispatch slots warn
 until configured. This is separate from compiler or runtime errors.
@@ -167,7 +171,8 @@ import fs from "node:fs";
 import path from "node:path";
 const plugin = JSON.parse(fs.readFileSync(path.join(process.env.AFC_BACKUP, "plugin-after.json"), "utf8"));
 const entry = path.join(plugin.path, "bin", "afc.mjs");
-if (!fs.existsSync(entry) || !fs.existsSync(path.join(plugin.path, "bin", "roles.bundle.mjs")))
+const commands = ["roles", "doctor", "migrate", "coupon", "leader"];
+if (!fs.existsSync(entry) || commands.some(name => !fs.existsSync(path.join(plugin.path, "bin", `${name}.bundle.mjs`))))
   throw new Error("Installed commands are missing");
 const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
 fs.mkdirSync(process.env.AFC_SHIM_DIR, { recursive: true });
@@ -185,6 +190,7 @@ p plugin ls agent-fleet-cockpit --json
 p plugin logs agent-fleet-cockpit --json
 p plugin update agent-fleet-cockpit --check --ref "$AFC_TAG" --json
 "$AFC_SHIM_DIR/afc" --help
+"$AFC_SHIM_DIR/afc" leader --help
 "$AFC_SHIM_DIR/roles" ls
 ```
 
@@ -192,7 +198,8 @@ Expect Git source identity, the approved tag's commit, and `running` when both
 saved enabled switches were on; otherwise expect `disabled`. Open the daily
 host's AFC cockpit and AFC settings page, confirm the saved language/configuration
 and plugin-data are present, and check logs for compilation or initialization
-errors. Confirm `command -v afc` and `command -v roles` select these shims. Git updates
+errors. The `afc` shim also routes `afc leader`; no separate leader shim is required.
+Confirm `command -v afc` and `command -v roles` select these shims. Git updates
 replace the managed directory, so regenerate the shims after every applied update.
 An ordinary update checks default HEAD, not the install tag; use an explicit `--ref`
 when retaining a release revision.
