@@ -3,7 +3,7 @@ import { t } from "../shared/i18n";
 
 /** Minimal local Paseo 0.11 plugin RPC transport; no agent or provider actions live here. */
 export class LeaderRpcClient {
-  private socket: WebSocket | null = null;
+  private socket: InstanceType<typeof globalThis.WebSocket> | null = null;
   private ready = false;
   private rejectConnect: ((error: Error) => void) | null = null;
   private pending = new Map<string, { resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }>();

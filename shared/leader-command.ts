@@ -9,7 +9,7 @@ export const leaderSwapRpc = defineRpc({
   input: z.object({ project: z.string().trim().min(1), action: z.enum(["run", "status", "cancel"]).default("run"), dryRun: z.boolean().default(false), again: z.boolean().default(false) }),
   output: z.object({
     ok: z.boolean(), dryRun: z.boolean(), running: z.boolean(), message: z.string(),
-    job: shiftProgressSchema.nullable(), events: z.array(shiftProgressSchema).default([]),
+    job: shiftProgressSchema.nullable(), events: z.array(shiftProgressSchema).default([]), eventsOffset: z.number().int().nonnegative().default(0),
     plan: z.object({ project: z.string(), agentId: z.string(), workspaceId: z.string().nullable(), title: z.string(), provider: z.string(), model: z.string(), modeId: z.string().nullable(), thinkingOptionId: z.string().nullable(), featureValues: z.record(z.string(), z.unknown()) }).nullable(),
   }),
 });

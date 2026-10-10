@@ -180,3 +180,60 @@ test("Paseo adapter opens in the existing workspace with the original config and
   assert.equal(creation.title, "Demo leader");
   assert.deepEqual(calls, ["handover", "open", "detach:new-host", "archive:old"]);
 });
+
+test("standalone bundled CLI exchanges Paseo 0.11 RPC frames with an isolated fake socket host", async () => {
+  const { createRequire } = await import("node:module");
+  const { spawn } = await import("node:child_process");
+  const { copyFileSync } = await import("node:fs");
+  const { resolve } = await import("node:path");
+  const { WebSocketServer } = createRequire(import.meta.url)("ws");
+  const f = fixture();
+  const commands = join(f.dir, "bin"); mkdirSync(commands);
+  const source = resolve(import.meta.dirname, "../../bin");
+  for (const file of ["afc.mjs", "leader.bundle.mjs"]) copyFileSync(join(source, file), join(commands, file));
+  const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+  await new Promise<void>(resolve => server.on("listening", resolve));
+  const endpoint = `127.0.0.1:${server.address().port}`;
+  const methods: string[] = [];
+  let rejectRpc = false;
+  server.on("connection", (socket: any) => socket.on("message", async (raw: Buffer) => {
+    const frame = JSON.parse(raw.toString());
+    if (frame.type === "hello") {
+      assert.equal(frame.protocolVersion, 1); assert.equal(frame.clientType, "cli"); assert.equal(frame.auth, undefined);
+      socket.send(JSON.stringify({ type: "session", message: { type: "status", payload: { status: "server_info", serverId: "demo-server" } } })); return;
+    }
+    assert.equal(frame.type, "session"); const message = frame.message;
+    assert.equal(message.type, "plugin.rpc.invoke.request"); assert.equal(message.pluginId, "agent-fleet-cockpit");
+    methods.push(message.method);
+    if (rejectRpc) { socket.send(JSON.stringify({ type: "session", message: { type: "rpc_error", payload: { requestId: message.requestId, error: "Demo unavailable RPC" } } })); return; }
+    const output = message.method === "leader.swap" ? await leaderSwap({} as never, leaderSwapRpc.input.parse(message.input), f.ports) : await readLeaderUsage({} as never, f.config, async id => f.agents.get(id) ?? null);
+    socket.send(JSON.stringify({ type: "session", message: { type: "plugin.rpc.invoke.response", payload: { requestId: message.requestId, output } } }));
+  }));
+  const run = (args: string[]) => new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
+    const child = spawn(process.execPath, [join(commands, "afc.mjs"), "leader", ...args, "--host", endpoint], { cwd: f.dir, env: { ...process.env, AFC_LANGUAGE: "en" } });
+    let stdout = "", stderr = "";
+    const timer = setTimeout(() => { child.kill(); reject(new Error("Demo CLI exceeded deadline")); }, 15000);
+    child.stdout.on("data", data => { stdout += data; }); child.stderr.on("data", data => { stderr += data; });
+    child.on("error", error => { clearTimeout(timer); reject(error); });
+    child.on("exit", code => { clearTimeout(timer); resolve({ code, stdout, stderr }); });
+  });
+  try {
+    const before = readFileSync(f.config, "utf8");
+    const dry = await run(["swap", "demo", "--dry-run", "--json"]);
+    assert.equal(dry.code, 0, dry.stderr); assert.equal(JSON.parse(dry.stdout).dryRun, true);
+    assert.deepEqual(f.calls, ["get:old"]); assert.equal(existsSync(f.state), false); assert.equal(existsSync(f.log), false); assert.equal(readFileSync(f.config, "utf8"), before);
+    const report = await run(["usage", "--json"]);
+    assert.equal(report.code, 0, report.stderr); assert.equal(JSON.parse(report.stdout).rows[0].level, "warning");
+    const swap = await run(["swap", "demo", "--json"]);
+    assert.equal(swap.code, 0, swap.stderr); assert.equal(JSON.parse(swap.stdout).job.phase, "done");
+    for (const step of ["handover", "open", "detach", "wait", "archive"]) assert.ok(swap.stderr.includes(`${step}:`));
+    assert.equal(f.archiveCount(), 1);
+    const repeated = await run(["swap", "demo", "--json"]); assert.equal(repeated.code, 0); assert.equal(f.archiveCount(), 1);
+    rejectRpc = true;
+    const failed = await run(["status", "demo", "--json"]); assert.equal(failed.code, 1); assert.ok(failed.stderr.includes("Demo unavailable RPC")); assert.ok(failed.stderr.includes("afc leader status demo"));
+    assert.ok(methods.every(method => ["leader.swap", "leader.usage"].includes(method)));
+  } finally {
+    for (const socket of server.clients) socket.terminate();
+    await new Promise<void>(resolve => server.close(() => resolve()));
+  }
+});

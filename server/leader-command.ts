@@ -24,8 +24,8 @@ export async function readLeaderUsage(paseo: PaseoApi, configPath = KANBAN_CONFI
 
 /** One orchestration path for the CLI and homepage, with persisted automatic continuation. */
 export async function leaderSwap(paseo: PaseoApi, input: LeaderSwapInput, ports?: ShiftPorts): Promise<LeaderSwapResult> {
-  const { slot, job, running, available, events } = await inspectSupervisorShift(input.project);
-  const result = (ok: boolean, message: string, next = job, plan: LeaderSwapResult["plan"] = null): LeaderSwapResult => ({ ok, dryRun: input.dryRun, message, job: next, plan, running, events });
+  const { slot, job, running, available, events, eventsOffset } = await inspectSupervisorShift(input.project);
+  const result = (ok: boolean, message: string, next = job, plan: LeaderSwapResult["plan"] = null): LeaderSwapResult => ({ ok, dryRun: input.dryRun, message, job: next, plan, running, events, eventsOffset });
   if (!slot) return result(false, t("shift.server.notRegistered"));
   if (!available && input.action !== "cancel") return result(false, t("leader.swap.noKanban"));
   if (input.action === "status") return result(job?.phase !== "failed", job?.detail ?? t("leader.swap.ready"));
@@ -42,7 +42,7 @@ export async function leaderSwap(paseo: PaseoApi, input: LeaderSwapInput, ports?
   }
   if (running) return result(true, t("shift.server.alreadyRunning"));
   if (!input.again) {
-    if (job?.phase === "done") return result(true, job.detail);
+    if (job?.phase === "done" && job.newId === slot.agentId) return result(true, job.detail);
     if (!job) {
       const last = (await readHandoffs(Number.MAX_SAFE_INTEGER)).find(row => row.project === slot.code);
       if (last?.newId === slot.agentId && tAll("shift.result.done").includes(last.result)) {
@@ -54,5 +54,5 @@ export async function leaderSwap(paseo: PaseoApi, input: LeaderSwapInput, ports?
   if (job?.phase === "failed" && !job.canContinue) return result(false, job.detail);
   const next = await requestSupervisorShift(paseo, slot.project, job && job.phase !== "done" ? "continue" : "start", ports);
   const state = await inspectSupervisorShift(slot.project);
-  return { ...result(next.phase !== "failed", next.detail, state.job ?? next), running: state.running, events: state.events };
+  return { ...result(next.phase !== "failed", next.detail, state.job ?? next), running: state.running, events: state.events, eventsOffset: state.eventsOffset };
 }

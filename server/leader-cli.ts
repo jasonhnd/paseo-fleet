@@ -37,8 +37,8 @@ export async function runLeaderCli(args: string[], ports: LeaderCliPorts): Promi
   let last = "";
   let seen = 0;
   for (;;) {
-    for (const event of result.events.slice(seen)) ports.progress(t("leader.cli.progress", { step: event.step ?? event.phase, detail: event.detail, old: event.oldId, new: event.newId ?? "?" }));
-    seen = result.events.length;
+    for (const event of result.events.slice(Math.max(0, seen - result.eventsOffset))) ports.progress(t("leader.cli.progress", { step: event.step ?? event.phase, detail: event.detail, old: event.oldId, new: event.newId ?? "?" }));
+    seen = result.eventsOffset + result.events.length;
     const job = result.job;
     const detail = job ? t("leader.cli.progress", { step: job.step ?? job.phase, detail: job.detail, old: job.oldId, new: job.newId ?? "?" }) : result.message;
     if (detail !== last && result.events.length === 0) { ports.progress(detail); last = detail; }

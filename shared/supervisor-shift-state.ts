@@ -36,11 +36,11 @@ export function parseShiftState(text: string): StoredShift[] {
   const rows: StoredShift[] = [];
   for (const item of raw) {
     if (!item || typeof item !== "object") continue;
-    const row = item as { events?: unknown[]; progress?: Partial<ShiftProgress>; resume?: unknown; queuedAt?: unknown };
+    const row = item as { eventsOffset?: unknown; events?: unknown[]; progress?: Partial<ShiftProgress>; resume?: unknown; queuedAt?: unknown };
     const progress = row.progress;
     if (!progress || !isPhase(progress.phase) || typeof progress.project !== "string" || !progress.project) continue;
-    if (progress.phase === "done") continue;
     rows.push({
+      ...(typeof row.eventsOffset === "number" && Number.isSafeInteger(row.eventsOffset) && row.eventsOffset >= 0 ? { eventsOffset: row.eventsOffset } : {}),
       ...(Array.isArray(row.events) ? { events: parseShiftState(JSON.stringify(row.events.slice(-40).map(progress => ({ progress })))).map(row => row.progress) } : {}),
       progress: {
         phase: progress.phase,
@@ -69,6 +69,7 @@ export function parseShiftState(text: string): StoredShift[] {
  */
 export function restoreShiftForDisplay(rows: StoredShift[]): StoredShift[] {
   return rows.map((row) => {
+    if (row.progress.phase === "done") return row;
     if (row.progress.phase === "failed") {
       return { ...row, progress: { ...row.progress, canCancel: false, label: row.progress.label || phaseLabel("failed") } };
     }

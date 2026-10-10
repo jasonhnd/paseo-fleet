@@ -12167,6 +12167,7 @@ var leaderSwapRpc = defineRpc({
     message: string2(),
     job: shiftProgressSchema.nullable(),
     events: array(shiftProgressSchema).default([]),
+    eventsOffset: number2().int().nonnegative().default(0),
     plan: object({ project: string2(), agentId: string2(), workspaceId: string2().nullable(), title: string2(), provider: string2(), model: string2(), modeId: string2().nullable(), thinkingOptionId: string2().nullable(), featureValues: record(string2(), unknown()) }).nullable()
   })
 });
@@ -12203,8 +12204,8 @@ ${t("leader.cli.usage")}`);
   let last = "";
   let seen = 0;
   for (; ; ) {
-    for (const event of result.events.slice(seen)) ports.progress(t("leader.cli.progress", { step: event.step ?? event.phase, detail: event.detail, old: event.oldId, new: event.newId ?? "?" }));
-    seen = result.events.length;
+    for (const event of result.events.slice(Math.max(0, seen - result.eventsOffset))) ports.progress(t("leader.cli.progress", { step: event.step ?? event.phase, detail: event.detail, old: event.oldId, new: event.newId ?? "?" }));
+    seen = result.eventsOffset + result.events.length;
     const job = result.job;
     const detail = job ? t("leader.cli.progress", { step: job.step ?? job.phase, detail: job.detail, old: job.oldId, new: job.newId ?? "?" }) : result.message;
     if (detail !== last && result.events.length === 0) {

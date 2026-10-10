@@ -231,6 +231,7 @@ export type ShiftResume = "queue" | "start" | "open" | "wait";
 /** One in-progress shift, written outside git so a plugin reload can show it again. */
 export interface StoredShift {
   events?: ShiftProgress[];
+  eventsOffset?: number;
   progress: ShiftProgress;
   resume: ShiftResume;
   queuedAt: number | null;
