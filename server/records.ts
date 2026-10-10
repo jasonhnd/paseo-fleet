@@ -105,6 +105,8 @@ export async function readAgentRecordFiles(paseoDir: string = PASEO_DIR): Promis
   try {
     dirs = await readdir(root);
   } catch (error) {
+    // A new daemon has no records directory until its first agent is persisted.
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
     console.error("[afc] cannot read the agent records directory:", String(error).slice(0, 160));
     return null;
   }
