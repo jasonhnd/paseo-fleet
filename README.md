@@ -19,11 +19,15 @@ paseo plugin install github:jasonhnd/paseo-fleet --ref <release-tag>
 
 From a checkout, install the repository folder itself: `paseo plugin install /absolute/path/to/paseo-fleet`. The repository root is the plugin folder (`paseo-plugin.json`, `OVERVIEW.md`, `package.json`, the two entries, `client/`, `server/`, `shared/`).
 
-Git installs run the manifest's `build` preparation command, `npm ci --omit=dev
---ignore-scripts`, using the committed lockfile. Node and npm must be on the daemon's
-PATH. The SDK and UI libraries stay in development dependencies; Paseo supplies its
-host modules and Zod. The background client uses the locked production protocol, relay and Zod packages. npm publication must omit the Git-only preparation command
-from its release artifact, because an npm install already resolves production dependencies.
+Git installs run `node server/prepare.mjs` from the manifest's `build` field. It runs
+`npm ci --include=dev --ignore-scripts --no-audit --no-fund` against the committed
+lockfile, then `npm run build` before Paseo compiles and activates the plugin. Node
+and npm must be on the daemon's PATH. The SDK and UI libraries stay in development
+dependencies; Paseo supplies its host modules and Zod. The background client uses
+the locked production protocol, relay and Zod packages. Generated third-party
+bundles are ignored by Git and built at installation time. npm artifacts include
+prepacked bundles; preparation uses `npm install` when no lockfile is present and
+checks these bundles without calling repository-only builders.
 
 For an existing daily daemon, use the backup, switch and rollback checklist in
 [Git installation](docs/GIT-INSTALL.md).
@@ -100,14 +104,16 @@ When the private denylist flags a word that is not personal in context (a short 
 
 ## Standalone commands and development
 
-Use Node 22.13 or newer. Build the commands with `npm run build:cli` before installing
-a Git checkout; release commits must include `bin/*.bundle.mjs` and
-`server/paseo-client.bundle.mjs`. The latter embeds the pinned Node client SDK for
+Use Node 22.13 or newer. Build the commands with `npm run build` when working in
+a checkout. Git installation builds `bin/*.bundle.mjs` and
+`server/paseo-client.bundle.mjs` during preparation; do not commit these generated
+files. The latter embeds the pinned Node client SDK for
 background connections before any RPC handler has supplied a host API. Its development
 input is `bin/daemon-client.ts`; the server imports only the generated local module and
 obtains API types through `PluginHandlerContext` from `@getpaseo/plugin/server`.
-Run `npm run build` after changing the SDK version or connection input. `npm pack` rebuilds
-them with `prepack`. Published commands need only Node, without TypeScript loaders,
+Run `npm run build` after changing the SDK version or connection input. `npm pack`
+and `npm run pack:check` rebuild them through their lifecycle hooks. Published
+commands need only Node, without TypeScript loaders,
 Python, or development dependencies.
 
 ```sh

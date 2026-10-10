@@ -59,6 +59,7 @@
     "scan": "node scripts/check-private.mjs --all",
     "identity": "node scripts/check-identity.mjs --history",
     "pack:check": "node scripts/check-package-files.mjs",
+    "prepack:check": "npm run build",
     "contract:check": "node scripts/sync-contract.mjs --check",
     "contract:manifest": "node scripts/sync-contract.mjs --write-manifest",
     "shared:check": "node scripts/compare-scripts.mjs",

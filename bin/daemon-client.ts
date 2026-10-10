@@ -1,5 +1,5 @@
-// Development-only input for the committed Node client bundle. The plugin compiler
-// consumes the generated server module without requiring the SDK in a Git checkout.
+// Development-only input for the generated Node client bundle. Preparation builds
+// this local module before the plugin compiler checks the server entries.
 import { createPaseoClient as createSdkClient } from "@getpaseo/client";
 import type { createPaseoClient as createBundledClient } from "../server/paseo-client.bundle.mjs";
 

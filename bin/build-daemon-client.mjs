@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Prebuild the background connection dependency; production installs need no development SDK.
+// Build the background connection dependency during source preparation or prepack.
 import { writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
@@ -15,8 +15,9 @@ const result = await build({
   format: "esm",
   target: "node22.5",
   write: false,
-  // CommonJS dependencies require Node built-ins in both ESM and the plugin wrapper.
-  banner: { js: 'import { createRequire } from "node:module"; const require = createRequire(process.cwd() + "/package.json");' },
+  // Anchor ESM require to this module. The plugin compiler removes this unused shim
+  // when converting the current dependency graph to its CommonJS wrapper.
+  banner: { js: 'import { createRequire } from "node:module"; const require = /* @__PURE__ */ createRequire(import.meta.url);' },
   minifyIdentifiers: true,
   legalComments: "eof",
 });

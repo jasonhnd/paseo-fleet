@@ -2,27 +2,42 @@
 
 Paseo 0.11 clones the selected Git revision into a managed directory. It does not
 infer dependency installation from a lockfile. This repository declares the
-preparation command `npm ci --omit=dev --ignore-scripts` in the manifest's `build`
-field. Preparation runs before compilation and activation on install and update.
+preparation entry `node server/prepare.mjs` in the manifest's `build` field. For a
+Git checkout it runs `npm ci --include=dev --ignore-scripts --no-audit --no-fund`,
+then `npm run build`. Explicitly including development dependencies also works
+when the daemon sets NODE_ENV=production. Preparation runs before compilation and
+activation on install and update.
 Node 22.13 or newer and npm must be available on the daemon's PATH.
 
 Server API types come from `PluginHandlerContext["paseo"]` in
 `@getpaseo/plugin/server`. Background tasks also need a connection before the first
-handler or hook runs. Their factory is committed as `server/paseo-client.bundle.mjs`,
-built from the development-only client SDK by `npm run build`. Its protocol, relay
-and Zod dependencies are locked production dependencies. Git consumers do not
-install the client SDK or development tools. Rebuild and commit the generated
-module whenever its input or the pinned SDK changes. Plugin IDs, surfaces and
-registration stay the same.
+handler or hook runs. Their factory is generated as `server/paseo-client.bundle.mjs`
+from the development-only client SDK by `npm run build`. Its protocol, relay and
+Zod dependencies are locked production dependencies. The server imports the local
+generated module rather than the client SDK. CLI and server bundles contain
+third-party code, so they are ignored by Git and never committed. Rebuild locally
+after changing their inputs or the pinned SDK. Plugin IDs, surfaces and registration
+stay the same.
 
 Paseo supplies Zod and its supported SDK runtime entries to plugin bundles. Ordinary
 Node modules still need their declared dependencies. Shared code must stay runtime
 neutral, including type imports. The same rules apply to other plugins: an offline
 build with a contributor's node_modules is insufficient evidence for a Git release.
-Test a tagged checkout with only production dependencies and a fresh daemon home.
-For npm publication, remove the Git-only preparation command from the npm artifact;
-npm installation already installs production dependencies, and the npm whitelist
-does not include this repository's lockfile.
+Test a tagged checkout that initially has neither dependencies nor bundles, with a
+fresh daemon home. Installation requires registry access for the locked dependencies
+and enough time and space for development tools and the source build.
+
+This follows the same preparation flow as Kanban for Paseo: a plain Node entry
+installs dependencies with development tools included and lifecycle scripts disabled,
+builds ignored bundles in Git checkouts, and validates the expected bundle set.
+AFC additionally builds its background Node client and keeps protocol and relay
+packages as production dependencies for that module's ordinary ESM imports.
+
+`npm run pack:check` and npm's `prepack` build the bundles before checking or packing
+the whitelist. npm artifacts keep the same preparation entry, omit the lockfile and
+repository build tools, and already include the built CLI and background client.
+Preparation falls back to `npm install --include=dev --ignore-scripts --no-audit
+--no-fund` and validates those prepacked files without invoking omitted builders.
 
 Sources: [publishing](https://github.com/getpaseo/paseo/blob/main/public-docs/plugins/publishing.md)
 and [runtime and CLI reference](https://github.com/getpaseo/paseo/blob/main/public-docs/plugins/reference.md).

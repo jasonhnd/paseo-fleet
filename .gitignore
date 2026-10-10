@@ -17,3 +17,7 @@ tmp/
 backups/
 state/
 data/
+
+# Generated third-party bundles are built during preparation and prepack.
+bin/*.bundle.mjs
+server/*.bundle.mjs
