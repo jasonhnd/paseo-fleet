@@ -310,7 +310,7 @@ export function antigravityDisplayWindows(reading: AntigravityReading | null, no
       label: cliLabel(bucket, window), primary: false,
       usedPct: sample?.usedPct ?? null, resetsAt: sample?.resetsAt ?? null,
       source: sample ? "screen" : "none", readingState: sample ? live ? "live" : "stale" : "unknown",
-      cycleKind: "unknown", readError: sample ? null : readErrorText(reading?.error ?? null),
+      cycleKind: "unknown", readError: sample ? null : t("quota.antigravity.displayUnknown"),
       sampledAt: sample ? reading?.readAt : null, staleUsedPct: sample && !live ? sample.usedPct : null,
       apiUsd: 0, planUsd: null,
     });

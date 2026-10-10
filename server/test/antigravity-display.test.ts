@@ -45,6 +45,7 @@ test("failed or absent reads keep all four slots unknown without fabricated rese
     assert.equal(result.windows.length, 4);
     assert.ok(result.windows.every(row => row.usedPct === null && row.remainingPct === null && row.resetsAt === null && row.readAt === null));
     assert.ok(result.windows.every(row => row.readingState === "unknown"));
+    assert.ok(result.windows.every(row => row.sourceText === t("quota.antigravity.displayUnknown")));
   }
   const partial = reading(); partial.samples = partial.samples.slice(0, 1);
   assert.equal(card(antigravityDisplayWindows(partial, now)).windows.filter(row => row.remainingPct !== null).length, 1);
