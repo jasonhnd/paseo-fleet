@@ -83,3 +83,11 @@ test("multiple protected Antigravity plans still produce one CLI display card", 
   assert.equal(results.filter(result => result.adapter === "antigravity-cli").length, 1);
   assert.equal(results.filter(result => result.adapter === "manual").length, 1);
 });
+
+test("display fields cannot replace another provider's company windows", () => {
+  const window = antigravityDisplayWindows(reading(), now)[0];
+  const plan: UsagePlan = { id: "hand", name: "Hand copy", adapter: "manual", windows: [{ ...window, usedPct: 80, source: "manual" }],
+    antigravityDisplay: [window], priceUsdMonthly: null, dispatch: false, note: "", providers: [], api30dUsd: 0, roi30d: null, coverage: "" };
+  assert.equal(companyWindows([plan], new Date(now).toISOString())[0].usedPct, 80);
+  assert.equal(companyWindows([plan], new Date(now).toISOString())[0].source, "manual");
+});
