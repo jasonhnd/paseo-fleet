@@ -19,6 +19,7 @@ No public release is declared by this document.
 
 ### Fixed
 
+- Concurrent quota refreshes and panel requests use exclusive temporary files for JSON snapshots, preventing one writer from consuming another writer's pending rename.
 - Failed or signal-terminated agy commands discard even valid stdout rows; only a normal code-zero read can supply new live samples.
 
 - An `antigravity-cli` plan keeps its unknown ACP hold when the reader switch is off or unset. A hand-copied percent does not replace that hold. An expired agy table is shown as a stale sample.

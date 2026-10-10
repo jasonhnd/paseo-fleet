@@ -16,6 +16,8 @@
 
 Current source: `server/paths.ts`, `server/settings.ts`. Fresh plans start empty; examples are opt-in demo data, not real prices or readings. Existing configurations are not overwritten on first-run initialization.
 
+Snapshot JSON writes use an exclusively created sibling temporary file per call, with a process id and random identifier, then rename the complete file into place. This also isolates writers in separate processes. The last successful rename wins; this is not a lock for read/modify/write operations, a transaction across legacy and export files, or a disk durability guarantee. Write and rename failures reject to the caller; cleanup removes only that call's temporary file and reports cleanup failures without replacing the original error. Abrupt process termination can leave its temporary file behind; other writers do not sweep those files.
+
 ## Reader and writer inventory
 
 | Integration | Reads / stores | Control or boundary |
