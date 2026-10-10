@@ -104,6 +104,25 @@ for (const stage of ["handover", "open", "detach", "wait", "archive"]) test(`RPC
   assert.equal(f.keys.size, 1);
 });
 
+test("completed swaps remain visible live but never reappear on the homepage after reload", async () => {
+  const f = fixture();
+  await leaderSwap({} as never, input(), f.ports);
+  const completed = await settled();
+  assert.equal(completed.job?.phase, "done");
+  assert.equal(existsSync(f.state), false, "Completed swaps must leave the durable active state");
+  resetShiftClaimsForTests();
+  assert.equal((await inspectSupervisorShift("demo")).job, null);
+  // Old versions persisted completed rows; ignore them without renewing the display window.
+  writeFileSync(f.state, JSON.stringify([{ progress: completed.job, resume: "wait", queuedAt: null }]));
+  resetShiftClaimsForTests();
+  assert.equal((await inspectSupervisorShift("demo")).job, null);
+  const calls = [...f.calls];
+  const repeated = await leaderSwap({} as never, input(), f.ports);
+  assert.equal(repeated.job?.phase, "done", "Completed command idempotency must use the handoff log");
+  assert.deepEqual(f.calls, calls);
+  assert.equal(f.archiveCount(), 1);
+});
+
 test("dry-run reads a plan without prompts, host mutations, state writes or logs", async () => {
   const f = fixture();
   const before = readFileSync(f.config, "utf8");

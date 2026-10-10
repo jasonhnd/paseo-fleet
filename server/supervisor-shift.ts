@@ -519,6 +519,7 @@ function storedResume(job: ShiftProgress, saved: JobMeta | undefined): ShiftResu
 async function persistActive(): Promise<void> {
   const rows: StoredShift[] = [];
   for (const job of tasks.values()) {
+    if (job.phase === "done") continue;
     const saved = meta.get(job.project);
     rows.push({
       progress: job,
