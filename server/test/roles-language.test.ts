@@ -1,4 +1,4 @@
-// Exercise both CLI runtimes with demo state only; protocol tokens stay language independent.
+// Exercise CLI language behavior with demo state only; protocol tokens stay language independent.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";

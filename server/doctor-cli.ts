@@ -1,4 +1,4 @@
-// Read-only one-click health check. The command is bin/afc-doctor, which starts this file.
+// Read-only one-click health check, started by bin/afc.mjs doctor.
 // Default: a red / yellow / green table. --json: the same report as JSON. Exit code: red 2, yellow 1, all green 0.
 // Nothing is written, started, stopped or logged in. The daily run and its history belong to the plugin, not to this command.
 import { doctorExitCode, formatDoctorTable } from "../shared/doctor";

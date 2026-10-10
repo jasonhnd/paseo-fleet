@@ -43,7 +43,7 @@ function renameKeys(pools: Record<string, PoolStatus>, from: typeof alpha, to: t
 }
 
 describe("poolStatus does not depend on pool ids", () => {
-  // Two unrelated sets of ids for the same plans; the old built-in ids are covered by the tmp/harness tests.
+  // Two unrelated sets of ids exercise the same plans without assuming built-in pool names.
   const options = { now: NOW, codexCouponCount: 1, codexCouponExpiresAt: new Date(NOW + 5 * DAY).toISOString() };
   test("two sets of ids judge the same", () => {
     const a = poolStatus(demoPlans(alpha), options);
