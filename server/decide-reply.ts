@@ -39,12 +39,19 @@ export function userShelveNote(): string {
   return t("decisions.reply.userShelveNote");
 }
 
+/** Stored note when the user closes an item from the panel. Sent with `--as decided`. */
+export function userDismissNote(): string {
+  return t("decisions.reply.userDismissNote");
+}
+
 export type SupervisorPick =
   | { via: SupervisorVia; agentId: string; title: string }
   | { via: "missing" };
 
 export interface DecideDeps {
   readOpen: (id: string) => Promise<OpenDecisionItem | null>;
+  /** Any status, used to undo a panel close and to name the leader. Optional for older callers. */
+  readRecord?: (id: string) => Promise<OpenDecisionItem | null>;
   roles: (args: string[]) => Promise<string>;
   send: (agentId: string, prompt: string) => Promise<void>;
   readTable: () => Promise<Record<string, string> | null>;
@@ -87,6 +94,22 @@ export function rolesDoneArgs(id: string, note: string): string[] {
   return ["decide", "done", id, "--note", note];
 }
 
+export function rolesDismissArgs(id: string, note = userDismissNote()): string[] {
+  return ["decide", "done", id, "--as", "decided", "--note", note];
+}
+
+export function rolesReopenArgs(id: string): string[] {
+  return ["decide", "reopen", id];
+}
+
+export function dismissPrompt(item: OpenDecisionItem, note = userDismissNote()): string {
+  return t("decisions.prompt.dismissed", { id: item.id, title: item.title, note });
+}
+
+export function restorePrompt(item: OpenDecisionItem): string {
+  return t("decisions.prompt.restored", { id: item.id, title: item.title });
+}
+
 export function rolesCommentArgs(id: string, note: string): string[] {
   return ["decide", "comment", id, "--note", note];
 }
@@ -120,6 +143,49 @@ function cleanChoice(raw: string): string | null {
   return null;
 }
 
+/** Close from the panel. A second click, a missing leader, or a failed notice does not throw. */
+async function dismissDecision(id: string, deps: DecideDeps): Promise<{ ok: boolean; message: string }> {
+  const item = await deps.readOpen(id);
+  if (!item) return { ok: true, message: t("decisions.reply.dismissedAlready") };
+  try {
+    await deps.roles(rolesDismissArgs(item.id));
+  } catch (error) {
+    return { ok: false, message: t("decisions.reply.notRecorded", { error: String(error).slice(0, 200) }) };
+  }
+  const target = await supervisorFor(item, deps);
+  if (target.via === "missing") return { ok: true, message: t("decisions.reply.dismissedNoLeader") };
+  try {
+    await deps.send(target.agentId, dismissPrompt(item));
+  } catch (error) {
+    return { ok: true, message: t("decisions.reply.dismissedNotifyFailed", { error: String(error).slice(0, 200) }) };
+  }
+  return { ok: true, message: t("decisions.reply.dismissedNotified", { title: target.title }) };
+}
+
+/** Undo a panel close. Already open is a no-op. A missing leader or a failed notice still counts as reopened. */
+async function restoreDecision(id: string, deps: DecideDeps): Promise<{ ok: boolean; message: string }> {
+  const open = await deps.readOpen(id);
+  if (open) return { ok: true, message: t("decisions.reply.restoredAlready") };
+  const record = deps.readRecord ? await deps.readRecord(id) : null;
+  if (deps.readRecord && !record) {
+    return { ok: false, message: t("decisions.reply.restoreFailed", { error: t("cli.roles.noItem", { id }) }) };
+  }
+  try {
+    await deps.roles(rolesReopenArgs(id));
+  } catch (error) {
+    return { ok: false, message: t("decisions.reply.restoreFailed", { error: String(error).slice(0, 200) }) };
+  }
+  if (!record) return { ok: true, message: t("decisions.reply.restored") };
+  const target = await supervisorFor(record, deps);
+  if (target.via === "missing") return { ok: true, message: t("decisions.reply.restored") };
+  try {
+    await deps.send(target.agentId, restorePrompt(record));
+  } catch {
+    return { ok: true, message: t("decisions.reply.restored") };
+  }
+  return { ok: true, message: t("decisions.reply.restoredNotified", { title: target.title }) };
+}
+
 async function supervisorFor(item: OpenDecisionItem, deps: DecideDeps): Promise<SupervisorPick> {
   const [table, agents] = await Promise.all([deps.readTable(), deps.listAgents()]);
   return chooseSupervisor({ project: item.project, table, agents });
@@ -135,6 +201,8 @@ export async function submitDecision(
   if (!choice) return { ok: false, message: t("decisions.reply.badChoice") };
   const text = input.text.replace(/\s+/g, " ").trim().slice(0, 500);
   if (choice === REPLY_CHOICE.comment && !text) return { ok: false, message: t("decisions.reply.needText") };
+  if (choice === REPLY_CHOICE.dismiss) return dismissDecision(id, deps);
+  if (choice === REPLY_CHOICE.restore) return restoreDecision(id, deps);
   const item = await deps.readOpen(id);
   if (!item) return { ok: false, message: t("decisions.reply.notOpen") };
 
@@ -206,6 +274,7 @@ export async function submitDecision(
 export function productionDecideDeps(): DecideDeps {
   return {
     readOpen: readOpenDecision,
+    readRecord: readDecisionRecord,
     roles: (args) => run(ROLES_BIN, args, 20_000),
     send: async (agentId, prompt) => {
       await sendToAgent(agentId, prompt);
@@ -221,14 +290,22 @@ export function productionDecideDeps(): DecideDeps {
   };
 }
 
+function asDecisionItem(row: Json | undefined): OpenDecisionItem | null {
+  if (!row) return null;
+  return {
+    id: String(row.id),
+    project: String(row.project ?? ""),
+    title: String(row.title ?? ""),
+    detail: String(row.detail ?? ""),
+  };
+}
+
 async function readOpenDecision(id: string): Promise<OpenDecisionItem | null> {
   const items = await readJson<Json[]>(DECISIONS, []);
-  const item = items.find((row) => String(row.id) === id && row.status === "open");
-  if (!item) return null;
-  return {
-    id: String(item.id),
-    project: String(item.project ?? ""),
-    title: String(item.title ?? ""),
-    detail: String(item.detail ?? ""),
-  };
+  return asDecisionItem(items.find((row) => String(row.id) === id && row.status === "open"));
+}
+
+async function readDecisionRecord(id: string): Promise<OpenDecisionItem | null> {
+  const items = await readJson<Json[]>(DECISIONS, []);
+  return asDecisionItem(items.find((row) => String(row.id) === id));
 }

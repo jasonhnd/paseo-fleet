@@ -16,10 +16,13 @@ const CARD_MIN_WIDTH = 340;
 const MAX_CARD_COLUMNS = 2;
 
 /** All open decisions as one list of cards: summary and project filter on top, blocking first. */
-export function Decisions({ s, data, openAgent, showSettings = true }: { s: Styles; data: BoardSnapshot; openAgent: OpenAgent; showSettings?: boolean }) {
+export function Decisions({ s, data, openAgent, showSettings = true, sectionTitle }: { s: Styles; data: BoardSnapshot; openAgent: OpenAgent; showSettings?: boolean; sectionTitle?: string }) {
   const model = useDecisionLists(data);
-  return (
+  // A titled section stays mounted when the parent always renders it, so a panel close can keep its undo row after the open list drops the item.
+  if (sectionTitle && model.cards.length === 0 && model.unowned.length === 0 && model.unread.length === 0) return null;
+  const body = (
     <View style={{ gap: 16 }}>
+      {sectionTitle ? <Text style={s.h2}>{sectionTitle}</Text> : null}
       {showSettings ? <DecisionSettings s={s} enabled={data.decisionMaint.enabled} /> : null}
       {model.empty ? <Empty s={s} text={t("decisions.list.empty")} /> : null}
       {model.cards.length > 0 ? <SummaryBar s={s} model={model} /> : null}
@@ -27,24 +30,29 @@ export function Decisions({ s, data, openAgent, showSettings = true }: { s: Styl
       {model.visible.length > 0 ? (
         <ResponsiveGrid s={s} maxColumns={MAX_CARD_COLUMNS} minCellWidth={CARD_MIN_WIDTH} rowGap={16}>
           {model.visible.map((row) => (
-            <DecisionCard key={row.id} s={s} d={row} now={model.now} openAgent={openAgent} deferred={model.deferred.has(row.id)} chosen={model.chosen.get(row.id)?.chosen ?? null} onDefer={model.defer} onResult={(message) => model.note(row, message)} />
+            <DecisionCard key={row.id} s={s} d={row} now={model.now} openAgent={openAgent} deferred={model.deferred.has(row.id)} chosen={model.chosen.get(row.id)?.chosen ?? null} panelClosed={model.panelClosed.has(row.id)} onDefer={model.defer} onResult={(message) => model.note(row, message)} />
           ))}
         </ResponsiveGrid>
       ) : null}
       <UnreadSection s={s} rows={model.unread} openAgent={openAgent} />
     </View>
   );
+  return sectionTitle ? <View style={s.card}>{body}</View> : body;
 }
 
 export interface KeptChoice { decision: Decision; chosen: ChosenState }
+interface HeldClose { decision: Decision; closed: boolean }
 
 function useDecisionLists(data: BoardSnapshot) {
   const [deferred, setDeferred] = useState<Set<string>>(new Set());
   const [session, setKept] = useState<ReadonlyMap<string, KeptChoice>>(new Map());
+  const [held, setHeld] = useState<ReadonlyMap<string, HeldClose>>(new Map());
   const kept = useMemo(() => mergeKept(storedKept(data.recentChoices ?? []), session), [data.recentChoices, session]);
   const [filter, setFilter] = useState<string | null>(null);
   const now = Date.parse(data.generatedAt) || Date.now();
-  const cards = useMemo(() => withKept(data.decisions.filter((row) => row.kind === "decide"), kept), [data.decisions, kept]);
+  const base = useMemo(() => withKept(data.decisions.filter((row) => row.kind === "decide"), kept), [data.decisions, kept]);
+  const cards = useMemo(() => withHeld(base, held), [base, held]);
+  const panelClosed = useMemo(() => closedIds(base, held), [base, held]);
   const unread = useMemo(() => data.decisions.filter((row) => row.kind === "unread"), [data.decisions]);
   const unowned = useMemo(() => partitionUnownedDecisions(data.decisions.filter((row) => row.kind === "decide")).unowned, [data.decisions]);
   const sorted = useMemo(() => sortCardRows(cards, now, deferred), [cards, now, deferred]);
@@ -56,8 +64,21 @@ function useDecisionLists(data: BoardSnapshot) {
   const note = (row: Decision, message: ReplyMessage) => {
     const chosen = message.chosen;
     if (chosen) setKept((prev) => new Map(prev).set(row.id, { decision: row, chosen }));
+    if (message.panelClosed || message.panelRestored) setHeld((prev) => new Map(prev).set(row.id, { decision: row, closed: message.panelClosed === true }));
   };
-  return { now, cards, unread, unowned, sorted, visible, deferred, settled, chosen: kept, filter: active, setFilter, empty, defer, note };
+  return { now, cards, unread, unowned, sorted, visible, deferred, settled, chosen: kept, panelClosed, filter: active, setFilter, empty, defer, note };
+}
+
+/** A panel-closed row stays until the open list has it again. */
+function withHeld(rows: Decision[], held: ReadonlyMap<string, HeldClose>): Decision[] {
+  const open = new Set(rows.map((row) => row.id));
+  const extra = [...held.values()].filter((entry) => !open.has(entry.decision.id)).map((entry) => entry.decision);
+  return [...rows, ...extra];
+}
+
+function closedIds(rows: Decision[], held: ReadonlyMap<string, HeldClose>): Set<string> {
+  const open = new Set(rows.map((row) => row.id));
+  return new Set([...held.values()].filter((entry) => entry.closed && !open.has(entry.decision.id)).map((entry) => entry.decision.id));
 }
 
 /** Answers stored by the server (last 24 hours) come back as answered cards when the panel is opened again. */

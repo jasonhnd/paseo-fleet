@@ -16,12 +16,16 @@ export interface ReplyMessage {
   text: string;
   /** Set when a letter was recorded, so a list can keep the "picked" card after the row closes. */
   chosen?: ChosenState;
+  /** Set when the user closed the item from the panel, so the card can stay and offer undo. */
+  panelClosed?: boolean;
+  /** Set when that close was undone. */
+  panelRestored?: boolean;
 }
 
 const BUTTON_MIN_HEIGHT = 56;
 const LETTER_BOX = 40;
 
-export function DecisionActions({ s, id, title, detail, onDefer, onResult, allowText = true, initialChosen = null }: {
+export function DecisionActions({ s, id, title, detail, onDefer, onResult, allowText = true, initialChosen = null, initialPanelClosed = false }: {
   s: Styles;
   id: string;
   title: string;
@@ -31,18 +35,31 @@ export function DecisionActions({ s, id, title, detail, onDefer, onResult, allow
   /** false for decisions whose project has no <leader>: letters and shelve only. */
   allowText?: boolean;
   initialChosen?: ChosenState | null;
+  /** The snapshot already dropped this card after a panel close. */
+  initialPanelClosed?: boolean;
 }) {
   const card = useMemo(() => parseDecisionCard(title, detail), [title, detail]);
   const reply = useDecisionReply(id, onResult, initialChosen);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [writing, setWriting] = useState(false);
   const [shelving, setShelving] = useState(false);
+  const [confirmDismiss, setConfirmDismiss] = useState(false);
+  const [panelClosed, setPanelClosed] = useState(initialPanelClosed);
   const pick = (letter: string) => {
     setConfirming(null);
     reply.send(letter, reply.text);
   };
+  const dismiss = () => {
+    setConfirmDismiss(false);
+    void reply.send(REPLY_CHOICE.dismiss, "").then((result) => { if (result.ok) setPanelClosed(true); });
+  };
   if (reply.chosen && !reply.changing) {
     return <ChosenBox s={s} chosen={reply.chosen} busy={reply.busy} msg={reply.msg} canChange={canChangeChoice(reply.chosen.at, Date.now())} onChange={reply.startChange} />;
+  }
+  if (panelClosed && !reply.changing) {
+    return <ClosedBox s={s} busy={reply.busy} msg={reply.msg} onUndo={() => {
+      void reply.send(REPLY_CHOICE.restore, "").then((result) => { if (result.ok) setPanelClosed(false); });
+    }} />;
   }
   return (
     <View style={{ gap: 12 }}>
@@ -52,6 +69,7 @@ export function DecisionActions({ s, id, title, detail, onDefer, onResult, allow
         : <OptionList s={s} card={card} busy={reply.busy} confirming={confirming} onAsk={setConfirming} onPick={pick} />}
       {writing ? <CommentBox s={s} reply={reply} hasOptions={card.options.length > 0} /> : null}
       {shelving ? <ShelveConfirm s={s} busy={reply.busy} onYes={() => { setShelving(false); reply.send(REPLY_CHOICE.shelve, ""); }} onNo={() => setShelving(false)} /> : null}
+      {confirmDismiss ? <DismissConfirm s={s} busy={reply.busy} onYes={dismiss} onNo={() => setConfirmDismiss(false)} /> : null}
       {reply.msg ? <Text style={reply.msg.ok ? s.green : s.red}>{reply.msg.text}</Text> : null}
       <SecondaryRow
         s={s}
@@ -60,7 +78,8 @@ export function DecisionActions({ s, id, title, detail, onDefer, onResult, allow
         writing={writing}
         onWrite={() => setWriting((open) => !open)}
         onDefer={onDefer ? () => onDefer(id) : undefined}
-        onShelve={allowText ? undefined : () => setShelving(true)}
+        onShelve={allowText ? undefined : () => { setConfirmDismiss(false); setShelving(true); }}
+        onDismiss={() => { setShelving(false); setWriting(false); setConfirmDismiss(true); }}
       />
     </View>
   );
@@ -86,25 +105,33 @@ function useDecisionReply(id: string, onResult: ((message: ReplyMessage) => void
     if (next) setChosen(next);
     setChanging(false);
     setMsg(next ? null : result.ok ? { ok: true, text: result.message } : failure(result.message));
-    onResult?.({ ok: result.ok, text: result.message, chosen: next ?? undefined });
+    onResult?.({
+      ok: result.ok,
+      text: result.message,
+      chosen: next ?? undefined,
+      panelClosed: result.ok && choice === REPLY_CHOICE.dismiss ? true : undefined,
+      panelRestored: result.ok && choice === REPLY_CHOICE.restore ? true : undefined,
+    });
     if (result.ok) void client.invalidateQueries({ queryKey: ["afc", "snapshot"] });
   };
-  const send = (choice: string, body: string) => {
+  const send = (choice: string, body: string): Promise<{ ok: boolean; message: string }> => {
     setBusy(true);
     setMsg(null);
     const call = chosen && changing
       ? change({ id: currentId, choice, text: body }).then((result) => ({ result, answerId: result.ok && result.newId ? result.newId : currentId }))
       : reply({ id, choice, text: body }).then((result) => ({ result, answerId: id }));
-    call
+    return call
       .then(({ result, answerId }) => {
         if (answerId !== currentId) setCurrentId(answerId);
         done(choice, result, answerId);
+        return result;
       })
       .catch((error: unknown) => {
         const next = failure(replyError(error).text);
         setChanging(false);
         setMsg(next);
         onResult?.(next);
+        return { ok: false, message: next.text };
       })
       .finally(() => setBusy(false));
   };
@@ -255,6 +282,34 @@ function CommentBox({ s, reply, hasOptions }: { s: Styles; reply: Reply; hasOpti
   );
 }
 
+function DismissConfirm({ s, busy, onYes, onNo }: { s: Styles; busy: boolean; onYes: () => void; onNo: () => void }) {
+  return (
+    <View style={{ gap: 8 }}>
+      <Text style={s.text}>{t("decisions.actions.dismissConfirm")}</Text>
+      <View style={s.row}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t("decisions.actions.dismissYesLabel")} disabled={busy} style={pressed([s.button, { minHeight: 44 }])} onPress={onYes}>
+          <Text style={s.buttonText}>{t("decisions.actions.dismissYes")}</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={t("decisions.actions.cancel")} disabled={busy} style={pressed([s.ghost, { minHeight: 44 }])} onPress={onNo}>
+          <Text style={s.ghostText}>{t("decisions.actions.cancel")}</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function ClosedBox({ s, busy, msg, onUndo }: { s: Styles; busy: boolean; msg: { ok: boolean; text: string } | null; onUndo: () => void }) {
+  return (
+    <View style={{ gap: 8, padding: 12, borderRadius: 10, backgroundColor: s.p.greenBg, borderWidth: 1, borderColor: s.p.green }}>
+      <Text style={[s.text, { color: s.p.green, fontWeight: "600" }]}>{t("decisions.actions.dismissed")}</Text>
+      {msg ? <Text style={msg.ok ? s.green : s.red}>{msg.text}</Text> : null}
+      <Pressable accessibilityRole="button" accessibilityLabel={t("decisions.actions.dismissUndoLabel")} disabled={busy} style={pressed([s.ghost, { alignSelf: "flex-start", minHeight: 44 }])} onPress={onUndo}>
+        <Text style={s.ghostText}>{t("decisions.actions.dismissUndo")}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function ShelveConfirm({ s, busy, onYes, onNo }: { s: Styles; busy: boolean; onYes: () => void; onNo: () => void }) {
   return (
     <View style={{ gap: 8 }}>
@@ -271,7 +326,7 @@ function ShelveConfirm({ s, busy, onYes, onNo }: { s: Styles; busy: boolean; onY
   );
 }
 
-function SecondaryRow({ s, busy, canWrite, writing, onWrite, onDefer, onShelve }: {
+function SecondaryRow({ s, busy, canWrite, writing, onWrite, onDefer, onShelve, onDismiss }: {
   s: Styles;
   busy: boolean;
   canWrite: boolean;
@@ -279,13 +334,15 @@ function SecondaryRow({ s, busy, canWrite, writing, onWrite, onDefer, onShelve }
   onWrite: () => void;
   onDefer?: () => void;
   onShelve?: () => void;
+  onDismiss?: () => void;
 }) {
-  if (!canWrite && !onDefer && !onShelve) return null;
+  if (!canWrite && !onDefer && !onShelve && !onDismiss) return null;
   return (
-    <View style={[s.row, { gap: 4, borderTopWidth: 1, borderTopColor: s.p.border, paddingTop: 4 }]}>
+    <View style={[s.row, { gap: 4, flexWrap: "wrap", borderTopWidth: 1, borderTopColor: s.p.border, paddingTop: 4 }]}>
       {canWrite ? <LinkButton s={s} label={writing ? t("decisions.actions.hideNote") : t("decisions.actions.addNote")} busy={busy} onPress={onWrite} /> : null}
       {onDefer ? <LinkButton s={s} label={t("decisions.meta.deferred")} busy={busy} onPress={onDefer} /> : null}
       {onShelve ? <LinkButton s={s} label={t("decisions.actions.shelve")} busy={busy} onPress={onShelve} danger /> : null}
+      {onDismiss ? <LinkButton s={s} label={t("decisions.actions.dismiss")} busy={busy} onPress={onDismiss} /> : null}
     </View>
   );
 }

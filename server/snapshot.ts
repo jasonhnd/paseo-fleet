@@ -13,6 +13,7 @@ import { readSupervisorPanel } from "./supervisor-shift";
 import { readLeaderDetails } from "./leader-panel";
 import { readPausedProjects } from "./paused";
 import { countsWithoutPaused, isPausedProject } from "../shared/paused";
+import { productionCheckDeps, runOpenDecisionChecks, sourcesFromStored } from "./decision-check";
 import { productionNudgeDeps, runLeaderNudges } from "./leader-nudge";
 import { kanbanView, readWaitingTasks } from "./kanban";
 import {
@@ -309,6 +310,7 @@ interface PanelInput {
   records: AgentRecord[];
   stored: Json[];
   paused: Awaited<ReturnType<typeof readPausedProjects>>;
+  supervisors: Record<string, string> | null;
   home: Parameters<typeof buildHomeView>[0];
 }
 
@@ -322,7 +324,16 @@ async function readPanels(input: PanelInput, timer: StepTimer, nudge: boolean) {
   const registered = stored.map((d) => ({ project: String(d.project ?? ""), createdAt: String(d.createdAt ?? "") }));
   const sessions = new Map(records.map((r) => [r.id, { cwd: r.cwd, provider: r.provider }]));
   const details = await step("panels.leaderDetails", () => readLeaderDetails(paseo, supervisorPanel.rows, registered, now, sessions));
-  if (nudge) void runLeaderNudges(details, now, productionNudgeDeps(), paused).catch((error) => logSkipped("leader nudges", error));
+  if (nudge) {
+    void runLeaderNudges(details, now, productionNudgeDeps(), paused).catch((error) => logSkipped("leader nudges", error));
+    void runOpenDecisionChecks({
+      items: sourcesFromStored(stored),
+      details,
+      supervisors: input.supervisors,
+      paused,
+      now,
+    }, productionCheckDeps()).catch((error) => logSkipped("open decision checks", error));
+  }
   return { home, supervisorPanel: { ...supervisorPanel, details } };
 }
 
@@ -391,7 +402,7 @@ export async function buildSnapshot(paseo: PaseoApi, options: SnapshotOptions = 
 
   const agents = [...fleet.agents].sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
   const cursorUsingManual = poolFile.cursorRead?.usingManual === true;
-  const panels = await step("panels", () => readPanels({ paseo, now, live, records, stored, paused, home: { now, pools, roles, cursorUsingManual, banner: health.banner, via: poolNames(catalog, "via") } }, timer, options.nudge !== false));
+  const panels = await step("panels", () => readPanels({ paseo, now, live, records, stored, paused, supervisors: supervisorTable, home: { now, pools, roles, cursorUsingManual, banner: health.banner, via: poolNames(catalog, "via") } }, timer, options.nudge !== false));
   const warnings = [...roleWarnings, ...sourceWarnings, ...(perm.warning ? [perm.warning] : []), ...health.warnings, ...(kanban.warning ? [kanban.warning] : []), ...(scheduleView.warning ? [scheduleView.warning] : [])];
 
   return {

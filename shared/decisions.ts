@@ -235,7 +235,7 @@ export function isNoLeaderOwner(owner: string | null | undefined): boolean {
 }
 
 /** Non-letter answers the panel sends with a decide-reply. */
-export const REPLY_CHOICE = { shelve: "shelve", askOptions: "askOptions", comment: "comment" } as const;
+export const REPLY_CHOICE = { shelve: "shelve", askOptions: "askOptions", comment: "comment", dismiss: "dismiss", restore: "restore" } as const;
 
 export interface MaintAction {
   kind: "remind" | "shelve";

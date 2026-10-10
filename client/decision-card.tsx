@@ -11,13 +11,14 @@ import { Badge, OpenRow, type OpenAgent, pressed, type Styles } from "./ui";
 export type Decision = BoardSnapshot["decisions"][number];
 
 /** One open decision as one card: question and tags, what is going on, big option buttons, small side actions. */
-export function DecisionCard({ s, d, now, openAgent, deferred = false, chosen = null, onDefer, onResult }: {
+export function DecisionCard({ s, d, now, openAgent, deferred = false, chosen = null, panelClosed = false, onDefer, onResult }: {
   s: Styles;
   d: Decision;
   now: number;
   openAgent: OpenAgent;
   deferred?: boolean;
   chosen?: ChosenState | null;
+  panelClosed?: boolean;
   onDefer?: (id: string) => void;
   onResult?: (message: ReplyMessage) => void;
 }) {
@@ -28,7 +29,7 @@ export function DecisionCard({ s, d, now, openAgent, deferred = false, chosen = 
       <CardHeader s={s} d={d} now={now} blocking={blocking} deferred={deferred} />
       <Context s={s} title={d.title} detail={d.detail} />
       {stored
-        ? <DecisionActions s={s} id={d.id} title={d.title} detail={d.detail} onDefer={deferred ? undefined : onDefer} onResult={onResult} allowText={canWriteToLeader(d)} initialChosen={chosen} />
+        ? <DecisionActions s={s} id={d.id} title={d.title} detail={d.detail} onDefer={deferred ? undefined : onDefer} onResult={onResult} allowText={canWriteToLeader(d)} initialChosen={chosen} initialPanelClosed={panelClosed} />
         : <OpenRow s={s} row={d} openAgent={openAgent} label={t("decisions.cardView.openAgent")} />}
     </View>
   );
