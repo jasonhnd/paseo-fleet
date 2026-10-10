@@ -8,12 +8,14 @@
 // them, keep using the legacy directory. The choice is made once per process.
 //
 // Other plugins: their install directory comes from `$PASEO_HOME/config.json` (`plugins.<id>.path`);
-// AFC_HOME / KANBAN_HOME override it. Kanban's data directory follows the same pattern as ours:
+// AFC uses its running package location; AFC_HOME is a fallback outside a managed instance.
+// KANBAN_HOME overrides its host-configured path. Kanban's data directory follows the same pattern as ours:
 // KANBAN_DATA_DIR, else its plugin-data directory once it holds a board, else `<install dir>/data`.
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { accessSync, constants, existsSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { type Env, PLUGIN_IDS, paseoHome, pluginDataDir } from "./contract";
+import { hasManagedInstallIdentity, runtimePluginDir } from "./runtime-location";
 
 /** Files whose presence marks a directory as holding real cockpit state. */
 export const STATE_MARKERS = ["decisions.json", "plans.json"] as const;
@@ -169,31 +171,38 @@ function envDir(env: Env, name: string): string | null {
 
 // ---------------------------------------------------------------- this plugin
 
-/** Where the cockpit plugin is installed. */
-export function afcPluginDir(env: Env = process.env, home: string = homedir()): string | null {
-  return envDir(env, "AFC_HOME") ?? pluginInstallDir(PLUGIN_IDS.cockpit, env, home);
+/** The running package wins over a host config that is still being updated. */
+export function afcPluginDir(env: Env = process.env, home: string = homedir(), runningDir = runtimePluginDir(env, home)): string | null {
+  return runningDir ?? (hasManagedInstallIdentity() ? null : envDir(env, "AFC_HOME") ?? pluginInstallDir(PLUGIN_IDS.cockpit, env, home));
 }
 
 /** The cockpit's command-line directory: `<plugin>/bin`, or `<checkout>/bin` beside the plugin folder. */
-export function afcBinDir(env: Env = process.env, home: string = homedir(), exists: Exists = existsSync): string | null {
-  const plugin = afcPluginDir(env, home);
+export function afcBinDir(env: Env = process.env, home: string = homedir(), exists: Exists = existsSync, runningDir = runtimePluginDir(env, home)): string | null {
+  const plugin = afcPluginDir(env, home, runningDir);
   if (!plugin) return null;
   const inside = join(plugin, "bin");
-  if (exists(join(inside, "afc.mjs"))) return inside;
+  if (exists(inside)) return inside;
   return join(dirname(plugin), "bin");
 }
 
 /** The `roles` command shipped with the cockpit; plain `roles` (found on PATH) when the plugin location is unknown. */
-export function rolesBin(env: Env = process.env, home: string = homedir()): string {
-  const bin = afcBinDir(env, home);
+export function rolesBin(env: Env = process.env, home: string = homedir(), runningDir = runtimePluginDir(env, home)): string {
+  const bin = afcBinDir(env, home, existsSync, runningDir);
   return bin ? (existsSync(join(bin, "roles.mjs")) ? join(bin, "roles.mjs") : join(bin, "roles")) : "roles";
 }
 
-/** The `afc` command, when it exists on disk. */
-export function afcCli(env: Env = process.env, home: string = homedir(), exists: Exists = existsSync): string | null {
-  const bin = afcBinDir(env, home, exists);
+/** Only publish a regular, executable command. Recheck it on every publication. */
+export function afcCli(env: Env = process.env, home: string = homedir(), exists: Exists = existsSync, runningDir = runtimePluginDir(env, home)): string | null {
+  const bin = afcBinDir(env, home, exists, runningDir);
   const cli = bin ? join(bin, "afc.mjs") : null;
-  return cli && exists(cli) ? cli : null;
+  try {
+    if (!cli || !exists(cli) || !statSync(cli).isFile()) throw new Error("CLI is missing");
+    accessSync(cli, constants.X_OK);
+    return cli;
+  } catch (error) {
+    console.warn(`[afc] cockpit CLI unavailable; exporting null (${cli ?? "installation unknown"}):`, String(error).slice(0, 160));
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------- Paseo Kanban (read-only until F6a)

@@ -137,14 +137,14 @@ describe("installed plugins", () => {
   test("no Paseo config: nothing is installed, roles falls back to PATH", () => {
     const home = freshHome();
     assert.equal(pluginInstallDir("paseo-kanban", {}, home), null);
-    assert.equal(rolesBin({}, home), "roles");
+    assert.equal(rolesBin({}, home, null), "roles");
   });
 
   test("bin/ sits beside the plugin folder in a checkout", () => {
     const { home, cockpit } = homeWithPlugins();
-    assert.equal(afcBinDir({}, home), join(cockpit, "..", "bin"));
-    assert.equal(rolesBin({}, home), join(cockpit, "..", "bin", "roles"));
-    assert.equal(afcBinDir({ AFC_HOME: join(home, "pkg") }, home), join(home, "pkg", "..", "bin"));
+    assert.equal(afcBinDir({}, home, undefined, null), join(cockpit, "..", "bin"));
+    assert.equal(rolesBin({}, home, null), join(cockpit, "..", "bin", "roles"));
+    assert.equal(afcBinDir({ AFC_HOME: join(home, "pkg") }, home, undefined, null), join(home, "pkg", "..", "bin"));
   });
 
   test("checkout names: the nearest .git ancestor", () => {
