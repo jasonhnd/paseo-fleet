@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { isDarkSurface, mixColors, paletteFromTheme, withOpacity } from "../../shared/palette";
-import { MISSING_HOST_THEME } from "../../shared/theme-fallback";
+import { NEUTRAL_THEME } from "../../shared/theme-fallback";
 import { LIGHT_THEME, DARK_THEME } from "./fixtures/themes";
 
 test("palette follows shared Kanban recipes and derives category shades from the host", () => {
@@ -27,9 +27,9 @@ test("palette follows shared Kanban recipes and derives category shades from the
     assert.equal(p.shareColors[15], mixColors(c.accent, c.surface0, 0.65));
     assert.equal(p.blueBg, mixColors(c.surface1, c.accent, 0.1));
   }
-  assert.deepEqual(paletteFromTheme(undefined), paletteFromTheme(MISSING_HOST_THEME));
-  assert.deepEqual(paletteFromTheme(null), paletteFromTheme(MISSING_HOST_THEME));
-  for (const value of Object.values(MISSING_HOST_THEME.colors)) {
+  assert.deepEqual(paletteFromTheme(undefined), paletteFromTheme(NEUTRAL_THEME));
+  assert.deepEqual(paletteFromTheme(null), paletteFromTheme(NEUTRAL_THEME));
+  for (const value of Object.values(NEUTRAL_THEME.colors)) {
     assert.match(value, /^#([\da-f]{2})\1\1$/i);
   }
 });

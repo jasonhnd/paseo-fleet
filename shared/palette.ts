@@ -1,5 +1,5 @@
 import type { PluginTheme } from "@getpaseo/plugin";
-import { MISSING_HOST_THEME } from "./theme-fallback";
+import { NEUTRAL_THEME } from "./theme-fallback";
 import type { TokenPoolKey } from "./token-block";
 
 export interface Palette {
@@ -109,7 +109,7 @@ function readable(ink: string, background: string, foreground: string): string {
 
 /** Pure PluginTheme -> Fleet tokens. Called on every host-props render, on web and native. */
 export function paletteFromTheme(theme: PluginTheme | null | undefined): Palette {
-  const c = (theme ?? MISSING_HOST_THEME).colors;
+  const c = (theme ?? NEUTRAL_THEME).colors;
   const successBg = mixColors(c.surface1, c.statusSuccess, 0.1);
   const warningBg = mixColors(c.surface1, c.statusWarning, 0.1);
   const dangerBg = mixColors(c.surface1, c.statusDanger, 0.1);
