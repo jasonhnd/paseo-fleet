@@ -1629,6 +1629,8 @@
   "shift.detail.takenNotRegistered": "The new session said \"{taken}\", but the registry does not show the new id yet; the old session was not archived.",
   "shift.detail.waiting": "Waiting for the new session to reply \"{taken}\" and for the registry to show the new id.",
   "shift.detail.wrongWorkspace": "The new session landed in another workspace ({workspace}); the old session was not archived and nothing else was created.",
+  "shift.detail.sessionUnreadable": "The existing new session ({newId}) cannot be read yet. Both sessions are kept; retry to check the same session again.",
+  "shift.detail.workspaceUnreadable": "The workspace of one of the sessions cannot be read yet. Both sessions are kept; retry to check the same new session ({newId}) again.",
   "shift.elapsed.days": "running {days} d",
   "shift.elapsed.daysHours": "running {days} d {hours} h",
   "shift.elapsed.hours": "running {hours} h",

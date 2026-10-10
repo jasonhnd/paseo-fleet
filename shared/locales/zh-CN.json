@@ -1629,6 +1629,8 @@
   "shift.detail.takenNotRegistered": "新会话说{taken}，但登记还不是新 id，旧会话没有归档。",
   "shift.detail.waiting": "等新会话回复「{taken}」，并等登记改成新 id。",
   "shift.detail.wrongWorkspace": "新会话落在了别的 workspace（{workspace}），没有归档旧会话，也没有再新建。",
+  "shift.detail.sessionUnreadable": "暂时读不到已创建的新会话（{newId}）。两个会话均保留；重试会继续复查同一个新会话。",
+  "shift.detail.workspaceUnreadable": "暂时读不到其中一个会话的 workspace。两个会话均保留；重试会继续复查同一个新会话（{newId}）。",
   "shift.elapsed.days": "已 {days} 天",
   "shift.elapsed.daysHours": "已 {days} 天 {hours} 小时",
   "shift.elapsed.hours": "已 {hours} 小时",

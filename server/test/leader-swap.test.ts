@@ -104,6 +104,66 @@ for (const stage of ["handover", "open", "detach", "wait", "archive"]) test(`RPC
   assert.equal(f.keys.size, 1);
 });
 
+for (const unavailable of ["session", "workspace-missing", "workspace-empty", "old-workspace-missing"]) test(`RPC preserves the new session across reloads while ${unavailable} is unreadable`, async () => {
+  const f = fixture(); f.fail("wait");
+  await leaderSwap({} as never, input(), f.ports); await settled();
+  f.fail("");
+  const newId = [...f.keys.values()][0];
+  const fresh = f.agents.get(newId)!;
+  const getAgent = f.ports.getAgent;
+  f.ports.getAgent = async id => {
+    const agent = await getAgent(id);
+    if (id === newId && unavailable === "session") return null;
+    if (id === newId && unavailable === "workspace-missing") return { ...fresh, workspaceId: null };
+    if (id === newId && unavailable === "workspace-empty") return { ...fresh, workspaceId: "" };
+    if (id === "old" && unavailable === "old-workspace-missing") return { ...f.old, workspaceId: null };
+    return agent;
+  };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    resetShiftClaimsForTests();
+    await leaderSwap({} as never, input(), f.ports);
+    const state = await settled();
+    assert.equal(state.job?.phase, "failed");
+    assert.equal(state.job?.step, "wait");
+    assert.equal(state.job?.canContinue, true);
+    assert.equal(state.job?.newId, newId);
+    assert.equal(state.job?.detail, t(unavailable === "session" ? "shift.detail.sessionUnreadable" : "shift.detail.workspaceUnreadable", { newId }));
+    const saved = JSON.parse(readFileSync(f.state, "utf8"))[0];
+    assert.equal(saved.resume, "wait");
+    assert.equal(saved.progress.newId, newId);
+    assert.equal(f.creates.length, 1);
+    assert.equal(f.archiveCount(), 0);
+    assert.equal(JSON.parse(readFileSync(f.config, "utf8")).supervisors.demo, "old");
+  }
+  f.ports.getAgent = getAgent;
+  resetShiftClaimsForTests();
+  await leaderSwap({} as never, input(), f.ports);
+  const completed = await settled();
+  assert.equal(completed.job?.phase, "done");
+  assert.equal(completed.job?.newId, newId);
+  assert.equal(f.creates.length, 1);
+  assert.equal(f.archiveCount(), 1);
+});
+
+test("a confirmed different workspace remains terminal across reloads without opening or archiving", async () => {
+  const f = fixture(); f.fail("wait");
+  await leaderSwap({} as never, input(), f.ports); await settled();
+  f.fail(""); f.agents.get("new-1")!.workspaceId = "other-demo-workspace";
+  resetShiftClaimsForTests();
+  await leaderSwap({} as never, input(), f.ports);
+  const state = await settled();
+  assert.equal(state.job?.canContinue, false);
+  assert.equal(state.job?.step, "wait");
+  assert.equal(state.job?.detail, t("shift.detail.wrongWorkspace", { workspace: "other-demo-workspace" }));
+  const calls = [...f.calls];
+  resetShiftClaimsForTests();
+  const repeated = await leaderSwap({} as never, input(), f.ports);
+  assert.equal(repeated.ok, false);
+  assert.deepEqual(f.calls, calls);
+  assert.equal(f.creates.length, 1);
+  assert.equal(f.archiveCount(), 0);
+});
+
 test("completed swaps remain visible live but never reappear on the homepage after reload", async () => {
   const f = fixture();
   await leaderSwap({} as never, input(), f.ports);

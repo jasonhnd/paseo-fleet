@@ -282,10 +282,19 @@ async function openNewSession(run: ShiftRun, agent: ShiftAgent): Promise<Stage<N
 /** resume "wait": the new session already exists, only its labels are needed. */
 async function reattachSession(run: ShiftRun, agent: ShiftAgent): Promise<Stage<NewSession>> {
   const newId = run.request.existingNewId;
-  if (!newId) return stop(fail(run, agent, { detail: t("shift.detail.noNewSession"), result: t("shift.result.noNewSession") }));
+  if (!newId) return stop(fail(run, agent, { step: "wait", detail: t("shift.detail.noNewSession"), result: t("shift.result.noNewSession") }));
+  await checkpoint(run, rowFor(run, agent, "waiting", t("shift.detail.waiting", { taken: takenOverReply() }), { newId }), "wait");
   const fresh = await run.ports.getAgent(newId);
-  if (!fresh || fresh.workspaceId !== agent.workspaceId) return stop(fail(run, agent, { detail: t("shift.detail.wrongWorkspace", { workspace: fresh?.workspaceId ?? "?" }), result: t("shift.result.wrongWorkspace"), newId }));
-  return { ok: true, value: { newId, labels: fresh?.labels ?? {} } };
+  if (!fresh || !fresh.workspaceId || !agent.workspaceId) return stop(fail(run, agent, {
+    step: "wait",
+    detail: t(!fresh ? "shift.detail.sessionUnreadable" : "shift.detail.workspaceUnreadable", { newId }),
+    result: t("shift.result.recheckFailed"),
+    newId,
+    canContinue: true,
+    resumeNext: "wait",
+  }));
+  if (fresh.workspaceId !== agent.workspaceId) return stop(fail(run, agent, { step: "wait", detail: t("shift.detail.wrongWorkspace", { workspace: fresh.workspaceId }), result: t("shift.result.wrongWorkspace"), newId }));
+  return { ok: true, value: { newId, labels: fresh.labels } };
 }
 
 // ---- detach, takeover, archive ----
