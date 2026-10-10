@@ -56,7 +56,7 @@
 
 [工作流](WORKFLOW.md) · [数据](DATA.md) · [兼容](COMPATIBILITY.md) · [发布/更新](RELEASE.md) · [贡献](CONTRIBUTING.md) · [安全](SECURITY.md) · [变更](CHANGELOG.md)
 
-源码先 `npm run build:cli`。已打包命令使用 Node，不要求 Python/tsx。看板 npm prepack 带生成 bundle；Git manifest build 运行 server/prepare.mjs；Fleet Git 仍须证明其准备路径和可用命令，不能借看板安装结果。独立 doctor：
+源码先 `npm run build:cli`。已打包命令使用 Node，不要求 Python/tsx。看板 npm prepack 带生成 bundle；只有看板的 manifest build 运行 server/prepare.mjs。Fleet 源码使用 npm run build:cli，Git 安装仍须单独证明准备路径和可用命令，不能借看板安装结果。独立 doctor：
 
 ```sh
 node "$FLEET_INSTALL/bin/afc.mjs" doctor --json

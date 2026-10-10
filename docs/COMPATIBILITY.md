@@ -18,7 +18,7 @@ Both manifests declare Paseo `>=0.11.0 <0.12.0`. Check **both daemon and desktop
 | macOS | Local source/CLI/compiler checks are recorded in the import/toolchain documents. Full clean-host desktop and first-card certification remains a release gate. |
 | Linux | Release target; full native workflow verification has not been recorded here. Do not treat compilation as platform certification. |
 | WSL2 | Requires a separate Linux-environment validation record. |
-| Native Windows | Not supported for the initial release; Node-only commands do not prove the entire workflow or optional shell helpers works. |
+| Native Windows | Not supported for the initial release; Node-only commands do not prove the entire workflow or optional shell helpers work. |
 
 No platform is certified by this documentation change. Before release, record the exact OS, Node, daemon and app versions, provider/model, install source and tested companion commit/tag. Optional macOS probes are not requirements for the core workflow.
 

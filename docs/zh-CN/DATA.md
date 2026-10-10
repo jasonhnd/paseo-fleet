@@ -24,7 +24,7 @@ plans.json 存用户池/adapter/周期时区/手填/阈值优先序；afc.config
 
 ## 备份、迁移、移除与隔离
 
-配置、决定、快照、日志、导出、备份、secrets 全私有。暂停写入后做看板 SQLite 一致快照，不原样复制活 db/WAL。另备份 $PASEO_HOME/plugin-settings/<id>、语言、enabled。移除保留 plugin-data，但可能删设置与受管 Git checkout；代码降级不撤销数据写入。
+配置、决定、快照、日志、导出、备份、secrets 全私有。暂停 Fleet 写入后，拷贝所选数据目录的 plans.json、afc.config.json、decisions.json、exports/ 及其它私有状态。只有同时备份 Kanban 数据时才对 kanban.db 做 SQLite 一致快照，不原样复制正在写入的 db/WAL。另备份 $PASEO_HOME/plugin-settings/<id>、语言、enabled。移除保留 plugin-data，但可能删设置与受管 Git checkout；代码降级不撤销数据写入。
 
 用已安装命令 migrate --help 查看接口：`node "$FLEET_INSTALL/bin/afc.mjs" migrate --help` 或 `node "$BOARD_INSTALL/bin/paseo-kanban.mjs" migrate --help`。先用显式演示 source/target 演练，再做已授权切换，迁移日志/备份不能发布。
 

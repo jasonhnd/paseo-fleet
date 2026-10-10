@@ -36,7 +36,7 @@ Hiding a pool is a display setting, not a dispatch stop. Use pool dispatch/prote
 
 Default `PASEO_HOME` is `~/.paseo`. Inspect the plugin's startup data-directory log before backup or migration; legacy installs may still use their previous directory. Do not assume a new install source moves old data. The installed code/CLI path can change on a Git update.
 
-Keep configuration, decisions, usage snapshots, logs, exports, backups and any `secrets/` private. Pause writers and use a consistent SQLite snapshot for the board, not a raw copy of an active database/WAL. Back up `$PASEO_HOME/plugin-settings/<id>` and enabled state separately from plugin-data. Removal preserves plugin-data but can delete plugin settings and a managed Git checkout. Restoration and code downgrade do not automatically reverse data writes.
+Keep configuration, decisions, usage snapshots, logs, exports, backups and any `secrets/` private. Pause Fleet writers, then copy `plans.json`, `afc.config.json`, `decisions.json` and `exports/` together with any other private state in the selected data directory. Only when also backing up Kanban should you take a consistent SQLite snapshot of `kanban.db`; do not copy an active database/WAL. Back up `$PASEO_HOME/plugin-settings/<id>` and enabled state separately from plugin-data. Removal preserves plugin-data but can delete plugin settings and a managed Git checkout. Restoration and code downgrade do not automatically reverse data writes.
 
 Use `node "$FLEET_INSTALL/bin/afc.mjs" migrate --help` or `node "$BOARD_INSTALL/bin/paseo-kanban.mjs" migrate --help` for the installed migration interface. Rehearse with explicit source/target demo directories before any authorized cutover. Do not publish migration logs or backup contents.
 

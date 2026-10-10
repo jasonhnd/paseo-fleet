@@ -40,6 +40,6 @@ The leader launch sets the board activation marker (`BOARD_AGENT_ENV` in Kanban'
 
 ## Waiting and decisions
 
-Report ready deliverables even when another PR or external check is pending; describe it in `handoff.waitingOn`. Use a human-needed block for missing authorization or a decision only the user can make. Keep independent work moving. Questions should include lettered options, their consequences and a recommendation; reversible technical choices can be recorded by the lead within the authorized scope.
+Report ready deliverables even when another PR or external check is pending; describe it in `handoff.waitingOn`. Use a human-needed block for missing authorization or a decision only the user can make. Keep independent work moving.
 
 Fleet alone provides roles, quota and decisions, not a task board. Kanban alone uses configured profiles and basic ordering without Fleet quota protection, and has a local decisions list. See [DATA](DATA.md) and [the contract](CONTRACT.md) for integration boundaries.
