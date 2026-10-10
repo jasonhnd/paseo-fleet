@@ -110,6 +110,7 @@ export type ShiftPhase = "queued" | "handover" | "opening" | "detaching" | "wait
 
 export interface ShiftProgress {
   phase: ShiftPhase;
+  step?: string;
   label: string;
   detail: string;
   project: string;
@@ -141,6 +142,8 @@ export interface ShiftAgent {
 }
 
 export interface ShiftCreateInput {
+  idempotencyKey?: string;
+  labels?: Record<string, string>;
   workspaceId: string;
   cwd: string;
   title: string;
@@ -153,6 +156,8 @@ export interface ShiftCreateInput {
 }
 
 export interface ShiftPorts {
+  /** Persist the stage before the next host mutation. */
+  checkpoint?(progress: ShiftProgress): Promise<void>;
   now(): number;
   getAgent(id: string): Promise<ShiftAgent | null>;
   sendAndWait(id: string, prompt: string, timeoutMs: number): Promise<{ timedOut: boolean; reply: string | null; error: string | null }>;
@@ -225,6 +230,7 @@ export type ShiftResume = "queue" | "start" | "open" | "wait";
 
 /** One in-progress shift, written outside git so a plugin reload can show it again. */
 export interface StoredShift {
+  events?: ShiftProgress[];
   progress: ShiftProgress;
   resume: ShiftResume;
   queuedAt: number | null;

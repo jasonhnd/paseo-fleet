@@ -8,7 +8,7 @@ import { build } from "esbuild";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const ENTRIES = ["cli", "local-decisions", "migrate", "check-missing-cwd"];
-export const FLEET_ENTRIES = { roles: "server/roles-cli.ts", doctor: "server/doctor-cli.ts", migrate: "server/migrate-command.ts", coupon: "bin/coupon.ts" };
+export const FLEET_ENTRIES = { leader: "server/leader-cli.ts", roles: "server/roles-cli.ts", doctor: "server/doctor-cli.ts", migrate: "server/migrate-command.ts", coupon: "bin/coupon.ts" };
 
 export async function buildCli(root = ROOT) {
   root = realpathSync(root);

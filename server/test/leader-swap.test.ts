@@ -1,0 +1,182 @@
+import assert from "node:assert/strict";
+import { after, test } from "node:test";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { runSupervisorShift, handoverDoneReply, takenOverReply, PARENT_LABEL, type ShiftAgent, type ShiftPorts, type ShiftCreateInput } from "../../shared/supervisor-shift";
+import { leaderSwapRpc } from "../../shared/leader-command";
+import { setLanguage, t } from "../../shared/i18n";
+
+const root = mkdtempSync(join(tmpdir(), "leader-swap-"));
+process.env.PASEO_HOME = join(root, "home");
+process.env.AFC_DATA_DIR = join(root, "afc");
+process.env.ROLES_STATE_DIR = join(root, "roles");
+process.env.KANBAN_DATA_DIR = join(root, "kanban");
+const { leaderSwap, readLeaderUsage } = await import("../leader-command");
+const { setShiftStatePathForTests, resetShiftClaimsForTests, inspectSupervisorShift } = await import("../supervisor-shift");
+const { runLeaderCli } = await import("../leader-cli");
+after(() => rmSync(root, { recursive: true, force: true }));
+setLanguage("en");
+
+function fixture() {
+  resetShiftClaimsForTests();
+  const dir = mkdtempSync(join(root, "case-"));
+  const config = join(dir, "kanban.config.json");
+  const state = join(dir, "state.json");
+  const log = join(dir, "handoffs.log");
+  writeFileSync(config, JSON.stringify({ supervisors: { demo: "old" }, projects: { demo: { code: "DEMO" } } }));
+  const exports = join(process.env.KANBAN_DATA_DIR!, "exports");
+  mkdirSync(exports, { recursive: true });
+  const envelope = { schema: "fleet-quota/v1", producer: "paseo-kanban", producerVersion: "0.0.0-demo", generatedAt: new Date().toISOString(), ttlSeconds: 1800 };
+  writeFileSync(join(exports, "kanban.json"), JSON.stringify({ ...envelope, dataDir: process.env.KANBAN_DATA_DIR, cli: null, features: ["board-summary"] }));
+  writeFileSync(join(exports, "board-summary.json"), JSON.stringify({ ...envelope, projects: [], cards: [], dbPath: null }));
+  setShiftStatePathForTests(state, { config, log });
+  const old: ShiftAgent = { id: "old", status: "idle", title: "Demo leader", workspaceId: "demo-workspace", cwd: dir, provider: "demo-provider", model: "demo-model", modeId: "demo-mode", thinkingOptionId: "demo-effort", featureValues: { demo: true }, labels: { role: "supervisor", [PARENT_LABEL]: "former-parent" }, contextTokens: 750001 };
+  const calls: string[] = [];
+  const creates: ShiftCreateInput[] = [];
+  const agents = new Map([["old", old]]);
+  const keys = new Map<string, string>();
+  let fail = "";
+  let registered = "old";
+  let clock = 0;
+  let archiveCount = 0;
+  const ports: ShiftPorts = {
+    now: () => clock,
+    getAgent: async id => { calls.push(`get:${id}`); return agents.get(id) ?? null; },
+    sendAndWait: async () => { calls.push("handover"); if (fail === "handover") throw new Error("demo handover error"); return { timedOut: false, reply: handoverDoneReply(), error: null }; },
+    readHandover: async () => ({ path: "HANDOVER.md", preview: "Demo", summary: "Demo work" }),
+    readAcceptanceCards: async () => ["DEMO_0001"],
+    createAgent: async input => {
+      calls.push("open"); creates.push(input);
+      assert.ok(!existsSync(state) || JSON.parse(readFileSync(state, "utf8"))[0].progress.phase === "opening");
+      let id = keys.get(input.idempotencyKey!);
+      if (!id) { id = `new-${keys.size + 1}`; keys.set(input.idempotencyKey!, id); agents.set(id, { ...old, id, labels: { [PARENT_LABEL]: "old" } }); }
+      if (fail === "open") throw new Error("demo lost creation response");
+      return { id, workspaceId: old.workspaceId!, labels: { [PARENT_LABEL]: "old" } };
+    },
+    detach: async id => { calls.push("detach"); if (fail === "detach") throw new Error("demo detach error"); agents.get(id)!.labels = {}; },
+    latestReply: async () => { calls.push("reply"); if (fail === "wait") throw new Error("demo reply error"); return takenOverReply(); },
+    registeredSupervisor: async () => { calls.push("registration"); if (fail === "registration") return "old"; registered = [...keys.values()].at(-1) ?? registered; return registered; },
+    archive: async id => {
+      calls.push("archive"); if (fail === "archive") throw new Error("demo archive error");
+      assert.equal(id, "old"); assert.notEqual(registered, "old"); archiveCount++;
+      writeFileSync(config, JSON.stringify({ supervisors: { demo: registered }, projects: { demo: { code: "DEMO" } } }));
+    },
+    sleep: async ms => { clock += ms; if (clock > 2000000) throw new Error("demo queue timeout"); },
+  };
+  return { dir, config, state, log, old, calls, creates, ports, agents, keys, fail: (step: string) => { fail = step; }, archiveCount: () => archiveCount };
+}
+const input = (extra = {}) => leaderSwapRpc.input.parse({ project: "demo", ...extra });
+async function settled() {
+  for (let i = 0; i < 200; i++) { const state = await inspectSupervisorShift("demo"); if (!state.running) return state; await new Promise(resolve => setTimeout(resolve, 5)); }
+  throw new Error("Demo swap did not settle");
+}
+
+test("fake host runs every stage, keeps settings, and archives only after reply plus registration", async () => {
+  const f = fixture();
+  const outcome = await runSupervisorShift({ clicked: true, project: "demo", code: "DEMO", agentId: "old", resume: "start", existingNewId: null }, f.ports);
+  assert.deepEqual(outcome.steps, ["handover", "open", "detach", "wait", "archive"]);
+  assert.equal(outcome.archived, true);
+  assert.deepEqual(f.creates[0], { ...Object.fromEntries(["workspaceId", "cwd", "title", "provider", "model", "modeId", "thinkingOptionId", "featureValues"].map(key => [key, f.old[key as keyof ShiftAgent]])), idempotencyKey: "afc-leader-swap:demo:old", labels: { role: "supervisor" }, prompt: f.creates[0].prompt });
+  assert.ok(f.creates[0].prompt.includes("DEMO_0001"));
+  assert.ok(f.creates[0].prompt.includes("supervise"));
+});
+
+for (const stage of ["handover", "open", "detach", "wait", "archive"]) test(`RPC resumes ${stage} failure after process state is reloaded without duplicating a session`, async () => {
+  const f = fixture(); f.fail(stage);
+  await leaderSwap({} as never, input(), f.ports);
+  let state = await settled();
+  assert.equal(state.job?.phase, "failed");
+  assert.equal(state.job?.step, stage);
+  assert.equal(f.archiveCount(), 0);
+  assert.ok(existsSync(f.state));
+  f.fail(""); resetShiftClaimsForTests();
+  await leaderSwap({} as never, input(), f.ports);
+  state = await settled();
+  assert.equal(state.job?.phase, "done");
+  assert.equal(f.archiveCount(), 1);
+  assert.equal(f.keys.size, 1);
+  if (["detach", "wait", "archive"].includes(stage)) assert.equal(f.creates.length, 1);
+  resetShiftClaimsForTests();
+  const repeated = await leaderSwap({} as never, input(), f.ports);
+  assert.equal(repeated.job?.phase, "done");
+  assert.equal(f.archiveCount(), 1);
+  assert.equal(f.keys.size, 1);
+});
+
+test("dry-run reads a plan without prompts, host mutations, state writes or logs", async () => {
+  const f = fixture();
+  const before = readFileSync(f.config, "utf8");
+  const result = await leaderSwap({} as never, input({ dryRun: true }), f.ports);
+  assert.equal(result.ok, true);
+  assert.equal(result.plan?.title, f.old.title);
+  assert.deepEqual(f.calls, ["get:old"]);
+  assert.equal(readFileSync(f.config, "utf8"), before);
+  assert.equal(existsSync(f.state), false);
+  assert.equal(existsSync(f.log), false);
+});
+
+test("takeover reply without registration does not archive; a queue waits for idle", async () => {
+  const f = fixture(); f.fail("registration");
+  const failed = await runSupervisorShift({ clicked: true, project: "demo", code: "DEMO", agentId: "old", resume: "start", existingNewId: null, maxPolls: 1 }, f.ports);
+  assert.equal(failed.progress.phase, "failed"); assert.equal(f.archiveCount(), 0);
+  f.fail(""); f.old.status = "running";
+  f.ports.sleep = async () => { f.old.status = "idle"; };
+  const done = await runSupervisorShift({ clicked: true, project: "demo", code: "DEMO", agentId: "old", resume: "start", existingNewId: null }, f.ports);
+  assert.equal(done.progress.phase, "done"); assert.equal(done.steps[0], "queued");
+});
+
+test("CLI prints all stages and JSON reports; dry-run and usage perform only read RPCs", async () => {
+  const f = fixture(); const output: string[] = [], progress: string[] = [];
+  const ports = { call: async (method: string, raw: unknown) => { assert.equal(method, "leader.swap"); return leaderSwap({} as never, leaderSwapRpc.input.parse(raw), f.ports); }, write: (value: string) => output.push(value), progress: (value: string) => progress.push(value), sleep: async () => { await new Promise(resolve => setTimeout(resolve, 5)); } };
+  assert.equal(await runLeaderCli(["swap", "demo", "--dry-run", "--json"], ports), 0);
+  assert.equal(JSON.parse(output.pop()!).dryRun, true); assert.deepEqual(f.calls, ["get:old"]);
+  f.calls.length = 0; progress.length = 0;
+  assert.equal(await runLeaderCli(["swap", "demo", "--json"], ports), 0);
+  assert.equal(JSON.parse(output.pop()!).job.phase, "done");
+  for (const step of ["handover", "open", "detach", "wait", "archive"]) assert.ok(progress.some(line => line.startsWith(`${step}:`)), step);
+  const calls: string[] = [];
+  const report = await readLeaderUsage({} as never, f.config, async id => f.agents.get(id) ?? null);
+  assert.equal(report.rows[0].level, "warning");
+  assert.equal(await runLeaderCli(["usage", "--json"], { ...ports, call: async method => { calls.push(method); return report; } }), 0);
+  assert.deepEqual(calls, ["leader.usage"]);
+  assert.equal(JSON.parse(output.pop()!).thresholds.warningTokens, 750000);
+});
+
+test("CLI failures name the step, both sessions, state and continuation command", async () => {
+  const f = fixture(); f.fail("detach"); const lines: string[] = [];
+  const code = await runLeaderCli(["swap", "demo"], { call: async (_, raw) => leaderSwap({} as never, leaderSwapRpc.input.parse(raw), f.ports), write: value => lines.push(value), progress: value => lines.push(value), sleep: async () => { await new Promise(resolve => setTimeout(resolve, 5)); } });
+  assert.equal(code, 1);
+  assert.ok(lines.some(line => line.includes("Swap stopped at detach") && line.includes("old=old, new=new-1") && line.includes("afc leader swap demo")));
+  assert.equal(f.archiveCount(), 0);
+});
+
+test("Paseo adapter opens in the existing workspace with the original config and idempotency key", async () => {
+  const f = fixture();
+  const { supervisorShiftPorts } = await import("../supervisor-shift");
+  const calls: string[] = [];
+  let creation: any;
+  const snapshot = { status: "idle", title: f.old.title, workspaceId: f.old.workspaceId, cwd: f.old.cwd, provider: f.old.provider, model: f.old.model, currentModeId: f.old.modeId, thinkingOptionId: f.old.thinkingOptionId, labels: f.old.labels, lastUsage: { contextWindowUsedTokens: 800000 } };
+  const host = {
+    agents: { ref: (id: string) => ({
+      refresh: async () => ({ agent: snapshot }), current: () => snapshot,
+      run: async () => { calls.push("handover"); return { status: "completed", lastMessage: handoverDoneReply() }; },
+      detach: async () => { calls.push(`detach:${id}`); }, archive: async () => { calls.push(`archive:${id}`); },
+      waitForFinish: async () => ({ lastMessage: takenOverReply() }),
+    }) },
+    workspaces: { ref: (id: string) => ({ agents: { create: async (input: unknown) => {
+      assert.equal(id, f.old.workspaceId); creation = input; calls.push("open");
+      return { id: "new-host", workspaceId: id, refresh: async () => null, current: () => ({ labels: { [PARENT_LABEL]: "old" } }) };
+    } } }) },
+  };
+  const ports = supervisorShiftPorts(host as never, "demo", async () => false);
+  const request = { ...f.old, workspaceId: f.old.workspaceId!, prompt: "Demo takeover", idempotencyKey: "demo-key" };
+  await ports.getAgent("old");
+  await ports.sendAndWait("old", "Demo handover", 100);
+  const created = await ports.createAgent(request);
+  await ports.detach(created.id); await ports.archive("old");
+  assert.equal(creation.idempotencyKey, "demo-key");
+  assert.deepEqual(creation.config, { provider: "demo-provider/demo-model", modeId: "demo-mode", thinkingOptionId: "demo-effort", featureValues: { demo: true } });
+  assert.equal(creation.title, "Demo leader");
+  assert.deepEqual(calls, ["handover", "open", "detach:new-host", "archive:old"]);
+});

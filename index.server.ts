@@ -34,6 +34,8 @@ import { doctorRpc } from "./shared/doctor";
 import { runDoctor } from "./server/doctor";
 import { startDoctorDaily } from "./server/doctor-daily";
 import { readPanelPrefs, updatePanelPrefs } from "./server/panel-prefs";
+import { leaderSwapRpc, leaderUsageRpc } from "./shared/leader-command";
+import { leaderSwap, readLeaderUsage } from "./server/leader-command";
 import { requestSupervisorShift } from "./server/supervisor-shift";
 import { boardUsageRpc, cursorConnectRpc, cursorDisconnectRpc, planUpdateRpc, resetCouponsRefreshRpc } from "./shared/usage";
 import { confirmResetCoupons, startResetCouponConfirm } from "./server/reset-coupons";
@@ -84,6 +86,8 @@ export default function contribute(server: PluginServerContext) {
     if (result.status === "saved" && input.file === "plans") requestPoolRefreshNow();
     return result;
   });
+  server.handle(leaderUsageRpc, async (_, { paseo }) => readLeaderUsage(paseo));
+  server.handle(leaderSwapRpc, async (input, { paseo }) => leaderSwap(paseo, input));
   server.handle(doctorRpc, async () => runDoctor());
   server.handle(accessRpc, async ({ refresh }) => {
     if (refresh) await refreshAccess("now");
