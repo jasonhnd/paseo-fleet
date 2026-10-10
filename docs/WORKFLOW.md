@@ -36,7 +36,7 @@ Difficulty selects configured model and effort options. It does not confer autho
 6. The reviewer checks the actual changes and evidence, approving or requesting changes. The lead compares the result with the user's request, then accepts or returns it. Approval alone is not final acceptance. Repeated rejection should trigger a scope/brief review.
 7. A separate authorized operation handles merge or release. A first-card demo needs neither. Check the clean working tree and completed card; let managed agent/workspace cleanup finish.
 
-The leader launch sets the board activation marker (`BOARD_AGENT_ENV` in `server/agent-env.ts`) to `1` and sends `KANBAN_ROLE=supervisor` at creation. Labels alone do not trigger the protocol on the supported host; the first variable alone defaults to executor. Creation, protocol delivery and registration are separate checks. Recovery as a visible session message is not a retroactive system prompt.
+The leader launch sets the board activation marker (`BOARD_AGENT_ENV` in Kanban's `server/agent-env.ts`) to `1` and sends `KANBAN_ROLE=supervisor` at creation. Labels alone do not trigger the protocol on the supported host; the first variable alone defaults to executor. Creation, protocol delivery and registration are separate checks. Recovery as a visible session message is not a retroactive system prompt.
 
 ## Waiting and decisions
 

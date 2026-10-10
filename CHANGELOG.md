@@ -28,7 +28,7 @@ No public release is declared by this document.
 
 - Intended initial package version: 0.1.0; status: experimental, unreleased.
 - Paseo manifest range: >=0.11.0 <0.12.0. Full platform/desktop certification is pending.
-- Contract schema: fleet-quota/v1. No contract or data migration is introduced by these documentation changes.
+- Contract schema: fleet-quota/v1; additive contractVersion: 1.2.0. No contract or data migration is introduced by these documentation changes.
 - Minimum released companion version: not established; no supported release pair is declared.
 - Tested companion tag/commit and upgrade order: to be recorded in each release after interoperability checks. Do not infer these from matching package versions.
 - Git install, package, desktop, first-card and rollback evidence is required before release; see docs/RELEASE.md. Code downgrade does not undo data writes.

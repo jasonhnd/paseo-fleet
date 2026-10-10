@@ -29,7 +29,7 @@ L1：清楚的小改；L2：集中常规改动；L3：跨文件或调查；L4：
 6. 审查核对改动和证据后通过或返工；leader 对用户需求逐项核对后验收。审查通过不等于最终验收；反复打回要复核范围和简报。
 7. 合并或发版另交已授权操作，首卡演示无需这些。核对完成状态与干净工作区，等待管理的会话/workspace 清理完毕。
 
-启动会话将看板标记（server/agent-env.ts 的 BOARD_AGENT_ENV）设为 1，同时传 KANBAN_ROLE=supervisor。仅标签在支持的 host 上不触发协议；只传前者默认为执行。创建、协议送达、登记须分别确认。可见会话消息恢复不能称补写 system prompt。
+启动会话将看板标记（Kanban server/agent-env.ts 的 BOARD_AGENT_ENV）设为 1，同时传 KANBAN_ROLE=supervisor。仅标签在支持的 host 上不触发协议；只传前者默认为执行。创建、协议送达、登记须分别确认。可见会话消息恢复不能称补写 system prompt。
 
 ## 等待与决定
 
