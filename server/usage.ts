@@ -77,6 +77,8 @@ interface PlanConfig {
    * Omitted means true. Hard stops (97%, Claude 75% / 5-hour 70%, hand-copied 80%, dispatch:false) still apply.
    */
   pacePause?: boolean;
+  /** Optional dispatch role allowlist. Independent of pacing and quota protection. */
+  onlyRoles?: string[];
   /**
    * Optional hard stop, as a percent already used. Missing keeps that pool's existing line
    * (Claude's 75% reserve and 5-hour 70% pause, a hand-copied 80%, otherwise 97%).
@@ -292,6 +294,7 @@ function planOf(cfg: PlanConfig, planConfigs: PlanConfig[], ctx: PlanContext): U
     priceUsdMonthly: cfg.priceUsdMonthly,
     dispatch: cfg.dispatch,
     ...(cfg.pacePause !== undefined ? { pacePause: cfg.pacePause } : {}),
+    ...(Array.isArray(cfg.onlyRoles) ? { onlyRoles: cfg.onlyRoles.filter(role => typeof role === "string" && role.length > 0) } : {}),
     ...(stopPct !== null ? { stopPct } : {}),
     note: cfg.note ?? "",
     providers: cfg.providers,

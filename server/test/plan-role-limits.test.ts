@@ -42,7 +42,7 @@ before(async () => {
   await Promise.all([data, process.env.PASEO_HOME!, join(plugin, "shared")].map(dir => mkdir(dir, { recursive: true })));
   await writeFile(join(process.env.PASEO_HOME!, "config.json"), JSON.stringify({ daemon: { agentProfiles: profiles } }));
   const baseRoles = Object.fromEntries(roles.slice(0, 5).map(role => [role, { L2: profiles.filter(p => p.role === role || p.candidateFor === role).map(p => ({ profile: p.name, effort: null })) }]));
-  await writeFile(join(plugin, "shared/default-dispatch.example.json"), JSON.stringify({ version: 1, defaultTier: "L2", roles: baseRoles }));
+  await writeFile(join(plugin, "shared/default-dispatch.example.json"), JSON.stringify({ version: 1, defaultTier: "L2", roles: baseRoles, downgradeWhenTight: [] }));
   usage = await import("../usage");
   pools = await import("../pools-status");
   dispatch = await import("../dispatch");
@@ -50,10 +50,10 @@ before(async () => {
 });
 after(async () => { mock.timers.reset(); await rm(root, { recursive: true, force: true }); });
 
-async function assemble(changes: Record<string, unknown> = {}) {
+async function assemble(changes: Record<string, unknown> = {}, api = host) {
   await writeFile(join(data, "plans.json"), JSON.stringify({ plans: [{ ...rawPlan, ...changes }] }));
   clearCache();
-  return usage.assemble(host, "7d");
+  return usage.assemble(api, "7d");
 }
 const json = async (path: string) => JSON.parse(await readFile(path, "utf8"));
 const reviewNames = ["Demo reviewer", "Demo review candidate"];
@@ -73,7 +73,11 @@ test("raw review-only plans survive normalization, RPC, status, contract export 
   for (const flags of [dispatch.poolFlagsFromJson(legacy.pools, now), dispatch.poolFlagsFromJson(exported.pools, now)]) {
     for (const profile of profiles) assert.equal(profilePaused(profile, flags[rawPlan.id]), !reviewNames.includes(profile.name), profile.name);
   }
-  await dispatch.publishDispatch(status, now, catalog);
+  // Exercise the real timer refresh as well as the standalone writer.
+  await usage.refreshPoolStatus(host);
+  const panel = boardUsageRpc.output.parse(await usage.buildUsage(host, "7d"));
+  assert.deepEqual(panel.plans[0].onlyRoles, ["reviewer"]);
+  assert.equal(panel.pools![rawPlan.id].dispatchable, true);
   for (const path of [dispatch.DISPATCH_MATRIX, join(data, "exports/dispatch-matrix.json")]) {
     const matrix = await json(path);
     assert.deepEqual(matrix.roles.reviewer.L2.map((row: { profile: string; paused?: boolean }) => [row.profile, Boolean(row.paused)]), reviewNames.map(name => [name, false]));
@@ -108,6 +112,16 @@ test("role limits never open a closed, exhausted or protected unread pool", asyn
   }
 });
 
+test("quota and rate-limit read failures keep protected pools paused", async () => {
+  for (const message of ["quota exhausted", "rate_limit"]) {
+    const failed = { providers: { listUsage: async () => { throw new Error(message); } } } as never;
+    const { board } = await assemble({ quotaProtection: "pause", manualOverride: null, paceDisable: true }, failed);
+    const status = pools.poolStatus(board.plans, { now });
+    assert.equal(status[rawPlan.id].dispatchable, false);
+    for (const profile of profiles) assert.equal(profilePaused(profile, dispatch.poolFlagsFromJson(status, now)[rawPlan.id]), true, profile.name);
+  }
+});
+
 test("unprotected and legacy pools still enforce explicit roles, including unknown role names", async () => {
   for (const quotaProtection of [undefined, "none"]) {
     const { board } = await assemble({ quotaProtection, paceDisable: true });
@@ -124,7 +138,7 @@ test("explicit plan limits narrow existing reviewer exceptions without opening o
   const { board } = await assemble();
   const window = { ...board.plans[0].windows[0], usedPct: 80 };
   const leader = {
-    ...board.plans[0], id: "demo-leader", adapter: "claude-cli", windows: [window],
+    ...board.plans[0], id: "demo-leader", adapter: "claude-cli", windows: [window, { ...window, label: "Weekly · Fable", usedPct: 20 }],
     reviewerException: { roles: ["reviewer"], stopPct: 90, until: "2030-06-08T00:00:00Z" },
   };
   const cases = [
@@ -137,6 +151,10 @@ test("explicit plan limits narrow existing reviewer exceptions without opening o
     const status = pools.poolStatus([{ ...leader, onlyRoles: item.onlyRoles }, { ...board.plans[0], id: "demo-unrestricted", onlyRoles: undefined }], { now });
     assert.equal(status[leader.id].dispatchable, item.dispatchable);
     assert.deepEqual(status[leader.id].onlyRoles, item.allowed);
+    assert.equal(status["claude-fable"].dispatchable, item.dispatchable);
+    assert.deepEqual(status["claude-fable"].onlyRoles, item.allowed);
     assert.equal(status["demo-unrestricted"].onlyRoles, undefined);
   }
+  const expired = { ...leader, reviewerException: { ...leader.reviewerException, until: new Date(now).toISOString() } };
+  assert.equal(pools.poolStatus([expired], { now })[leader.id].dispatchable, false);
 });

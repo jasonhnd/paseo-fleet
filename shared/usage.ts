@@ -105,6 +105,8 @@ const planSchema = z.object({
    * Omitted means true (pause when ahead). Hard stops are unaffected.
    */
   pacePause: z.boolean().optional(),
+  /** Nonempty lists restrict dispatch roles even when pacing or quota protection is disabled. */
+  onlyRoles: z.array(z.string()).optional(),
   /**
    * Optional hard stop, as a percent already used. Missing keeps that pool's existing line
    * (Claude's 75% reserve and 5-hour 70% pause, a hand-copied 80%, otherwise 97%).

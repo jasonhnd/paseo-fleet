@@ -69,7 +69,8 @@ export interface PoolStatus {
   priorityUntil?: string;
   /**
    * When set, only profiles whose `role` or `candidateFor` is listed may take new work.
-   * Absent means every role on a dispatchable pool may take work. Omitted once the exception expires.
+   * Absent or empty means every role on a dispatchable pool may take work.
+   * Explicit plan limits persist; limits from a dated reviewer exception end with that exception.
    */
   onlyRoles?: string[];
   /**

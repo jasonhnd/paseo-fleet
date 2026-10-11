@@ -535,7 +535,24 @@ export function poolStatus(plans: UsagePlan[], options: PoolStatusOptions = {}):
   // DEMO_0070: the coupon used to force prefer on the Codex pool here (reason + codexCouponPreferNote()).
   // Removed on purpose; the coupon record and burn-mode pacing are untouched, only the preference is gone.
   applyCodexCredits(ctx.draft, plans, options, now, catalog);
-  return withNeed(Object.fromEntries([...ctx.draft].map(([key, row]) => [key, { ...row.status, ...wasteRiskOf(row.status) }])), ctx.targets, catalog);
+  const pools = Object.fromEntries([...ctx.draft].map(([key, row]) => [key, { ...row.status, ...wasteRiskOf(row.status) }]));
+  return withNeed(restrictPlanRoles(pools, plans, catalog), ctx.targets, catalog);
+}
+
+/** Apply explicit role limits last: they can narrow a reviewer exception, but never reopen a pool. */
+function restrictPlanRoles(pools: Record<string, PoolStatus>, plans: UsagePlan[], catalog: PoolEntry[]): Record<string, PoolStatus> {
+  const byId = new Map(plans.map(plan => [plan.id, plan]));
+  const planIds = new Map(catalog.map(pool => [pool.id, pool.planId]));
+  for (const [id, row] of Object.entries(pools)) {
+    const roles = byId.get(planIds.get(id) ?? id)?.onlyRoles;
+    if (!roles?.length) continue;
+    const onlyRoles = row.onlyRoles?.length ? roles.filter(role => row.onlyRoles!.includes(role)) : [...roles];
+    pools[id] = onlyRoles.length > 0 ? { ...row, onlyRoles } : {
+      ...row, onlyRoles, dispatchable: false, prefer: false, deprioritize: false,
+      paceState: "stopped", reason: t("dispatch.status.paused"),
+    };
+  }
+  return pools;
 }
 
 /**
