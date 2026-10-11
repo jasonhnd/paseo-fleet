@@ -1,9 +1,20 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { CONTRACT_SCHEMA, EXPORTS, Envelope, type ExportKind } from "../../../shared/contract/schema";
+import { CONTRACT_SCHEMA, EXPORTS, Envelope, RoleMatrix, type ExportKind } from "../../../shared/contract/schema";
 import { INVALID, VALID } from "./fixtures";
 
 const KINDS = Object.keys(EXPORTS) as ExportKind[];
+
+test("model branches survive parsing alongside legacy metadata and malformed models cannot fall back", () => {
+  const legacy = { byExecutorFamily: { demo: { L2: [{ profile: "Demo legacy", effort: "high" }] } } };
+  const model = { byExecutorModel: { "demo-alpha": { L2: [{ profile: "Demo reviewer", effort: "high" }] } } };
+  assert.deepEqual(RoleMatrix.parse({ ...legacy, ...model }), { ...legacy, ...model });
+  assert.deepEqual(RoleMatrix.parse(legacy), legacy);
+  for (const bad of [null, [], "invalid", { "": { L2: [] } }, { "demo-alpha": { L2: [{ effort: "high" }] } }]) {
+    assert.equal(RoleMatrix.safeParse({ ...legacy, byExecutorModel: bad }).success, false);
+  }
+  assert.deepEqual(RoleMatrix.parse({ byExecutorModel: {} }), { byExecutorModel: {} });
+});
 
 describe("export payload schemas", () => {
   for (const kind of KINDS) {

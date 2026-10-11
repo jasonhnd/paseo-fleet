@@ -5,7 +5,7 @@
 import { z } from "zod";
 
 export const CONTRACT_SCHEMA = "fleet-quota/v1";
-export const CONTRACT_VERSION = "1.2.0";
+export const CONTRACT_VERSION = "1.3.0";
 
 export const PLUGIN_IDS = {
   cockpit: "agent-fleet-cockpit",
@@ -74,8 +74,13 @@ export const MatrixEntry = z.object({
 /** Tier name (L1..L4) to an ordered candidate list. */
 export const TierMap = z.record(z.string(), z.array(MatrixEntry));
 
-/** A role either maps tiers directly, or first branches on the executor's model family. */
-export const RoleMatrix = z.union([z.object({ byExecutorFamily: z.record(z.string(), TierMap) }), TierMap]);
+/** Exact actual model ids. A present model branch must never be stripped by a legacy union alternative. */
+export const ModelRoleMatrix = z.object({ byExecutorModel: z.record(z.string().trim().min(1), TierMap) }).passthrough();
+const LegacyFamilyRoleMatrix = z.object({ byExecutorFamily: z.record(z.string(), TierMap) }).passthrough()
+  .refine(value => !Object.hasOwn(value, "byExecutorModel"), "Invalid model branch");
+const DirectRoleMatrix = TierMap.refine(value => !Object.hasOwn(value, "byExecutorModel") && !Object.hasOwn(value, "byExecutorFamily"), "Reserved branch key");
+/** Producers emit model branches; family branches remain readable only for legacy candidate migration. */
+export const RoleMatrix = z.union([ModelRoleMatrix, LegacyFamilyRoleMatrix, DirectRoleMatrix]);
 
 // dispatch-matrix.json keeps the existing version/defaultTier/roles shape inside the envelope.
 export const DispatchMatrix = Envelope.extend({

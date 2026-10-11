@@ -6,9 +6,10 @@
     "server/contract/paths.ts": "0f7359e94204df07c57589a93dfa0adf7344687d7a1890886baf33b38e15a31a",
     "server/contract/test/fixtures.ts": "9f929e855310d2528823e5f16d46b49db3399158d17b32de6202f3b0bd38bb32",
     "server/contract/test/io.test.ts": "cf88237004e8a3be7132999b8ccf052f876b4635aa5d2c84906df72df86718e2",
+    "server/contract/test/model-review.fixture.json": "116d4e17b880ede46317cdb0a0411825ee27b4721d562748fda431180a12b392",
     "server/contract/test/paths.test.ts": "0b9bd3569b06b6ada4942313d3233669b1f37f899c21742d94cfdff11b41d0da",
-    "server/contract/test/schema.test.ts": "64adcfe88b96e45da685d461992271959ed211ce7268fc35a04c24d573b8273f",
+    "server/contract/test/schema.test.ts": "05f917e1bcc7db67c2a6998cd331f91aa3138d7726f77bcd611ba39505d5850a",
     "shared/contract/index.ts": "467083a161867f36e383b167cd9d98193688819b233c26b6be9052e7f13e164b",
-    "shared/contract/schema.ts": "95038a50b8986881c8595211c2067cca15f50bc752c126f5c706bfbf554441c0"
+    "shared/contract/schema.ts": "43b51e0557bffe0d9c8477ad5b50eb3d522bfc13dec723b5c88d96e6e3098931"
   }
 }
