@@ -224,6 +224,36 @@ test("native provider, Grok, Cursor and Antigravity entry points share hourly ga
   await writeFile(join(process.env.AFC_DATA_DIR!, "afc.config.json"), JSON.stringify({ adapters: { "cursor-api": false } }));
 });
 
+test("reader failures and retained caps protect only the matching source; manual stops remain independent", (ctx) => {
+  ctx.mock.timers.enable({ apis: ["Date"], now });
+  const cursor: import("../cursor-usage").CursorUsageReading = { readAt: iso(now), ok: false, error: "authentication failed", includedPct: null,
+    autoPct: null, apiPct: null, onDemandUsd: null, onDemandLimitUsd: null, resetsAt: iso(now + 86400000), windows: [], source: "official",
+    loggedOut: true, linkBroken: true, lastKnown: { autoPct: 99, readAt: iso(now - QUOTA_SAMPLE_MS), resetsAt: iso(now + 86400000) } };
+  const context = { now, windowsBy: new Map([["codex", [{ label: "Weekly", usedPct: 10, resetsAt: iso(now + 86400000), collectedAt: iso(now) }]]]),
+    providerCollectedAt: iso(now), balances: new Map(), cursorReading: cursor, sumUsd: () => 0 };
+  const base = { id: "demo", priceUsdMonthly: null, providers: ["codex"], quotaCycle: { kind: "unknown" as const } };
+  const manual = { ...base, manualOverride: { usedPct: 1, at: iso(now), ttlSeconds: 7200 } };
+  const provider = { ...base, usageProvider: "codex" };
+  for (const [cfg, adapter] of [[manual, "manual"], [provider, "codex-cli"]] as const) {
+    const windows = windowsFor(cfg, adapter, context);
+    assert.equal(windows[0].safetyError, null);
+    assert.equal(windows[0].knownQuotaStop, null);
+  }
+  const manualFailure = windowsFor(manual, "manual", { ...context, quotaError: "rate_limit" });
+  assert.equal(manualFailure[0].safetyError, null);
+  const legacyManual = windowsFor({ ...base, quotaCycle: undefined, cycleDay: 1, manual: { usedPct: 1, at: iso(now) } }, "manual", { ...context, quotaError: "rate_limit" });
+  assert.equal(legacyManual[0].safetyError, null);
+  assert.equal(legacyManual[0].knownQuotaStop, null);
+  const failingProvider = windowsFor(provider, "codex-cli", { ...context, quotaError: "rate_limit" });
+  assert.equal(failingProvider[0].safetyError, "rate_limit");
+  const failingCursor = windowsFor(base, "cursor-api", context);
+  assert.ok(failingCursor[0].safetyError);
+  const plan: UsagePlan = { ...manual, adapter: "manual", name: "Manual", dispatch: true, windows: manualFailure, note: "", api30dUsd: 0, roi30d: null, coverage: "" };
+  assert.equal(poolStatus([plan], { now }).demo.dispatchable, true);
+  assert.equal(poolStatus([{ ...plan, dispatch: false }], { now }).demo.dispatchable, false);
+  ctx.mock.timers.reset();
+});
+
 test("Cursor and Grok failure/expiry cannot forget a known exhausted reading before reset", () => {
   const previous: import("../cursor-usage").CursorUsageReading = { readAt: iso(now - 2 * QUOTA_SAMPLE_MS), ok: true, error: null, includedPct: 99,
     autoPct: 99, apiPct: 0, onDemandUsd: null, onDemandLimitUsd: null, resetsAt: iso(now + 86400000), windows: [], source: "official", loggedOut: false };

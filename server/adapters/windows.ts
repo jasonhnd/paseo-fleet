@@ -214,6 +214,10 @@ export function knownQuotaFailure(error: unknown): string | null {
   return typeof error === "string" && /quota|rate[_ -]?limit|auth|unauthorized|not.logged|login.*lost/i.test(error) ? error : null;
 }
 
+function cursorSafetyError(reading: CursorUsageReading | null): string | null {
+  return reading?.linkBroken ? reading.notice ?? reading.error ?? "Cursor authentication failed" : knownQuotaFailure(reading?.error);
+}
+
 function cursorKnownStop(cfg: WindowPlan, reading: CursorUsageReading | null, now: number): string | null {
   const known = reading?.lastKnown;
   if (reading?.ok || cfg.quotaProtection === "none" || !known || !validQuotaTime(known.readAt, now)
@@ -264,21 +268,21 @@ function monthlyWindowOf(cfg: WindowPlan, adapter: AdapterId, ctx: WindowContext
     manualAt: manual?.at ?? null,
     sampledAt: live !== null ? validQuotaTime(ctx.cursorReading?.readAt, ctx.now ?? Date.now()) : null,
     displayExpiresAt: quotaDisplayExpiry(live !== null ? validQuotaTime(ctx.cursorReading?.readAt, ctx.now ?? Date.now()) : manual?.at ?? null, end.toISOString()),
-    safetyError: ctx.cursorReading?.linkBroken ? ctx.cursorReading.notice ?? ctx.cursorReading.error ?? "Cursor authentication failed" : knownQuotaFailure(ctx.cursorReading?.error),
-    knownQuotaStop: cursorKnownStop(cfg, ctx.cursorReading, ctx.now ?? Date.now()),
+    safetyError: adapter === CURSOR_API ? cursorSafetyError(ctx.cursorReading) : null,
+    knownQuotaStop: adapter === CURSOR_API ? cursorKnownStop(cfg, ctx.cursorReading, ctx.now ?? Date.now()) : null,
     // Card #66 correction ④: Paseo's balance does not split Cursor's quota blocks, so it is shown for
     // reference only. Dispatch uses the Auto percent from the official API or `/usage`, or the hand copy when both failed.
     balance: balance ? { usedUsd: balance.usedUsd, limitUsd: balance.limitUsd } : null,
   };
 }
 
-function hiddenWindowOf(cfg: WindowPlan, ctx: WindowContext): UsageWindow {
+function hiddenWindowOf(cfg: WindowPlan, ctx: WindowContext, adapter: AdapterId): UsageWindow {
   const daily = cfg.priceUsdMonthly !== null ? (cfg.priceUsdMonthly * 12) / 365 : null;
   return {
     label: t("screen.window.quotaHidden"), usedPct: null, resetsAt: null, startsAt: null, elapsedPct: null, projectedPct: null, runsOutAt: null,
     verdict: "unknown", apiUsd: ctx.sumUsd((r) => cfg.providers.includes(r.provider) && r.hour >= Date.now() - 7 * DAY), fullWindowUsd: null, planUsd: daily !== null ? daily * 7 : null,
     source: "none", manualAt: null,
-    safetyError: knownQuotaFailure(ctx.quotaError),
+    safetyError: adapterSpec(adapter).readsProvider ? knownQuotaFailure(ctx.quotaError) : null,
   };
 }
 
@@ -297,7 +301,7 @@ export function windowsFor(cfg: WindowPlan, adapter: AdapterId, ctx: WindowConte
   const provider = adapterSpec(adapter).readsProvider ? providerWindowsOf(cfg, adapter, ctx) : [];
   if (cfg.quotaCycle || cfg.manualOverride !== undefined) return configuredWindows(cfg, adapter, ctx, provider);
   const windows = [...provider, ...(cfg.cycleDay ? [monthlyWindowOf(cfg, adapter, ctx)] : [])];
-  if (windows.length === 0) windows.push(hiddenWindowOf(cfg, ctx));
+  if (windows.length === 0) windows.push(hiddenWindowOf(cfg, ctx, adapter));
   return windows;
 }
 
@@ -306,13 +310,14 @@ function configuredWindows(cfg: WindowPlan, adapter: AdapterId, ctx: WindowConte
   const now = ctx.now ?? Date.now();
   const cycle = cfg.quotaCycle ?? { kind: "unknown" };
   const main = mainWindowOf(adapter, provider) ?? provider[0];
+  const providerError = adapterSpec(adapter).readsProvider ? ctx.quotaError : null;
   const cursor = adapter === CURSOR_API ? cursorLivePct(ctx.cursorReading) : null;
   const live = cursor !== null ? cursor : main?.usedPct ?? null;
   const reset = cursor !== null ? ctx.cursorReading?.resetsAt : main?.resetsAt;
   const sampledAt = validQuotaTime(cursor !== null ? ctx.cursorReading?.readAt : main?.sampledAt, now);
-  const collectedAt = cursor !== null ? sampledAt : main?.collectedAt ?? ctx.providerCollectedAt ?? null;
+  const collectedAt = cursor !== null ? sampledAt : main?.collectedAt ?? (adapterSpec(adapter).readsProvider ? ctx.providerCollectedAt : null) ?? null;
   const expires = cursor !== null ? readingExpiry(sampledAt, reset ?? null) : main?.readingExpiresAt ?? null;
-  const liveValid = validPercent(live) && !ctx.quotaError && (!reset || Date.parse(reset) > now)
+  const liveValid = validPercent(live) && !providerError && (!reset || Date.parse(reset) > now)
     && (expires === null ? ctx.providerCollectedAt === undefined : Date.parse(expires) > now);
   const manual = manualState(cfg.manualOverride === undefined ? cfg.manual : cfg.manualOverride, cycle, now);
   const used = liveValid ? live : manual.state === "manual" ? manual.reading!.usedPct : null;
@@ -324,7 +329,7 @@ function configuredWindows(cfg: WindowPlan, adapter: AdapterId, ctx: WindowConte
   const paceEligible = bounds !== null && (liveValid
     ? cycle.kind !== "unknown" && liveKind === cycle.kind && (cycle.kind !== "duration" || bounds.end - bounds.start === cycle.seconds * 1000)
     : cycle.kind !== "unknown");
-  const error = liveValid || adapter === "manual" ? null : ctx.quotaError ?? t("quota.setup.readFailed");
+  const error = liveValid || adapter === "manual" ? null : providerError ?? (adapter === CURSOR_API ? ctx.cursorReading?.error : null) ?? t("quota.setup.readFailed");
   const knownStop = !liveValid && cfg.quotaProtection !== "none" && typeof live === "number" && live >= (cfg.stopPct ?? 97)
     && (!reset || Date.parse(reset) > now)
     ? t("quota.setup.windowAtStop", { window: main?.label ?? "Monthly", used: live, stop: cfg.stopPct ?? 97 }) : null;
@@ -342,8 +347,8 @@ function configuredWindows(cfg: WindowPlan, adapter: AdapterId, ctx: WindowConte
     collectedAt,
     sourceTimeKind: !liveValid && manual.state === "manual" ? "source" : cursor !== null ? sampledAt ? "source" : "unknown" : main?.sourceTimeKind ?? "unknown",
     displayExpiresAt: liveValid ? quotaDisplayExpiry(sampledAt ?? collectedAt, reset ?? null) : null,
-    safetyError: main?.safetyError ?? (ctx.cursorReading?.linkBroken ? ctx.cursorReading.notice ?? "Cursor authentication failed" : knownQuotaFailure(ctx.cursorReading?.error)) ?? knownQuotaFailure(ctx.quotaError),
-    knownQuotaStop: knownStop ?? cursorKnownStop(cfg, ctx.cursorReading, now),
+    safetyError: main?.safetyError ?? (adapter === CURSOR_API ? cursorSafetyError(ctx.cursorReading) : null) ?? knownQuotaFailure(providerError),
+    knownQuotaStop: knownStop ?? (adapter === CURSOR_API ? cursorKnownStop(cfg, ctx.cursorReading, now) : null),
     readingState: liveValid ? "live" : manual.state === "unknown" && live !== null ? "stale" : manual.state,
     cycleKind: liveValid ? liveKind : cycle.kind, paceEligible,
     readError: error, staleUsedPct: manual.state === "stale" ? manual.reading?.usedPct ?? null : !liveValid ? live : null,
