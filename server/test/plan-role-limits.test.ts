@@ -1,0 +1,142 @@
+import assert from "node:assert/strict";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { after, before, mock, test } from "node:test";
+import { EXPORTS } from "../../shared/contract/schema";
+import { profilePaused, type DispatchProfile } from "../../shared/dispatch";
+import { boardUsageRpc, type UsagePlan } from "../../shared/usage";
+
+const root = await mkdtemp(join(tmpdir(), "plan-role-limits-"));
+const data = join(root, "data");
+const home = join(root, "home");
+const plugin = join(root, "plugin");
+const now = Date.parse("2030-06-04T12:00:00Z");
+const roles = ["reviewer", "executor", "batch", "reader", "decision", "supervisor", "other"];
+const profiles: DispatchProfile[] = [
+  ...roles.map(role => ({ name: `Demo ${role}`, role, provider: "demo-provider", pool: "demo-pool" })),
+  { name: "Demo review candidate", role: "candidate", candidateFor: "reviewer", provider: "demo-provider", pool: "demo-pool" },
+  { name: "Demo work candidate", role: "candidate", candidateFor: "executor", provider: "demo-provider", pool: "demo-pool" },
+  { name: "Demo without role", provider: "demo-provider", pool: "demo-pool" },
+];
+const rawPlan = {
+  id: "demo-pool", name: "Demo pool", adapter: "grok-cli", providers: ["demo-provider"],
+  usageProvider: "demo-provider", priceUsdMonthly: null, dispatch: true, cliRead: false,
+  pacePause: false, onlyRoles: ["reviewer"], tempException: "Demo review-only authorization",
+};
+const providerWindow = { id: "weekly", label: "Weekly", usedPct: 30, resetsAt: "2030-06-08T00:00:00Z" };
+const host = { providers: { listUsage: async () => ({ providers: [{ providerId: "demo-provider", windows: [providerWindow], balances: [] }] }) } } as never;
+let usage: typeof import("../usage");
+let pools: typeof import("../pools-status");
+let dispatch: typeof import("../dispatch");
+let clearCache: typeof import("../util").clearCache;
+
+before(async () => {
+  mock.timers.enable({ apis: ["Date"], now });
+  Object.assign(process.env, {
+    HOME: home, PASEO_HOME: join(home, "paseo"), PASEO_URL: "ws://127.0.0.1:1",
+    AFC_DATA_DIR: data, ROLES_STATE_DIR: data, KANBAN_DATA_DIR: join(root, "board"),
+    AFC_TRANSCRIPT_HOME: join(root, "transcripts"), AFC_HOME: plugin, AFC_LANGUAGE: "en",
+  });
+  delete process.env.KANBAN_HOME;
+  await Promise.all([data, process.env.PASEO_HOME!, join(plugin, "shared")].map(dir => mkdir(dir, { recursive: true })));
+  await writeFile(join(process.env.PASEO_HOME!, "config.json"), JSON.stringify({ daemon: { agentProfiles: profiles } }));
+  const baseRoles = Object.fromEntries(roles.slice(0, 5).map(role => [role, { L2: profiles.filter(p => p.role === role || p.candidateFor === role).map(p => ({ profile: p.name, effort: null })) }]));
+  await writeFile(join(plugin, "shared/default-dispatch.example.json"), JSON.stringify({ version: 1, defaultTier: "L2", roles: baseRoles }));
+  usage = await import("../usage");
+  pools = await import("../pools-status");
+  dispatch = await import("../dispatch");
+  ({ clearCache } = await import("../util"));
+});
+after(async () => { mock.timers.reset(); await rm(root, { recursive: true, force: true }); });
+
+async function assemble(changes: Record<string, unknown> = {}) {
+  await writeFile(join(data, "plans.json"), JSON.stringify({ plans: [{ ...rawPlan, ...changes }] }));
+  clearCache();
+  return usage.assemble(host, "7d");
+}
+const json = async (path: string) => JSON.parse(await readFile(path, "utf8"));
+const reviewNames = ["Demo reviewer", "Demo review candidate"];
+
+test("raw review-only plans survive normalization, RPC, status, contract export and both matrices", async () => {
+  const { board, catalog } = await assemble();
+  // Inspect every boundary, rather than constructing the expected pool flags by hand.
+  assert.deepEqual((board.plans[0] as UsagePlan & { onlyRoles?: string[] }).onlyRoles, ["reviewer"]);
+  assert.deepEqual((boardUsageRpc.output.parse(board).plans[0] as UsagePlan & { onlyRoles?: string[] }).onlyRoles, ["reviewer"]);
+  const status = await pools.writePoolStatus(board.plans, null, now, false, null, null, 0, null, null, null, catalog);
+  assert.equal(status[rawPlan.id].dispatchable, true);
+  assert.deepEqual(status[rawPlan.id].onlyRoles, ["reviewer"]);
+  const legacy = await json(pools.POOL_STATUS);
+  const exported = EXPORTS.poolStatus.schema.parse(await json(join(data, "exports/pool-status.json")));
+  assert.deepEqual(legacy.pools[rawPlan.id].onlyRoles, ["reviewer"]);
+  assert.deepEqual(exported.pools[rawPlan.id].onlyRoles, ["reviewer"]);
+  for (const flags of [dispatch.poolFlagsFromJson(legacy.pools, now), dispatch.poolFlagsFromJson(exported.pools, now)]) {
+    for (const profile of profiles) assert.equal(profilePaused(profile, flags[rawPlan.id]), !reviewNames.includes(profile.name), profile.name);
+  }
+  await dispatch.publishDispatch(status, now, catalog);
+  for (const path of [dispatch.DISPATCH_MATRIX, join(data, "exports/dispatch-matrix.json")]) {
+    const matrix = await json(path);
+    assert.deepEqual(matrix.roles.reviewer.L2.map((row: { profile: string; paused?: boolean }) => [row.profile, Boolean(row.paused)]), reviewNames.map(name => [name, false]));
+    for (const role of roles.slice(1, 5)) assert.ok(matrix.roles[role].L2.every((row: { paused?: boolean }) => row.paused === true), role);
+  }
+});
+
+test("missing, null and empty role lists keep existing unrestricted semantics", async () => {
+  for (const onlyRoles of [undefined, null, []]) {
+    const { board } = await assemble({ onlyRoles });
+    const status = pools.poolStatus(board.plans, { now });
+    assert.equal(status[rawPlan.id].dispatchable, true);
+    const flags = dispatch.poolFlagsFromJson(status, now)[rawPlan.id];
+    for (const profile of profiles) assert.equal(profilePaused(profile, flags), false, profile.name);
+  }
+});
+
+test("role limits never open a closed, exhausted or protected unread pool", async () => {
+  for (const changes of [
+    { dispatch: false },
+    { quotaProtection: "pause", manualOverride: null, usageProvider: "missing" },
+    { quotaProtection: "pause", manualOverride: null },
+  ]) {
+    const exhausted = changes.usageProvider !== "missing" && changes.dispatch !== false;
+    providerWindow.usedPct = exhausted ? 100 : 30;
+    try {
+      const { board } = await assemble({ ...changes, paceDisable: true });
+      const status = pools.poolStatus(board.plans, { now });
+      assert.equal(status[rawPlan.id].dispatchable, false);
+      for (const profile of profiles) assert.equal(profilePaused(profile, dispatch.poolFlagsFromJson(status, now)[rawPlan.id]), true, profile.name);
+    } finally { providerWindow.usedPct = 30; }
+  }
+});
+
+test("unprotected and legacy pools still enforce explicit roles, including unknown role names", async () => {
+  for (const quotaProtection of [undefined, "none"]) {
+    const { board } = await assemble({ quotaProtection, paceDisable: true });
+    const status = pools.poolStatus(board.plans, { now });
+    assert.equal(status[rawPlan.id].dispatchable, true);
+    for (const profile of profiles) assert.equal(profilePaused(profile, dispatch.poolFlagsFromJson(status, now)[rawPlan.id]), !reviewNames.includes(profile.name), profile.name);
+  }
+  const { board } = await assemble({ onlyRoles: ["unconfigured-role"] });
+  const flags = dispatch.poolFlagsFromJson(pools.poolStatus(board.plans, { now }), now)[rawPlan.id];
+  for (const profile of profiles) assert.equal(profilePaused(profile, flags), true, profile.name);
+});
+
+test("explicit plan limits narrow existing reviewer exceptions without opening other pools", async () => {
+  const { board } = await assemble();
+  const window = { ...board.plans[0].windows[0], usedPct: 80 };
+  const leader = {
+    ...board.plans[0], id: "demo-leader", adapter: "claude-cli", windows: [window],
+    reviewerException: { roles: ["reviewer"], stopPct: 90, until: "2030-06-08T00:00:00Z" },
+  };
+  const cases = [
+    { onlyRoles: undefined, allowed: ["reviewer"], dispatchable: true },
+    { onlyRoles: [], allowed: ["reviewer"], dispatchable: true },
+    { onlyRoles: ["reviewer", "executor"], allowed: ["reviewer"], dispatchable: true },
+    { onlyRoles: ["reader"], allowed: [], dispatchable: false },
+  ];
+  for (const item of cases) {
+    const status = pools.poolStatus([{ ...leader, onlyRoles: item.onlyRoles }, { ...board.plans[0], id: "demo-unrestricted", onlyRoles: undefined }], { now });
+    assert.equal(status[leader.id].dispatchable, item.dispatchable);
+    assert.deepEqual(status[leader.id].onlyRoles, item.allowed);
+    assert.equal(status["demo-unrestricted"].onlyRoles, undefined);
+  }
+});
