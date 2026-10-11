@@ -10,6 +10,26 @@ plans.json 存用户池/adapter/周期时区/手填/阈值优先序；afc.config
 
 JSON 快照每次写入都用独占创建的同目录临时文件，名字包含进程号和随机标识，完整写完后再 rename 到目标；不同进程的写者也互不占用临时文件。最后一次成功 rename 生效。这不提供读改写锁、旧格式文件与 export 之间的事务，或落盘持久性保证。写入和 rename 失败会向调用方抛出；只清理本次写入拥有的临时文件，清理失败记日志且不替换原始错误。进程突然终止可能留下临时文件，其他写者不会扫描删除它。
 
+### 计划角色限制
+
+计划可设置 `onlyRoles: ["reviewer"]`，只允许 `role` 或 `candidateFor` 为 `reviewer` 的档案从这个池接新活。其他角色及没有角色的档案保持暂停。列表会传到归一化 usage plan、usage RPC、pool status、`fleet-quota/v1` export 和两份派活矩阵。它独立于 `pacePause`；`pacePause: false` 只解除进度线暂停，`quotaProtection: "none"` 也不会解除角色限制。角色列表不能重开因额度策略或 `dispatch: false` 停用的池。
+
+```json
+{
+  "id": "demo-review-pool",
+  "name": "Demo review pool",
+  "adapter": "manual",
+  "providers": ["demo-provider"],
+  "dispatch": true,
+  "pacePause": false,
+  "onlyRoles": ["reviewer"]
+}
+```
+
+此片段只定义角色策略，须另外提供有效额度读数或周期。缺少、`null` 或空列表保持原来不限制角色的语义；未配置的角色名匹配不到档案。列表会持续生效，直到修改或删除：`tempException` 不提供到期时间，`paceDisable` 不是支持的进度线开关。修复前，计划顶层 `onlyRoles` 在 usage 归一化时丢失，仅有下游支持并不能执行限制。
+
+现有带日期的 Claude `reviewerException` 保持独立：`roles`、`stopPct`、`until` 只在有效的预留额度区间生效。显式计划列表与该例外取交集，也作用于同计划子池；没有交集时暂停池。限制不传给无关计划，两种配置均不放宽供应商或账号权限。
+
 | 集成 | 读取/存储与控制 |
 |---|---|
 | 角色预览 | 公共 provider/模型/mode 目录，输出 JSON；主动调用，不证明登录、不写档案、不读凭证。手动在 Paseo 配档。 |

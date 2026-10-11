@@ -61,25 +61,32 @@ const reviewNames = ["Demo reviewer", "Demo review candidate"];
 test("raw review-only plans survive normalization, RPC, status, contract export and both matrices", async () => {
   const { board, catalog } = await assemble();
   // Inspect every boundary, rather than constructing the expected pool flags by hand.
-  assert.deepEqual((board.plans[0] as UsagePlan & { onlyRoles?: string[] }).onlyRoles, ["reviewer"]);
-  assert.deepEqual((boardUsageRpc.output.parse(board).plans[0] as UsagePlan & { onlyRoles?: string[] }).onlyRoles, ["reviewer"]);
   const status = await pools.writePoolStatus(board.plans, null, now, false, null, null, 0, null, null, null, catalog);
-  assert.equal(status[rawPlan.id].dispatchable, true);
-  assert.deepEqual(status[rawPlan.id].onlyRoles, ["reviewer"]);
   const legacy = await json(pools.POOL_STATUS);
   const exported = EXPORTS.poolStatus.schema.parse(await json(join(data, "exports/pool-status.json")));
+  // Exercise the real timer refresh as well as the standalone writer.
+  await usage.refreshPoolStatus(host);
+  const panel = boardUsageRpc.output.parse(await usage.buildUsage(host, "7d"));
+  const matrices = await Promise.all([dispatch.DISPATCH_MATRIX, join(data, "exports/dispatch-matrix.json")].map(json));
+  // Keep all boundary observations available even when an older implementation fails the first assertion.
+  console.info("plan role boundaries", JSON.stringify({
+    normalizedOnlyRoles: (board.plans[0] as UsagePlan & { onlyRoles?: string[] }).onlyRoles ?? null,
+    statusOnlyRoles: status[rawPlan.id].onlyRoles ?? null,
+    exportedOnlyRoles: exported.pools[rawPlan.id].onlyRoles,
+    paused: matrices.map(matrix => Object.fromEntries(roles.slice(0, 5).map(role => [role, matrix.roles[role].L2.map((row: { paused?: boolean }) => Boolean(row.paused))]))),
+  }));
+  assert.deepEqual((board.plans[0] as UsagePlan & { onlyRoles?: string[] }).onlyRoles, ["reviewer"]);
+  assert.deepEqual((boardUsageRpc.output.parse(board).plans[0] as UsagePlan & { onlyRoles?: string[] }).onlyRoles, ["reviewer"]);
+  assert.equal(status[rawPlan.id].dispatchable, true);
+  assert.deepEqual(status[rawPlan.id].onlyRoles, ["reviewer"]);
   assert.deepEqual(legacy.pools[rawPlan.id].onlyRoles, ["reviewer"]);
   assert.deepEqual(exported.pools[rawPlan.id].onlyRoles, ["reviewer"]);
   for (const flags of [dispatch.poolFlagsFromJson(legacy.pools, now), dispatch.poolFlagsFromJson(exported.pools, now)]) {
     for (const profile of profiles) assert.equal(profilePaused(profile, flags[rawPlan.id]), !reviewNames.includes(profile.name), profile.name);
   }
-  // Exercise the real timer refresh as well as the standalone writer.
-  await usage.refreshPoolStatus(host);
-  const panel = boardUsageRpc.output.parse(await usage.buildUsage(host, "7d"));
   assert.deepEqual(panel.plans[0].onlyRoles, ["reviewer"]);
   assert.equal(panel.pools![rawPlan.id].dispatchable, true);
-  for (const path of [dispatch.DISPATCH_MATRIX, join(data, "exports/dispatch-matrix.json")]) {
-    const matrix = await json(path);
+  for (const matrix of matrices) {
     assert.deepEqual(matrix.roles.reviewer.L2.map((row: { profile: string; paused?: boolean }) => [row.profile, Boolean(row.paused)]), reviewNames.map(name => [name, false]));
     for (const role of roles.slice(1, 5)) assert.ok(matrix.roles[role].L2.every((row: { paused?: boolean }) => row.paused === true), role);
   }

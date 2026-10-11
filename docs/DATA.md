@@ -20,6 +20,26 @@ Snapshot JSON writes use an exclusively created sibling temporary file per call,
 
 ## Reader and writer inventory
 
+### Plan role limits
+
+A plan may set `onlyRoles: ["reviewer"]` to allow only profiles whose `role` or `candidateFor` is `reviewer` to take new work from that pool. Other roles, including profiles without a role, stay paused. The list passes through the normalized usage plan, the usage RPC, pool status, the `fleet-quota/v1` export and both dispatch matrices. It is independent of `pacePause`; `pacePause: false` only removes a progress-line pause. `quotaProtection: "none"` also leaves the role limit in force. An allowlist never reopens a pool stopped by its quota policy or `dispatch: false`.
+
+```json
+{
+  "id": "demo-review-pool",
+  "name": "Demo review pool",
+  "adapter": "manual",
+  "providers": ["demo-provider"],
+  "dispatch": true,
+  "pacePause": false,
+  "onlyRoles": ["reviewer"]
+}
+```
+
+This fragment defines the role policy; supply a valid quota reading/cycle separately. Missing, `null` or empty `onlyRoles` preserves the existing unrestricted-role behavior. An unconfigured role name matches no profile. The list persists until edited or removed: `tempException` does not supply an expiry, and `paceDisable` is not a supported pacing switch. Before this fix, top-level plan `onlyRoles` was dropped during usage normalization; downstream support alone did not enforce it.
+
+The existing dated Claude `reviewerException` remains separate: its `roles`, `stopPct` and `until` apply only in its active reserve band. Explicit plan roles intersect that exception and also apply to the plan's sub pools. No overlap pauses the pool. Limits do not transfer to unrelated plans, and neither form relaxes provider/account permissions.
+
 | Integration | Reads / stores | Control or boundary |
 |---|---|---|
 | Role preview | Public provider/model/mode catalog; produces role JSON. | User invokes discovery/preview; no login proof, profile write or credential read. Manually configure profiles in Paseo. |

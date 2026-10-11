@@ -19,6 +19,7 @@ No public release is declared by this document.
 
 ### Fixed
 
+- Explicit plan `onlyRoles` now survives usage normalization, RPC output and quota/dispatch publication. Only profiles with a listed `role` or `candidateFor` can dispatch; pacing and quota-protection overrides cannot broaden the allowlist. Existing dated reviewer exceptions remain separate and intersect explicit limits.
 - Concurrent quota refreshes and panel requests use exclusive temporary files for JSON snapshots, preventing one writer from consuming another writer's pending rename.
 - Failed or signal-terminated agy commands discard even valid stdout rows; only a normal code-zero read can supply new live samples.
 
