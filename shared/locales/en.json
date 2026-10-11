@@ -2112,5 +2112,8 @@
   "quota.companies.source.batchAt": "Provider batch timestamp {when} (earliest account read; account time unknown)",
   "quota.companies.source.unknownTime": "{label} · quota source time unknown",
   "quota.ui.panelUpdatedAt": "Panel updated {ago}; quotas sampled hourly",
-  "quota.companies.source.calledAt": "AFC requested quota {when}"
+  "quota.companies.source.calledAt": "AFC requested quota {when}",
+  "quota.companies.source.providerStatus": "Provider report status: {status}",
+  "quota.companies.source.readError": "Usage read error: {error}",
+  "quota.companies.source.availableEmpty": "Provider available; this quota window was not returned"
 }

@@ -126,7 +126,9 @@ export function companyWindows(plans: UsagePlan[], panelAt?: string): CompanyPro
       collectedAt: validQuotaTime(w.collectedAt, now),
       displayExpiresAt: w.displayExpiresAt ?? quotaDisplayExpiry(validQuotaTime(w.source === "manual" ? w.manualAt : w.sampledAt ?? w.collectedAt, now),
         w.source === "manual" ? w.readingExpiresAt ?? w.resetsAt : w.resetsAt),
-      readError: w.readError ?? null,
+      // A safety-only pause is still a successful display sample, not a reader failure.
+      readError: displayOnly ? null : w.readError ?? null,
+      providerStatus: w.providerStatus,
       readingState: displayOnly ? readAt ? "live" : "unknown" : w.readingState ?? (w.readError ? "stale" : readAt ? "live" : "unknown"),
       readingExpiresAt: w.readingExpiresAt,
     };

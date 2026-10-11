@@ -105,6 +105,7 @@ export interface CompanyProviderWindow extends QuotaWindowIdentity {
   collectedAt?: string | null;
   displayExpiresAt?: string | null;
   readError?: string | null;
+  providerStatus?: "available" | "unavailable" | "error";
   readingState?: "live" | "manual" | "stale" | "unknown";
   readingExpiresAt?: string | null;
 }
@@ -282,12 +283,17 @@ function windowBase(input: {
   amountText?: string | null;
   /** Replaces the generic source sentence. Used to label the agy table and the unproven ACP row. */
   sourceTextOverride?: string;
-  sample?: Pick<CompanyProviderWindow, "sourceTimeKind" | "collectedAt" | "readingState" | "readingExpiresAt" | "displayExpiresAt">;
+  sample?: Pick<CompanyProviderWindow, "sourceTimeKind" | "collectedAt" | "readingState" | "readingExpiresAt" | "displayExpiresAt" | "providerStatus" | "readError">;
 }): CompanyWindow {
   const unread = input.sourceKind === "unread" || input.sourceKind === "off";
   const stale = input.sourceKind === "stale";
-  const calledAt = input.source === "provider" && input.sample?.collectedAt ? clock(input.sample.collectedAt) : "";
+  const calledAt = (input.source === "provider" || input.sample?.providerStatus) && input.sample?.collectedAt ? clock(input.sample.collectedAt) : "";
   const origin = input.sourceTextOverride ?? sourceText(input.sourceKind, input.readAt, input.sample?.sourceTimeKind);
+  const status = input.sample?.providerStatus;
+  const error = input.sample?.readError;
+  const report = status && (unread || error) ? t("quota.companies.source.providerStatus", { status }) : "";
+  const problem = error && error !== status ? t("quota.companies.source.readError", { error }) : "";
+  const empty = unread && status === "available" && !error ? t("quota.companies.source.availableEmpty") : "";
   return {
     id: input.id,
     name: input.name,
@@ -296,7 +302,7 @@ function windowBase(input: {
     resetsAt: input.resetsAt,
     source: input.source,
     readAt: input.readAt,
-    sourceText: calledAt ? `${origin} · ${t("quota.companies.source.calledAt", { when: calledAt })}` : origin,
+    sourceText: [origin, report, problem, empty, calledAt ? t("quota.companies.source.calledAt", { when: calledAt }) : ""].filter(Boolean).join(" · "),
     sourceTimeKind: input.sample?.sourceTimeKind ?? (input.readAt ? "source" : "unknown"),
     collectedAt: input.sample?.collectedAt ?? null,
     displayExpiresAt: input.sample?.displayExpiresAt ?? quotaDisplayExpiry(input.readAt, input.resetsAt),
@@ -338,14 +344,15 @@ function claudeWindows(company: CompanyEntry, rows: CompanyProviderWindow[], poo
   });
   const live = (row: CompanyProviderWindow | undefined, id: string, name: string, who: string, poolKey: string | null, showPace: boolean) => {
     if (!row || row.usedPct === null) {
+      const report = row ?? rows.find(w => w.planId === planId && (w.providerStatus || w.readError));
       return windowBase({
-        id, name, usedPct: null, resetsAt: row?.resetsAt ?? null, source: "unread", readAt: null, sourceKind: "unread",
+        id, name, usedPct: null, resetsAt: row?.resetsAt ?? null, source: "unread", readAt: null, sourceKind: "unread", sample: report,
         who, pool: poolKey ? pools[poolKey] : undefined, mode: poolKey ? "pool" : "off", showPace: false,
       });
     }
     return windowBase({
       id, name, usedPct: row.usedPct, resetsAt: row.resetsAt, source: row.source === "none" ? "provider" : row.source, sample: row,
-      readAt: row.readAt, sourceKind: "auto", who, pool: poolKey ? pools[poolKey] : undefined,
+      readAt: row.readAt, sourceKind: row.readError ? "stale" : "auto", who, pool: poolKey ? pools[poolKey] : undefined,
       mode: "pool", showPace, stopRule: poolKey === null ? undefined : poolKey === planId ? "leader" : "plain",
       stopPctOverride: poolKey === planId ? claudeStopPct : undefined,
     });
@@ -476,10 +483,10 @@ function oneWindow(
   if (!row || row.usedPct === null) {
     return windowBase({
       id, name, usedPct: null, resetsAt: row?.resetsAt ?? null, source: "unread", readAt: null,
-      sourceKind: "unread", who, pool, mode, showPace: false,
+      sourceKind: "unread", who, pool, mode, showPace: false, sample: row,
     });
   }
-  const sourceKind = row.source === "manual" ? "manual" : row.source === "screen" ? "screen" : "auto";
+  const sourceKind = row.source === "manual" ? "manual" : row.readError ? "stale" : row.source === "screen" ? "screen" : "auto";
   return windowBase({
     id, name, usedPct: row.usedPct, resetsAt: row.resetsAt, source: row.source === "none" ? "provider" : row.source, sample: row,
     readAt: row.readAt, sourceKind, who, pool, mode, showPace, stopRule,

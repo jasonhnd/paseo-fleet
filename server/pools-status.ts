@@ -16,6 +16,7 @@ import {
 import { parseBurnWeek } from "../shared/reset-coupons-burn";
 import {
   adapterSpec,
+  baseAdapterOf,
   CLAUDE_CLI,
   CODEX_CLI,
   CURSOR_API,
@@ -510,9 +511,12 @@ function closeUndispatched(draft: Map<string, Draft>, plans: UsagePlan[], terms:
     if (plan.dispatch) continue;
     if (planBanned(plan, terms)) continue;
     const reason = plan.note || t("pools.status.planNotUsed");
+    // Closing dispatch cannot change the reading already chosen by the catalog/configuration.
+    const status = draft.get(plan.id)?.status
+      ?? entry(plan, plan.windows.find(w => w.primary) ?? mainWindowOf(baseAdapterOf(plan), plan.windows), false, reason);
     draft.set(plan.id, {
       flags: { dispatchable: false, deprioritize: false, prefer: false, paceState: "closed", paceHold: false, hard: true, reason },
-      status: entry(plan, plan.windows[0], false, reason, { paceState: "closed" }),
+      status: { ...status, dispatchable: false, deprioritize: false, prefer: false, paceState: "closed", reason },
     });
   }
 }

@@ -59,7 +59,7 @@ test("closed Claude without a main week never turns a session or subwindow into 
 
 test("closed unjudged and configured pools use their existing adapter or primary window rule", () => {
   const primary = { ...window("one_month", "Monthly", 25, iso(now + 20 * 86400000)), primary: true };
-  for (const adapter of ["codex-cli", "manual"] as const) {
+  for (const adapter of ["codex-cli", "manual", "muse-msp"] as const) {
     const row = poolStatus([plan([session, primary, weekly], adapter)], { now })["demo-pool"];
     assert.equal(row.window, "Monthly");
     assert.equal(row.usedPct, 25);
@@ -67,6 +67,9 @@ test("closed unjudged and configured pools use their existing adapter or primary
     assert.equal(row.observedAt, primary.sampledAt);
     assert.equal(row.dispatchable, false);
   }
+  const codex = poolStatus([plan([session, weekly], "codex-cli")], { now })["demo-pool"];
+  assert.equal(codex.window, "Weekly");
+  assert.equal(codex.usedPct, 53);
 });
 
 test("real publication does not rewrite old history or fabricate resets when a pool closes and reopens", async ctx => {
@@ -87,5 +90,10 @@ test("real publication does not rewrite old history or fabricate resets when a p
   }
   assert.equal(await readFile(QUOTA_HISTORY_FILE, "utf8"), historyBefore);
   assert.deepEqual(JSON.parse(await readFile(EARLY_RESET_FILE, "utf8")).events, []);
+  await writePoolStatus([plan([session, weekly, fable])], null, now + 86400000);
+  const appended = JSON.parse(await readFile(QUOTA_HISTORY_FILE, "utf8"));
+  assert.deepEqual(appended.samples[0], old.samples[0]);
+  assert.equal(appended.samples[1].pools["demo-pool"].usedPct, 53);
+  assert.equal(appended.samples[1].pools["demo-pool"].resetsAt, weekly.resetsAt);
   ctx.mock.timers.reset();
 });

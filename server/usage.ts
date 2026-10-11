@@ -42,7 +42,7 @@ import { type Json, readJson, STATE_DIR, writeJson } from "./util";
 import { t } from "../shared/i18n";
 import type { ManualReading, QuotaCycle } from "../shared/quota-cycle";
 import { readSettings, writeSettings } from "./settings";
-import { quotaErrorText, readProviderQuota } from "./provider-usage";
+import { providerUsageStatus, quotaErrorText, readProviderQuota } from "./provider-usage";
 
 export const PLANS = join(STATE_DIR, "plans.json");
 /** Display cache for the home page. Not read by Kanban. */
@@ -208,19 +208,31 @@ async function providerUsage(paseo: PaseoApi): Promise<ProviderUsage> {
     const sample = await readProviderQuota(paseo);
     const res = sample.value;
     const providers = (res?.providers ?? []) as Json[];
+    const batchError = quotaErrorText(sample.error);
     return {
-      windows: new Map(providers.map((p) => [String(p.providerId), ((p.windows?.length ? p.windows : p.error ? [{ label: "Weekly", usedPct: null }] : []) as Json[]).map((w: Json) => ({
-        ...w, collectedAt: sample.collectedAt,
-        // The legacy host fetchedAt is a batch minimum, not a per-account timestamp.
-        batchFetchedAt: res?.fetchedAt ?? null,
-        readError: sample.error ?? quotaErrorText(p.error),
-      }))])),
+      windows: new Map(providers.map((p) => {
+        const status = providerUsageStatus(p.status);
+        const error = batchError ?? quotaErrorText(p.error) ?? (status && status !== "available" ? status : null);
+        // An empty report carries metadata, not an invented weekly reading or reset.
+        const windows = (p.windows?.length ? p.windows : [{ label: t("screen.window.quotaHidden"), usedPct: null }]) as Json[];
+        return [String(p.providerId), windows.map((w: Json) => ({
+          ...w,
+          // A conflicting current report supplies no trusted percent. RPC failures retain old samples instead.
+          ...(error && !sample.error ? { usedPct: null, remainingPct: null } : {}),
+          collectedAt: sample.collectedAt,
+          fetchedAt: w.fetchedAt ?? p.fetchedAt ?? null,
+          // The legacy host fetchedAt is a batch minimum, not a per-account timestamp.
+          batchFetchedAt: res?.fetchedAt ?? null,
+          providerStatus: status,
+          readError: error,
+        }))];
+      })),
       balances: new Map(providers.map((p) => [String(p.providerId), (p.balances ?? []) as Json[]])),
-      error: sample.error,
+      error: batchError,
       collectedAt: sample.collectedAt,
     };
   } catch (e) {
-    return { windows: new Map(), balances: new Map(), error: String(e).slice(0, 200), collectedAt: null };
+    return { windows: new Map(), balances: new Map(), error: quotaErrorText(e), collectedAt: null };
   }
 }
 

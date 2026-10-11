@@ -200,6 +200,7 @@ function providerWindowsOf(cfg: WindowPlan, adapter: AdapterId, ctx: WindowConte
       ...time,
       collectedAt,
       displayExpiresAt: quotaDisplayExpiry(basis, resetsAt),
+      ...(w.providerStatus ? { providerStatus: w.providerStatus } : {}),
       readError: w.readError ?? null,
       safetyError: knownQuotaFailure(w.readError ?? ctx.quotaError),
       ...(configured ? { readingExpiresAt: readingExpiry(basis ?? (ctx.providerCollectedAt === undefined ? new Date(now).toISOString() : null), resetsAt) } : {}),
@@ -282,6 +283,7 @@ function hiddenWindowOf(cfg: WindowPlan, ctx: WindowContext, adapter: AdapterId)
     label: t("screen.window.quotaHidden"), usedPct: null, resetsAt: null, startsAt: null, elapsedPct: null, projectedPct: null, runsOutAt: null,
     verdict: "unknown", apiUsd: ctx.sumUsd((r) => cfg.providers.includes(r.provider) && r.hour >= Date.now() - 7 * DAY), fullWindowUsd: null, planUsd: daily !== null ? daily * 7 : null,
     source: "none", manualAt: null,
+    readError: adapterSpec(adapter).readsProvider ? ctx.quotaError ?? null : null,
     safetyError: adapterSpec(adapter).readsProvider ? knownQuotaFailure(ctx.quotaError) : null,
   };
 }
@@ -310,7 +312,7 @@ function configuredWindows(cfg: WindowPlan, adapter: AdapterId, ctx: WindowConte
   const now = ctx.now ?? Date.now();
   const cycle = cfg.quotaCycle ?? { kind: "unknown" };
   const main = mainWindowOf(adapter, provider) ?? provider[0];
-  const providerError = adapterSpec(adapter).readsProvider ? ctx.quotaError : null;
+  const providerError = adapterSpec(adapter).readsProvider ? ctx.quotaError ?? main?.readError : null;
   const cursor = adapter === CURSOR_API ? cursorLivePct(ctx.cursorReading) : null;
   const live = cursor !== null ? cursor : main?.usedPct ?? null;
   const reset = cursor !== null ? ctx.cursorReading?.resetsAt : main?.resetsAt;
@@ -329,7 +331,8 @@ function configuredWindows(cfg: WindowPlan, adapter: AdapterId, ctx: WindowConte
   const paceEligible = bounds !== null && (liveValid
     ? cycle.kind !== "unknown" && liveKind === cycle.kind && (cycle.kind !== "duration" || bounds.end - bounds.start === cycle.seconds * 1000)
     : cycle.kind !== "unknown");
-  const error = liveValid || adapter === "manual" ? null : providerError ?? (adapter === CURSOR_API ? ctx.cursorReading?.error : null) ?? t("quota.setup.readFailed");
+  const error = liveValid || adapter === "manual" ? null : providerError ?? (adapter === CURSOR_API ? ctx.cursorReading?.error : null)
+    ?? (main?.providerStatus === "available" ? null : t("quota.setup.readFailed"));
   const knownStop = !liveValid && cfg.quotaProtection !== "none" && typeof live === "number" && live >= (cfg.stopPct ?? 97)
     && (!reset || Date.parse(reset) > now)
     ? t("quota.setup.windowAtStop", { window: main?.label ?? "Monthly", used: live, stop: cfg.stopPct ?? 97 }) : null;
@@ -345,6 +348,7 @@ function configuredWindows(cfg: WindowPlan, adapter: AdapterId, ctx: WindowConte
     manualAt: liveValid ? null : manual.reading?.at ?? null,
     sampledAt,
     collectedAt,
+    ...(main?.providerStatus ? { providerStatus: main.providerStatus } : {}),
     sourceTimeKind: !liveValid && manual.state === "manual" ? "source" : cursor !== null ? sampledAt ? "source" : "unknown" : main?.sourceTimeKind ?? "unknown",
     // Safety expiry alone does not invalidate a successful sample's display. Failures and expired hand copies still do.
     displayExpiresAt: liveValid || (manual.state === "unknown" && validPercent(live) && !providerError && !main?.readError)

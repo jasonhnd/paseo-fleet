@@ -40,6 +40,8 @@ const windowSchema = z.object({
   id: z.string().optional(),
   readingState: z.enum(["live", "manual", "stale", "unknown"]).optional(),
   readError: z.string().nullable().optional(),
+  /** Last official report status; a successful RPC may still contain unavailable sources. */
+  providerStatus: z.enum(["available", "unavailable", "error"]).optional(),
   staleUsedPct: z.number().nullable().optional(),
   readingExpiresAt: z.string().nullable().optional(),
   /** Existing quota/auth/rate-limit reader signals override cached dispatch decisions. */

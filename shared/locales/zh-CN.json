@@ -2112,5 +2112,8 @@
   "quota.companies.source.batchAt": "来源批次时间 {when}（最早账号读数；本账号时间未知）",
   "quota.companies.source.unknownTime": "{label} · 额度来源时间未知",
   "quota.ui.panelUpdatedAt": "面板更新于 {ago}；额度固定每小时采样",
-  "quota.companies.source.calledAt": "AFC 调用额度读取于 {when}"
+  "quota.companies.source.calledAt": "AFC 调用额度读取于 {when}",
+  "quota.companies.source.providerStatus": "来源报告状态：{status}",
+  "quota.companies.source.readError": "额度读取错误：{error}",
+  "quota.companies.source.availableEmpty": "来源可用，但未返回这项额度窗口"
 }

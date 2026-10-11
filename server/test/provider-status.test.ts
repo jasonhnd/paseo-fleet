@@ -14,6 +14,7 @@ const { PLANS, buildUsage, refreshPoolStatus } = await import("../usage");
 const { POOL_STATUS } = await import("../pools-status");
 const { QUOTA_SAMPLING_FILE } = await import("../quota-sampling");
 const { clearCache } = await import("../util");
+const { quotaErrorText } = await import("../provider-usage");
 after(() => rm(root, { recursive: true, force: true }));
 setLanguage("en");
 const now = Date.parse("2030-06-01T00:13:20Z");
@@ -58,7 +59,7 @@ for (const status of ["available", "unavailable", "error"]) {
     assert.equal(primary.sourceTimeKind, "batch");
     if (status !== "available") assert.match(primary.readError!, new RegExp(status));
     const card = board.companies!.find(c => c.adapter === "claude-cli")!;
-    assert.match(card.windows[0].sourceText, new RegExp(status, "i"));
+    assert.match(card.windows[0].sourceText, new RegExp(`Provider report status: ${status}\\b`));
     assert.doesNotMatch(card.windows[0].sourceText, /auth|login|expired|rate.limit/i);
     assert.equal(card.windows[0].readAt, null);
     assert.equal(board.pools!["demo-manual"].dispatchable, true);
@@ -128,7 +129,8 @@ test("full RPC failure retains the old source clock, consumes the slot and recov
     assert.match(failed.pools![id].reason, /rate_limit/);
   }
   assert.equal(failed.pools!["demo-manual"].dispatchable, true);
-  assert.equal(failed.pools!["demo-none"].dispatchable, true);
+  // Existing policy: explicit RPC rate-limit evidence also holds provider pools with protection=none.
+  assert.equal(failed.pools!["demo-none"].dispatchable, false);
   assert.doesNotMatch(await readFile(QUOTA_SAMPLING_FILE, "utf8"), new RegExp(marker));
   await refreshPoolStatus(paseo);
   assert.equal(calls, 2);
@@ -138,5 +140,95 @@ test("full RPC failure retains the old source clock, consumes the slot and recov
   assert.equal(recovered.pools!["demo-claude"].dispatchable, true);
   assert.equal(recovered.pools!["demo-codex"].dispatchable, true);
   assert.equal(recovered.plans.find(p => p.id === "demo-claude")!.windows[0].readError, null);
+  ctx.mock.timers.reset();
+});
+
+test("error categories do not mistake an authorization field for an authentication failure", () => {
+  assert.equal(quotaErrorText({ code: "rate_limit", message: "authorization: demo-sensitive-marker" }), "rate_limit");
+  assert.equal(quotaErrorText("transport interrupted; authorization: demo-sensitive-marker"), "transport");
+  assert.equal(quotaErrorText("arbitrary private diagnostic demo-sensitive-marker"), "Provider usage failed");
+  assert.equal(quotaErrorText({ code: "unauthorized" }), "authentication");
+});
+
+test("invalid provider clocks and unrecognized status text are never repaired or published", async ctx => {
+  ctx.mock.timers.enable({ apis: ["Date"], now });
+  for (const fetchedAt of ["bad", iso(now + 1000)]) {
+    await setup();
+    const board = await buildUsage(host({ providerId: "claude", status: "available", fetchedAt, windows: [week()] }), "7d");
+    const primary = board.plans.find(p => p.id === "demo-claude")!.windows[0];
+    assert.equal(primary.sampledAt, null);
+    assert.equal(primary.sourceTimeKind, "unknown");
+    assert.equal(board.companies!.find(c => c.adapter === "claude-cli")!.windows[0].readAt, null);
+  }
+  await setup();
+  const marker = "demo-sensitive-marker";
+  const board = await buildUsage(host({ providerId: "claude", status: marker, windows: [] }), "7d");
+  assert.equal((board.plans.find(p => p.id === "demo-claude")!.windows[0] as Json).providerStatus, undefined);
+  assert.doesNotMatch(JSON.stringify(board), new RegExp(marker));
+  assert.doesNotMatch(await readFile(QUOTA_SAMPLING_FILE, "utf8"), new RegExp(marker));
+  ctx.mock.timers.reset();
+});
+
+test("a synchronous RPC error is sanitized before entering the durable sample", async ctx => {
+  ctx.mock.timers.enable({ apis: ["Date"], now });
+  await setup();
+  const marker = "demo-sensitive-marker";
+  const paseo = { providers: { listUsage: () => { throw new Error("transport interrupted; authorization: " + marker); } } } as unknown as PaseoApi;
+  const board = await buildUsage(paseo, "7d");
+  assert.match(board.companies!.find(c => c.adapter === "claude-cli")!.windows[0].sourceText, /transport/);
+  assert.equal(board.pools!["demo-manual"].dispatchable, true);
+  assert.equal(board.pools!["demo-none"].dispatchable, true);
+  assert.doesNotMatch(await readFile(QUOTA_SAMPLING_FILE, "utf8"), new RegExp(marker));
+  ctx.mock.timers.reset();
+});
+
+test("legacy empty/conflicting reports carry status hints without inventing a quota window", async ctx => {
+  ctx.mock.timers.enable({ apis: ["Date"], now });
+  for (const status of ["available", "unavailable", "error"]) {
+    await setup();
+    const file = JSON.parse(await readFile(PLANS, "utf8"));
+    delete file.plans[0].quotaCycle;
+    delete file.plans[0].quotaProtection;
+    await writeFile(PLANS, JSON.stringify(file));
+    const board = await buildUsage(host({ providerId: "claude", status, windows: status === "error" ? [week()] : [] }), "7d");
+    const row = board.plans.find(p => p.id === "demo-claude")!.windows[0];
+    assert.equal((row as Json).providerStatus, status);
+    assert.equal(row.usedPct, null);
+    const card = board.companies!.find(c => c.adapter === "claude-cli")!;
+    assert.equal(card.windows[0].usedPct, null);
+    assert.match(card.windows[0].sourceText, new RegExp(`Provider report status: ${status}\\b`));
+    assert.equal(card.windows[0].readAt, null);
+  }
+  ctx.mock.timers.reset();
+});
+
+test("a first RPC failure has no fabricated clock/status and provider recovery clears its hint only in the next slot", async ctx => {
+  ctx.mock.timers.enable({ apis: ["Date"], now });
+  await setup();
+  let calls = 0;
+  const paseo = { providers: { listUsage: async () => {
+    calls++;
+    if (calls === 1) throw new Error("transport interrupted");
+    return { providers: [{ providerId: "claude", status: calls === 2 ? "unavailable" : "available",
+      windows: calls === 2 ? [] : [week()], fetchedAt: calls === 2 ? null : iso(Date.now() - 1000) }] };
+  } } } as unknown as PaseoApi;
+  const failed = await buildUsage(paseo, "7d");
+  const primary = failed.plans.find(p => p.id === "demo-claude")!.windows[0];
+  assert.equal(primary.sampledAt, null);
+  assert.equal((primary as Json).providerStatus, undefined);
+  assert.match(failed.companies!.find(c => c.adapter === "claude-cli")!.windows[0].sourceText, /transport/);
+  assert.equal(failed.pools!["demo-none"].dispatchable, true);
+  ctx.mock.timers.setTime(now + 3600000);
+  const unavailable = await buildUsage(paseo, "7d");
+  assert.match(unavailable.plans.find(p => p.id === "demo-claude")!.windows[0].readError!, /unavailable/);
+  ctx.mock.timers.setTime(now + 3600000 + 60000);
+  await refreshPoolStatus(paseo);
+  assert.equal(calls, 2);
+  ctx.mock.timers.setTime(now + 7200000);
+  const recovered = await buildUsage(paseo, "7d");
+  assert.equal(calls, 3);
+  assert.equal(recovered.plans.find(p => p.id === "demo-claude")!.windows[0].readError, null);
+  assert.equal(recovered.pools!["demo-claude"].dispatchable, true);
+  assert.doesNotMatch(recovered.companies!.find(c => c.adapter === "claude-cli")!.windows[0].sourceText, /unavailable|transport/);
   ctx.mock.timers.reset();
 });
