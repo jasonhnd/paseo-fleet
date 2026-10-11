@@ -18,6 +18,7 @@ import { oneMonthBefore } from "../pools-pace";
 import { cursorLivePct } from "../usage-view";
 import { cycleBounds, manualState, validPercent, type ManualReading, type QuotaCycle } from "../../shared/quota-cycle";
 import { LIVE_READING_TTL_MS } from "../quota-timing";
+import { providerSourceTime, quotaDisplayExpiry, validQuotaTime } from "../../shared/quota-time";
 
 const HOUR = 60 * 60_000;
 const DAY = 24 * HOUR;
@@ -37,6 +38,8 @@ export interface WindowPlan {
   manual?: { usedPct: number; at: string } | null;
   manualOverride?: ManualReading | null;
   quotaCycle?: QuotaCycle;
+  stopPct?: number;
+  quotaProtection?: "pause" | "none";
   /** gemini or claude-gpt. Missing: the ACP row stays unknown and no CLI rows are shown. */
   antigravityBucket?: AntigravityBucket | null;
 }
@@ -57,6 +60,7 @@ export interface WindowContext<R extends UsdRow = UsdRow> {
   antigravityReading?: AntigravityReading | null;
   sumUsd: (pred: (r: R) => boolean) => number;
   quotaError?: string | null;
+  providerCollectedAt?: string | null;
   now?: number;
 }
 
@@ -157,11 +161,17 @@ function providerWindowsOf(cfg: WindowPlan, adapter: AdapterId, ctx: WindowConte
   const daily = cfg.priceUsdMonthly !== null ? (cfg.priceUsdMonthly * 12) / 365 : null;
   const windows: UsageWindow[] = [];
   for (const w of cfg.usageProvider ? (ctx.windowsBy.get(cfg.usageProvider) ?? []) : []) {
+    const now = ctx.now ?? Date.now();
+    const time = providerSourceTime(w, now);
+    const collectedAt = validQuotaTime(w.collectedAt ?? ctx.providerCollectedAt, now);
+    const basis = time.sampledAt ?? collectedAt;
     const label = String(w.label ?? "");
     const resetsAt = typeof w.resetsAt === "string" && Number.isFinite(Date.parse(w.resetsAt)) ? w.resetsAt : null;
     const rawUsed = typeof w.usedPct === "number" ? w.usedPct : typeof w.remainingPct === "number" ? 100 - w.remainingPct : null;
     // Legacy exhaustion rules must still see over-limit readings. Configured pools validate again below.
-    const used = typeof rawUsed === "number" && Number.isFinite(rawUsed) && rawUsed >= 0 ? rawUsed : null;
+    const numeric = typeof rawUsed === "number" && Number.isFinite(rawUsed) && rawUsed >= 0 ? rawUsed : null;
+    const expired = resetsAt !== null && Date.parse(resetsAt) <= now || basis !== null && now - Date.parse(basis) > 2 * HOUR;
+    const used = expired ? null : numeric;
     const len = windowLengthMs(label, resetsAt, w.id, adapter, ctx.now ?? Date.now());
     const configured = cfg.quotaCycle !== undefined || cfg.manualOverride !== undefined;
     const period = providerPeriod(label, w.id, resetsAt, adapter, ctx.now ?? Date.now());
@@ -187,9 +197,33 @@ function providerWindowsOf(cfg: WindowPlan, adapter: AdapterId, ctx: WindowConte
       planUsd: daily !== null && len !== null ? (daily * len) / DAY : null,
       source: "provider",
       manualAt: null,
+      ...time,
+      collectedAt,
+      displayExpiresAt: quotaDisplayExpiry(basis, resetsAt),
+      readError: w.readError ?? null,
+      safetyError: knownQuotaFailure(w.readError ?? ctx.quotaError),
+      ...(configured ? { readingExpiresAt: readingExpiry(basis ?? (ctx.providerCollectedAt === undefined ? new Date(now).toISOString() : null), resetsAt) } : {}),
+      ...(expired ? { staleUsedPct: numeric } : {}),
     });
   }
   return windows;
+}
+
+/** Only a real reader signal, never a missing percent, activates this independent failure stop. */
+export function knownQuotaFailure(error: unknown): string | null {
+  return typeof error === "string" && /quota|rate[_ -]?limit|auth|unauthorized|not.logged|login.*lost/i.test(error) ? error : null;
+}
+
+function cursorKnownStop(cfg: WindowPlan, reading: CursorUsageReading | null, now: number): string | null {
+  const known = reading?.lastKnown;
+  if (reading?.ok || cfg.quotaProtection === "none" || !known || !validQuotaTime(known.readAt, now)
+    || known.autoPct < (cfg.stopPct ?? 97) || known.resetsAt && Date.parse(known.resetsAt) <= now) return null;
+  return t("quota.setup.windowAtStop", { window: "Monthly", used: known.autoPct, stop: cfg.stopPct ?? 97 });
+}
+
+function readingExpiry(at: string | null, reset: string | null): string | null {
+  if (!at) return null;
+  return new Date(Math.min(Date.parse(at) + LIVE_READING_TTL_MS, reset ? Date.parse(reset) : Infinity)).toISOString();
 }
 
 /** Billing cycle of a monthly plan: the live Cursor reset wins over the configured billing day. */
@@ -228,6 +262,10 @@ function monthlyWindowOf(cfg: WindowPlan, adapter: AdapterId, ctx: WindowContext
     planUsd: cfg.priceUsdMonthly,
     source: live !== null ? liveSource : manual ? "manual" : "none",
     manualAt: manual?.at ?? null,
+    sampledAt: live !== null ? validQuotaTime(ctx.cursorReading?.readAt, ctx.now ?? Date.now()) : null,
+    displayExpiresAt: quotaDisplayExpiry(live !== null ? validQuotaTime(ctx.cursorReading?.readAt, ctx.now ?? Date.now()) : manual?.at ?? null, end.toISOString()),
+    safetyError: ctx.cursorReading?.linkBroken ? ctx.cursorReading.notice ?? ctx.cursorReading.error ?? "Cursor authentication failed" : knownQuotaFailure(ctx.cursorReading?.error),
+    knownQuotaStop: cursorKnownStop(cfg, ctx.cursorReading, ctx.now ?? Date.now()),
     // Card #66 correction ④: Paseo's balance does not split Cursor's quota blocks, so it is shown for
     // reference only. Dispatch uses the Auto percent from the official API or `/usage`, or the hand copy when both failed.
     balance: balance ? { usedUsd: balance.usedUsd, limitUsd: balance.limitUsd } : null,
@@ -240,6 +278,7 @@ function hiddenWindowOf(cfg: WindowPlan, ctx: WindowContext): UsageWindow {
     label: t("screen.window.quotaHidden"), usedPct: null, resetsAt: null, startsAt: null, elapsedPct: null, projectedPct: null, runsOutAt: null,
     verdict: "unknown", apiUsd: ctx.sumUsd((r) => cfg.providers.includes(r.provider) && r.hour >= Date.now() - 7 * DAY), fullWindowUsd: null, planUsd: daily !== null ? daily * 7 : null,
     source: "none", manualAt: null,
+    safetyError: knownQuotaFailure(ctx.quotaError),
   };
 }
 
@@ -270,7 +309,11 @@ function configuredWindows(cfg: WindowPlan, adapter: AdapterId, ctx: WindowConte
   const cursor = adapter === CURSOR_API ? cursorLivePct(ctx.cursorReading) : null;
   const live = cursor !== null ? cursor : main?.usedPct ?? null;
   const reset = cursor !== null ? ctx.cursorReading?.resetsAt : main?.resetsAt;
-  const liveValid = validPercent(live) && !ctx.quotaError && (!reset || Date.parse(reset) > now);
+  const sampledAt = validQuotaTime(cursor !== null ? ctx.cursorReading?.readAt : main?.sampledAt, now);
+  const collectedAt = cursor !== null ? sampledAt : main?.collectedAt ?? ctx.providerCollectedAt ?? null;
+  const expires = cursor !== null ? readingExpiry(sampledAt, reset ?? null) : main?.readingExpiresAt ?? null;
+  const liveValid = validPercent(live) && !ctx.quotaError && (!reset || Date.parse(reset) > now)
+    && (expires === null ? ctx.providerCollectedAt === undefined : Date.parse(expires) > now);
   const manual = manualState(cfg.manualOverride === undefined ? cfg.manual : cfg.manualOverride, cycle, now);
   const used = liveValid ? live : manual.state === "manual" ? manual.reading!.usedPct : null;
   const liveEnd = reset ? Date.parse(reset) : null;
@@ -282,6 +325,9 @@ function configuredWindows(cfg: WindowPlan, adapter: AdapterId, ctx: WindowConte
     ? cycle.kind !== "unknown" && liveKind === cycle.kind && (cycle.kind !== "duration" || bounds.end - bounds.start === cycle.seconds * 1000)
     : cycle.kind !== "unknown");
   const error = liveValid || adapter === "manual" ? null : ctx.quotaError ?? t("quota.setup.readFailed");
+  const knownStop = !liveValid && cfg.quotaProtection !== "none" && typeof live === "number" && live >= (cfg.stopPct ?? 97)
+    && (!reset || Date.parse(reset) > now)
+    ? t("quota.setup.windowAtStop", { window: main?.label ?? "Monthly", used: live, stop: cfg.stopPct ?? 97 }) : null;
   const label = liveValid ? cursor !== null ? calendarLabel("month") : /^(weekly|monthly|daily|day)$/i.test(main!.label) ? calendarLabel(liveKind) : main!.label : calendarLabel(cycle.kind);
   const primary: UsageWindow = {
     ...(liveValid && cursor === null && main?.id ? { id: main.id } : {}),
@@ -292,10 +338,16 @@ function configuredWindows(cfg: WindowPlan, adapter: AdapterId, ctx: WindowConte
     apiUsd: ctx.sumUsd(r => cfg.providers.includes(r.provider) && r.hour >= (bounds?.start ?? now - 7 * DAY)), fullWindowUsd: null, planUsd: cfg.priceUsdMonthly,
     source: liveValid ? cursor !== null ? "official" : "provider" : manual.state === "manual" ? "manual" : "none",
     manualAt: liveValid ? null : manual.reading?.at ?? null,
-    readingState: liveValid ? "live" : manual.state,
+    sampledAt,
+    collectedAt,
+    sourceTimeKind: !liveValid && manual.state === "manual" ? "source" : cursor !== null ? sampledAt ? "source" : "unknown" : main?.sourceTimeKind ?? "unknown",
+    displayExpiresAt: liveValid ? quotaDisplayExpiry(sampledAt ?? collectedAt, reset ?? null) : null,
+    safetyError: main?.safetyError ?? (ctx.cursorReading?.linkBroken ? ctx.cursorReading.notice ?? "Cursor authentication failed" : knownQuotaFailure(ctx.cursorReading?.error)) ?? knownQuotaFailure(ctx.quotaError),
+    knownQuotaStop: knownStop ?? cursorKnownStop(cfg, ctx.cursorReading, now),
+    readingState: liveValid ? "live" : manual.state === "unknown" && live !== null ? "stale" : manual.state,
     cycleKind: liveValid ? liveKind : cycle.kind, paceEligible,
-    readError: error, staleUsedPct: manual.state === "stale" ? manual.reading?.usedPct ?? null : null,
-    readingExpiresAt: liveValid ? new Date(Math.min(now + LIVE_READING_TTL_MS, reset ? Date.parse(reset) : Infinity)).toISOString()
+    readError: error, staleUsedPct: manual.state === "stale" ? manual.reading?.usedPct ?? null : !liveValid ? live : null,
+    readingExpiresAt: liveValid ? expires
       : manual.reading ? new Date(Math.min(Date.parse(manual.reading.at) + (manual.reading.ttlSeconds ?? 86400) * 1000, manual.reading.resetsAt ? Date.parse(manual.reading.resetsAt) : Infinity, manual.bounds?.end ?? Infinity)).toISOString() : null,
   };
   return [primary, ...provider.filter(w => w !== main)];

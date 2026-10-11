@@ -29,6 +29,7 @@ import {
   poolLineKind,
   priceButtonLabel,
   priceDraft,
+  quotaWindowReadText,
   roiLine,
   showCursorConnect,
   showCursorDisconnect,
@@ -76,6 +77,7 @@ function PlanWindow({ s, plan, pools, usageWindow, index }: {
   return (
     <View style={[s.item, { gap: 3 }]}>
       <WindowHead s={s} usageWindow={usageWindow} />
+      <Text style={s.muted}>{quotaWindowReadText(usageWindow)}</Text>
       {usageWindow.readingState ? <Text style={usageWindow.readingState === "stale" ? s.yellow : s.muted}>{usageWindow.readingState === "stale" ? t("quota.setup.staleReading", { used: usageWindow.staleUsedPct ?? "?", at: usageWindow.sampledAt ?? usageWindow.manualAt ?? "" }) : t("quota.setup.reading", { state: t(`quota.setup.state.${usageWindow.readingState}`), at: usageWindow.sampledAt ?? usageWindow.manualAt ?? "", error: usageWindow.readError ?? "" })}</Text> : null}
       {usageWindow.readingState === "live" && usageWindow.paceEligible === false ? <Text style={s.muted}>{t("quota.setup.liveNoPace", { window: windowLabel(usageWindow.label) })}</Text> : null}
       {usageWindow.usedPct !== null ? <Bar s={s} pct={remainingFill(usageWindow.usedPct)} marker={usageWindow.elapsedPct === null ? null : remainingMarker(usageWindow.elapsedPct)} color={barColor} /> : null}

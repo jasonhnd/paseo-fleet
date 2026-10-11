@@ -20,7 +20,7 @@ import {
 } from "../../shared/quota-adapters";
 import { validPercent } from "../../shared/quota-cycle";
 import type { UsageWindow } from "../../shared/usage";
-import { LIVE_READING_TTL_MS } from "../quota-timing";
+import { LIVE_READING_TTL_MS, QUOTA_DISPLAY_TTL_MS } from "../quota-timing";
 import { sampleQuota } from "../quota-sampling";
 
 export const AGY_USAGE_COMMAND = { bin: "agy", args: ["-p", "/usage"] as const };
@@ -212,11 +212,11 @@ export async function readAntigravityUsage(options: { now?: number; force?: bool
   return sample.value ?? unavailableAntigravityReading(now);
 }
 
-function fresh(readAt: string, now: number): boolean {
+function fresh(readAt: string, now: number, ttl = LIVE_READING_TTL_MS): boolean {
   const at = Date.parse(readAt);
   if (!Number.isFinite(at)) return false;
   const age = now - at;
-  return age >= 0 && age <= LIVE_READING_TTL_MS;
+  return age >= 0 && age < ttl;
 }
 
 function readErrorText(error: AntigravityReadError | null): string {
@@ -284,7 +284,7 @@ export interface AntigravityWindowPlan {
 export function antigravityDisplayWindows(reading: AntigravityReading | null, now: number): UsageWindow[] {
   return (["gemini", "claude-gpt"] as const).flatMap((bucket) => (["five-hour", "week"] as const).map((window) => {
     const sample = reading?.error === null ? reading.samples.find((row) => row.bucket === bucket && row.window === window) : undefined;
-    const live = !!sample && !!reading && !reading.stale && fresh(reading.readAt, now)
+    const live = !!sample && !!reading && !reading.stale && fresh(reading.readAt, now, QUOTA_DISPLAY_TTL_MS)
       && (sample.resetsAt === null || Date.parse(sample.resetsAt) > now);
     const row = blankWindow({
       id: `${bucket}-${window === "week" ? ANTIGRAVITY_WEEK_WINDOW : ANTIGRAVITY_FIVE_HOUR_WINDOW}`,
@@ -295,7 +295,7 @@ export function antigravityDisplayWindows(reading: AntigravityReading | null, no
       sampledAt: sample ? reading?.readAt : null, staleUsedPct: sample && !live ? sample.usedPct : null,
       apiUsd: 0, planUsd: null,
     });
-    const expires = sample && reading ? Math.min(Date.parse(reading.readAt) + LIVE_READING_TTL_MS, sample.resetsAt ? Date.parse(sample.resetsAt) : Infinity) : NaN;
+    const expires = sample && reading ? Math.min(Date.parse(reading.readAt) + QUOTA_DISPLAY_TTL_MS, sample.resetsAt ? Date.parse(sample.resetsAt) : Infinity) : NaN;
     return { ...row, readingExpiresAt: Number.isFinite(expires) ? new Date(expires).toISOString() : null };
   }));
 }
@@ -336,10 +336,12 @@ export function antigravityPlanWindows(plan: AntigravityWindowPlan, reading: Ant
       readingState: "live",
       cycleKind: "week",
       readError: null,
+      sampledAt: reading!.readAt,
       apiUsd,
       planUsd,
     })
     : hold;
+  if (acp.usedPct !== null && reading) acp.readingExpiresAt = new Date(Math.min(Date.parse(reading.readAt) + LIVE_READING_TTL_MS, week?.resetsAt ? Date.parse(week.resetsAt) : Infinity)).toISOString();
   if (!bucket || !reading || reading.error !== null) return [acp];
   const shown = [week, five].flatMap((sample) => sample ? [blankWindow({
     id: sample.window === "week" ? ANTIGRAVITY_WEEK_WINDOW : ANTIGRAVITY_FIVE_HOUR_WINDOW,

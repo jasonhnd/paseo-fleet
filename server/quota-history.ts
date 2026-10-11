@@ -16,7 +16,7 @@ const MAX_SAMPLES = 60;
 
 export interface HistorySample {
   at: string;
-  pools: Record<string, { usedPct: number | null; resetsAt: string | null }>;
+  pools: Record<string, { usedPct: number | null; resetsAt: string | null; observedAt?: string | null }>;
 }
 
 interface HistoryFile {
@@ -53,7 +53,7 @@ export function spanOf(samples: Array<{ at: string }>): { from: string; to: stri
 function sampleFrom(pools: Record<string, PoolStatus>, at: string): HistorySample {
   const out: HistorySample["pools"] = {};
   for (const [key, pool] of Object.entries(pools)) {
-    out[key] = { usedPct: pool.usedPct, resetsAt: pool.resetsAt };
+    out[key] = { usedPct: pool.usedPct, resetsAt: pool.resetsAt, ...(pool.observedAt !== undefined ? { observedAt: pool.observedAt } : {}) };
   }
   return { at, pools: out };
 }
@@ -73,12 +73,14 @@ export async function recordSample(pools: Record<string, PoolStatus>, now = Date
 export function samplesInPeriod(samples: HistorySample[], pool: string, resetsAt: string | null, startMs: number, endMs: number): Array<{ at: string; usedPct: number }> {
   const out: Array<{ at: string; usedPct: number }> = [];
   for (const sample of samples) {
-    const t = Date.parse(sample.at);
-    if (Number.isNaN(t) || t < startMs || t > endMs) continue;
     const row = sample.pools?.[pool];
+    const at = row && "observedAt" in row ? row.observedAt : sample.at;
+    if (!at) continue;
+    const t = Date.parse(at);
+    if (Number.isNaN(t) || t < startMs || t > endMs) continue;
     if (!row || typeof row.usedPct !== "number") continue;
     if (resetsAt && row.resetsAt && row.resetsAt !== resetsAt && !sameResetWindow(row.resetsAt, resetsAt)) continue;
-    out.push({ at: sample.at, usedPct: row.usedPct });
+    out.push({ at, usedPct: row.usedPct });
   }
   return out;
 }

@@ -5,7 +5,7 @@ import { setLanguage, t } from "../../shared/i18n";
 import { companyCatalog } from "../../shared/quota-adapters";
 import { buildCompanies } from "../../shared/quota-companies";
 import { antigravityDisplayWindows, readingFromRun } from "../quota/antigravity-usage";
-import { LIVE_READING_TTL_MS } from "../quota-timing";
+import { QUOTA_DISPLAY_TTL_MS } from "../quota-timing";
 import { companyWindows } from "../usage-view";
 import type { UsagePlan } from "../../shared/usage";
 
@@ -30,7 +30,7 @@ test("one card presents both buckets in fixed order, with remaining boundary val
   const result = card();
   assert.equal(result.name, "Antigravity");
   assert.equal(antigravityRowStale(result.windows[0], now), false);
-  assert.equal(antigravityRowStale(result.windows[0], now + LIVE_READING_TTL_MS), true);
+  assert.equal(antigravityRowStale(result.windows[0], now + QUOTA_DISPLAY_TTL_MS), true);
   assert.deepEqual(result.windows.map(row => row.name), ["Gemini · 5 hour", "Gemini · Weekly", "Claude · 5 hour", "Claude · Weekly"]);
   assert.deepEqual(result.windows.map(row => row.usedPct), [0, 100, 5, 3]);
   assert.deepEqual(result.windows.map(row => row.remainingPct), [100, 0, 95, 97]);
@@ -52,7 +52,7 @@ test("failed or absent reads keep all four slots unknown without fabricated rese
 });
 
 test("expired samples retain their value and real sampling time, including a passed reset", () => {
-  const result = card(antigravityDisplayWindows(reading(), now + LIVE_READING_TTL_MS + 1));
+  const result = card(antigravityDisplayWindows(reading(), now + QUOTA_DISPLAY_TTL_MS + 1));
   assert.equal(result.stale, true);
   assert.ok(result.windows.every(row => row.readingState === "stale" && row.tone === "yellow" && row.readAt === new Date(now).toISOString()));
   assert.deepEqual(result.windows.map(row => row.remainingPct), [100, 0, 95, 97]);

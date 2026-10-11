@@ -72,6 +72,7 @@ import { STATE_DIR, writeJson } from "./util";
 import { kanbanConfigPath } from "./paths";
 import { sampleQuota } from "./quota-sampling";
 import { QUOTA_SAMPLE_MS } from "./quota-timing";
+import { QUOTA_DISPLAY_TTL_MS, validQuotaTime } from "../shared/quota-time";
 
 export { agentLaunchEnv, stripAnsi };
 export {
@@ -95,6 +96,8 @@ const SESSION = "afc-cursor-usage";
 const CURSOR_AGENT_BIN = join(homedir(), ".local", "bin", "cursor-agent");
 
 export interface CursorUsageReading {
+  /** Last actual successful Auto reading, so failure cannot clear a known exhausted pool. */
+  lastKnown?: { autoPct: number; readAt: string; resetsAt: string | null };
   readAt: string;
   ok: boolean;
   error: string | null;
@@ -130,7 +133,14 @@ export interface CursorUsageReading {
 
 export async function readCursorUsageFile(): Promise<CursorUsageReading | null> {
   try {
-    return normalizeStoredReading(JSON.parse(await readFile(CURSOR_USAGE_FILE, "utf8")));
+    const reading = normalizeStoredReading(JSON.parse(await readFile(CURSOR_USAGE_FILE, "utf8")));
+    if (!reading) return null;
+    const at = validQuotaTime(reading.readAt, Date.now());
+    if (reading.ok && (!at || Date.now() - Date.parse(at) >= QUOTA_DISPLAY_TTL_MS || reading.resetsAt && Date.parse(reading.resetsAt) <= Date.now())) {
+      return { ...reading, ok: false, error: reading.error ?? t("quota.setup.staleHold"),
+        ...(reading.autoPct !== null ? { lastKnown: reading.lastKnown ?? { autoPct: reading.autoPct, readAt: reading.readAt, resetsAt: reading.resetsAt } } : {}) };
+    }
+    return reading;
   } catch {
     return null;
   }
@@ -454,7 +464,12 @@ export function combineCursorReading(input: {
   const screenOn = input.screenRead !== false;
   const screen = screenOn ? input.screen : null;
   const alarm = mergeHomeAlarm(input.homeAlarm, screen?.homeAlarm);
-  const finish = (reading: CursorUsageReading): CursorUsageReading => ({ ...reading, homeAlarm: alarm, screenRead: screenOn });
+  const finish = (reading: CursorUsageReading): CursorUsageReading => {
+    const lastKnown = reading.ok && reading.autoPct !== null ? { autoPct: reading.autoPct, readAt: reading.readAt, resetsAt: reading.resetsAt }
+      : input.previous?.lastKnown ?? (input.previous?.ok && input.previous.autoPct !== null
+        ? { autoPct: input.previous.autoPct, readAt: input.previous.readAt, resetsAt: input.previous.resetsAt } : undefined);
+    return { ...reading, homeAlarm: alarm, screenRead: screenOn, ...(lastKnown ? { lastKnown } : {}) };
+  };
   const stayBroken = !input.attemptedOfficial && (input.previous?.linkState === "broken" || input.previous?.linkBroken === true);
   if (stayBroken) {
     if (screen?.ok && screen.autoPct !== null) {
@@ -600,6 +615,7 @@ async function plansCursorScreenRead(): Promise<boolean> {
 
 /** Test seam. Production leaves this unset and reads plans.json. */
 export interface CaptureCursorHooks {
+  statePath?: string;
   /** Used instead of plans.json. A missing `screenRead` still means on. */
   plan?: { screenRead?: unknown } | null;
   screenIfDue?: (cwd: string, mode: "unlinked" | "fallback", epoch: number) => Promise<CursorUsageReading | null>;
@@ -669,7 +685,10 @@ async function captureCursorUsageOnce(cwd: string, hooks?: CaptureCursorHooks): 
 /** Login/disconnect requests share the slot; they cannot force an extra quota read. */
 export async function captureCursorUsage(cwd = join(STATE_DIR, "tmp"), hooks?: CaptureCursorHooks): Promise<CursorUsageReading | null> {
   if (!adapterOn(CURSOR_API)) return null;
-  const sample = await sampleQuota("cursor", () => captureCursorUsageOnce(cwd, hooks), { errorOf: reading => reading.error });
+  const sample = await sampleQuota("cursor", () => captureCursorUsageOnce(cwd, hooks), { statePath: hooks?.statePath, errorOf: reading => reading.error });
+  if (sample.error && sample.collectedAt !== sample.attemptedAt) {
+    return { ...(sample.value ?? emptyReading(sample.attemptedAt ?? "", sample.error, false)), ok: false, error: sample.error };
+  }
   return sample.value;
 }
 

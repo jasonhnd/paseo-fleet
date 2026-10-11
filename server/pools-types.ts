@@ -7,6 +7,8 @@ import type { PaceState } from "./pools-pace";
 import type { ClaudeUsedReading } from "./pools-unread";
 
 export interface PoolStatus {
+  /** Source/batch or AFC sample clock on private snapshots, independent of publication. */
+  observedAt?: string | null;
   quotaProtection?: "pause" | "none";
   readingExpiresAt?: string | null;
   plan: string;

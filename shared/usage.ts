@@ -31,6 +31,10 @@ const windowSchema = z.object({
   manualAt: z.string().nullable(),
   /** When this window's sample was taken. Omitted on windows that are not a stored sample. */
   sampledAt: z.string().nullable().optional(),
+  /** AFC read invocation time; never substituted for sampledAt. */
+  collectedAt: z.string().nullable().optional(),
+  sourceTimeKind: z.enum(["source", "batch", "unknown"]).optional(),
+  displayExpiresAt: z.string().nullable().optional(),
   primary: z.boolean().optional(),
   /** Stable provider window id, retained when its displayed label is translated. */
   id: z.string().optional(),
@@ -38,6 +42,10 @@ const windowSchema = z.object({
   readError: z.string().nullable().optional(),
   staleUsedPct: z.number().nullable().optional(),
   readingExpiresAt: z.string().nullable().optional(),
+  /** Existing quota/auth/rate-limit reader signals override cached dispatch decisions. */
+  safetyError: z.string().nullable().optional(),
+  /** A known exhausted reading remains a quota stop while its reset is still pending. */
+  knownQuotaStop: z.string().nullable().optional(),
   /** Provider window identity, independent of the displayed translation. */
   cycleKind: z.enum(["day", "week", "month", "duration", "unknown"]).optional(),
   /** False when live usage cannot be compared with the selected cycle. */

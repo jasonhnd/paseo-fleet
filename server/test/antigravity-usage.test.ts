@@ -22,7 +22,7 @@ import type { UsagePlan, UsageWindow } from "../../shared/usage";
 import { windowsFor, type WindowContext, type WindowPlan } from "../adapters/windows";
 import { poolStatus } from "../pools-status";
 import { companyWindows } from "../usage-view";
-import { LIVE_READING_TTL_MS, QUOTA_SAMPLE_MS } from "../quota-timing";
+import { LIVE_READING_TTL_MS, QUOTA_DISPLAY_TTL_MS, QUOTA_SAMPLE_MS } from "../quota-timing";
 import {
   AGY_USAGE_COMMAND,
   antigravityDisplayWindows,
@@ -367,8 +367,8 @@ describe("same pool", () => {
     assert.equal(manualStatus.usedPct, 0);
   });
 
-  test("an expired CLI sample stays visible and is not a live ACP percent", () => {
-    const old = NOW - LIVE_READING_TTL_MS - 1000;
+  test("an expired display sample stays visible and is not a live ACP percent", () => {
+    const old = NOW - QUOTA_DISPLAY_TTL_MS - 1000;
     const aged = readingFromRun(runOf([
       "Gemini Models\tWeekly Limit Remaining\t90%\t2028-06-08T00:00:00Z",
       "Gemini Models\tFive Hour Limit Remaining\t50%\t2028-06-01T05:00:00Z",

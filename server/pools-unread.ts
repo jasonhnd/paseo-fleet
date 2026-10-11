@@ -92,14 +92,14 @@ export function carriedSuffix(reason: string): string {
 export function claudeReadingFromSnapshot(
   file: {
     generatedAt?: unknown;
-    pools?: Record<string, { usedPct?: unknown; resetsAt?: unknown; reason?: unknown }>;
+    pools?: Record<string, { usedPct?: unknown; resetsAt?: unknown; reason?: unknown; observedAt?: unknown }>;
   } | null,
   pool: string,
 ): ClaudeUsedReading | null {
   const row = file?.pools?.[pool];
   if (!row || typeof row.usedPct !== "number" || !Number.isFinite(row.usedPct)) return null;
   const reason = typeof row.reason === "string" ? row.reason : "";
-  const at = carriedReadAt(reason) ?? (typeof file?.generatedAt === "string" ? file.generatedAt : "");
+  const at = carriedReadAt(reason) ?? ("observedAt" in row ? typeof row.observedAt === "string" ? row.observedAt : "" : typeof file?.generatedAt === "string" ? file.generatedAt : "");
   if (Number.isNaN(Date.parse(at))) return null;
   return {
     usedPct: row.usedPct,
@@ -109,7 +109,7 @@ export function claudeReadingFromSnapshot(
 }
 
 export function claudeReadingFromHistory(
-  samples: Array<{ at?: unknown; pools?: Record<string, { usedPct?: unknown; resetsAt?: unknown }> }>,
+  samples: Array<{ at?: unknown; pools?: Record<string, { usedPct?: unknown; resetsAt?: unknown; observedAt?: unknown }> }>,
   pool: string,
 ): ClaudeUsedReading | null {
   for (let i = samples.length - 1; i >= 0; i--) {
@@ -120,12 +120,12 @@ export function claudeReadingFromHistory(
 }
 
 function readingFromSample(
-  sample: { at?: unknown; pools?: Record<string, { usedPct?: unknown; resetsAt?: unknown }> } | undefined,
+  sample: { at?: unknown; pools?: Record<string, { usedPct?: unknown; resetsAt?: unknown; observedAt?: unknown }> } | undefined,
   pool: string,
 ): ClaudeUsedReading | null {
   const row = sample?.pools?.[pool];
   if (!row || typeof row.usedPct !== "number" || !Number.isFinite(row.usedPct)) return null;
-  const at = typeof sample.at === "string" ? sample.at : "";
+  const at = "observedAt" in row ? typeof row.observedAt === "string" ? row.observedAt : "" : typeof sample.at === "string" ? sample.at : "";
   if (Number.isNaN(Date.parse(at))) return null;
   return {
     usedPct: row.usedPct,

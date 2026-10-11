@@ -76,6 +76,7 @@ function PeriodRow({ s, period, data, onPick }: { s: Styles; period: Period; dat
         <Chip key={item} s={s} label={PERIOD_LABEL[item]} active={item === period} onPress={() => onPick(item)} />
       ))}
       <Text style={s.muted}>{stamp}</Text>
+      <Text style={s.muted}>{t("quota.ui.panelUpdatedAt", { ago: timeAgo(data.generatedAt) })}</Text>
     </View>
   );
 }

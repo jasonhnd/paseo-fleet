@@ -9,7 +9,7 @@ import type { BoardSnapshot } from "../shared/board";
 import { tAll } from "../shared/i18n";
 import { claudeCategory, DAY_MS } from "../shared/dispatch";
 import type { HomeView } from "../shared/home-view";
-import { companyCardSchema, type CompanyCard } from "../shared/quota-companies";
+import { companyCardSchema, refreshCompanyTime, type CompanyCard } from "../shared/quota-companies";
 import { buildRoleCards, type RoleSource } from "../shared/role-plain";
 import { poolOfProvider, shareByRole, stackDays, tokenMap, tokensOf } from "../shared/token-chart";
 import { readRoleWork } from "./kanban";
@@ -27,19 +27,19 @@ interface Hit {
   tokens: number;
 }
 
-async function readCompanies(): Promise<CompanyCard[]> {
-  const raw = await readJson<{ companies?: unknown }>(QUOTA_COMPANIES, {});
+export async function readCompanies(now: number): Promise<CompanyCard[]> {
+  const raw = await readJson<{ companies?: unknown; generatedAt?: unknown }>(QUOTA_COMPANIES, {});
   const parsed = companyCardSchema.array().safeParse(raw.companies);
   if (!parsed.success) return [];
   const banned = readBannedProviders();
-  return parsed.data.filter((card) => !providerBanned(card, banned)).map((card) => ({
+  return parsed.data.filter((card) => !providerBanned(card, banned)).map((card) => refreshCompanyTime({
     ...card,
     windows: card.windows.map((row) => ({
       ...row,
       // Role names in the quota cache may still use the old supervisor name; show <leader> instead.
       who: tAll("snapshot.legacyLeaderName").reduce((who, old) => who.replaceAll(old, "<leader>"), row.who),
     })),
-  }));
+  }, now, typeof raw.generatedAt === "string" ? raw.generatedAt : null));
 }
 
 function hitsFromBuckets(
@@ -111,7 +111,7 @@ export async function buildHomeView(input: {
   /** Pool id → how the work is paid for (shared/quota-adapters.ts poolNames(catalog, "via")). */
   via?: Readonly<Record<string, string>>;
 }): Promise<HomeView> {
-  const companies = await readCompanies();
+  const companies = await readCompanies(input.now);
   const policyKey = readBannedProviders().join("|");
   const charts = await cached(`home-usage:${policyKey}:${new Date(input.now).toISOString().slice(0, 13)}`, 60_000, () => usageCharts(input.now)).catch(() => ({
     days: stackDays([], input.now),

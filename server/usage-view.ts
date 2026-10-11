@@ -8,6 +8,7 @@ import type { BoardUsage, UsagePlan } from "../shared/usage";
 import { cursorLinkOverride, msgUnlinked, type CursorUsageReading } from "./cursor-usage";
 import { tAll, type MessageKey } from "../shared/i18n";
 import type { CursorReadMeta, PoolStatus } from "./pools";
+import { quotaDisplayExpiry, validQuotaTime } from "../shared/quota-time";
 
 /** Cursor login-file and lost-login alarms; a stored alarm may be in any catalog language. */
 const TOKEN_ALARM_KEYS: readonly MessageKey[] = [
@@ -32,7 +33,7 @@ export function cursorReadForPlan(reading: CursorUsageReading | null, manualAt: 
   if (!reading) return null;
   const live = reading.ok && reading.autoPct !== null;
   return {
-    readAt: reading.readAt,
+    readAt: validQuotaTime(reading.readAt, Date.now()),
     ok: live,
     includedPct: reading.includedPct,
     autoPct: reading.autoPct,
@@ -105,21 +106,28 @@ export function poolView(pools: Record<string, PoolStatus>, earlyReset: Record<s
 }
 
 /** Windows of every plan the company cards draw from plan windows; a cursor-api plan's card uses the Cursor read instead. */
-export function companyWindows(plans: UsagePlan[], readAt: string): CompanyProviderWindow[] {
-  return plans.filter((p) => p.adapter !== CURSOR_API).flatMap((p) => (p.adapter === ANTIGRAVITY_CLI ? p.antigravityDisplay ?? p.windows : p.windows).map((w) => ({
-    planId: p.id,
-    label: w.label,
-    id: w.id,
-    cycleKind: w.cycleKind,
-    primary: w.primary,
-    usedPct: w.usedPct,
-    resetsAt: w.resetsAt,
-    source: w.source === "manual" || w.source === "none" || w.source === "provider" ? w.source : "screen",
-    readAt: w.sampledAt ?? w.manualAt ?? readAt,
-    readError: w.readError ?? null,
-    readingState: w.readingState,
-    readingExpiresAt: w.readingExpiresAt,
-  })));
+export function companyWindows(plans: UsagePlan[], panelAt?: string): CompanyProviderWindow[] {
+  const now = panelAt && Number.isFinite(Date.parse(panelAt)) ? Date.parse(panelAt) : Date.now();
+  return plans.filter((p) => p.adapter !== CURSOR_API).flatMap((p) => (p.adapter === ANTIGRAVITY_CLI ? p.antigravityDisplay ?? p.windows : p.windows).map((w) => {
+    const readAt = validQuotaTime(w.source === "manual" ? w.manualAt : w.sampledAt, now);
+    return {
+      planId: p.id,
+      label: w.label,
+      id: w.id,
+      cycleKind: w.cycleKind,
+      primary: w.primary,
+      usedPct: w.usedPct ?? w.staleUsedPct ?? null,
+      resetsAt: w.resetsAt,
+      source: w.source === "manual" || w.source === "none" || w.source === "provider" ? w.source : "screen",
+      readAt,
+      sourceTimeKind: readAt ? w.source === "manual" ? "source" : w.sourceTimeKind ?? "source" : "unknown",
+      collectedAt: validQuotaTime(w.collectedAt, now),
+      displayExpiresAt: w.displayExpiresAt ?? quotaDisplayExpiry(validQuotaTime(w.sampledAt ?? w.manualAt ?? w.collectedAt, now), w.resetsAt),
+      readError: w.readError ?? null,
+      readingState: w.readingState ?? (w.readError ? "stale" : readAt ? "live" : "unknown"),
+      readingExpiresAt: w.readingExpiresAt,
+    };
+  }));
 }
 
 export function companyCursor(plans: UsagePlan[], reading: CursorUsageReading | null, cursorRead: CursorReadMeta | null): CompanyCursorRead | null {
@@ -129,7 +137,9 @@ export function companyCursor(plans: UsagePlan[], reading: CursorUsageReading | 
   return {
     ok: live,
     loggedOut: cursorRead?.loggedOut === true || reading?.loggedOut === true,
-    readAt: reading?.readAt ?? null,
+    readAt: validQuotaTime(reading?.readAt, Date.now()),
+    readingExpiresAt: monthly?.readingExpiresAt ?? null,
+    displayExpiresAt: quotaDisplayExpiry(validQuotaTime(reading?.readAt, Date.now()), monthly?.resetsAt ?? null),
     manualAt: cursorRead?.manualAt ?? monthly?.manualAt ?? null,
     manualUsedPct: live ? null : monthly?.usedPct ?? null,
     resetsAt: monthly?.resetsAt ?? null,

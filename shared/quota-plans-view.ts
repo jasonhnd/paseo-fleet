@@ -4,6 +4,18 @@ import { cursorScreenOffNotice } from "./quota-companies";
 import { CURSOR_API, GROK_CLI, isMonthlyWindow, type PlanSource, poolCatalog, poolEntry } from "./quota-adapters";
 import { remainingRounded, remainingText, stopRemainText, untilResetRemainText } from "./quota-line";
 import type { BoardUsage, UsagePlan, UsageWindow } from "./usage";
+import { validQuotaTime } from "./quota-time";
+
+export function quotaWindowReadText(window: UsageWindow, now = Date.now()): string {
+  const at = validQuotaTime(window.source === "manual" ? window.manualAt : window.sampledAt, now);
+  const when = at ? fmtWhen(at) : "";
+  const label = t(window.source === "manual" ? "quota.companies.source.manual" : window.source === "official" ? "quota.companies.source.official"
+    : window.source === "screen" ? "quota.companies.source.screen" : "quota.companies.source.auto");
+  const origin = window.sourceTimeKind === "batch" && when && window.source !== "manual" ? t("quota.companies.source.batchAt", { when })
+    : when ? t("quota.companies.source.at", { label, when }) : t("quota.companies.source.unknownTime", { label });
+  const call = window.source === "provider" ? validQuotaTime(window.collectedAt, now) : null;
+  return call ? `${origin} · ${t("quota.companies.source.calledAt", { when: fmtWhen(call) })}` : origin;
+}
 
 export type PoolView = NonNullable<BoardUsage["pools"]>[string];
 

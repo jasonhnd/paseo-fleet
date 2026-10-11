@@ -51,6 +51,8 @@ before(async () => {
 after(async () => { mock.timers.reset(); await rm(root, { recursive: true, force: true }); });
 
 async function assemble(changes: Record<string, unknown> = {}, api = host) {
+  // Independent fixture scenarios; changing real plans does not reset sampler state.
+  await rm(join(data, "quota-sampling.json"), { force: true });
   await writeFile(join(data, "plans.json"), JSON.stringify({ plans: [{ ...rawPlan, ...changes }] }));
   clearCache();
   return usage.assemble(api, "7d");

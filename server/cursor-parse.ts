@@ -157,6 +157,8 @@ export function normalizeStoredReading(parsed: unknown): CursorUsageReading | nu
   const error = typeof raw.error === "string" ? raw.error : null;
   const windows = screenWindows(raw.windows);
   return {
+    ...(raw.lastKnown && typeof raw.lastKnown.autoPct === "number" && Number.isFinite(raw.lastKnown.autoPct) && typeof raw.lastKnown.readAt === "string"
+      ? { lastKnown: { autoPct: raw.lastKnown.autoPct, readAt: raw.lastKnown.readAt, resetsAt: typeof raw.lastKnown.resetsAt === "string" ? raw.lastKnown.resetsAt : null } } : {}),
     readAt: raw.readAt,
     ok: raw.ok,
     error,

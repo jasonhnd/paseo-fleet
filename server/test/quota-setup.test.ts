@@ -1,5 +1,5 @@
 import { strict as assert } from "node:assert";
-import { after, before, test } from "node:test";
+import { after, afterEach, before, test } from "node:test";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -37,6 +37,8 @@ before(async () => {
   initializeSettings(dir, fileURLToPath(new URL("../../examples/", import.meta.url)));
 });
 after(async () => { await rm(dir, { recursive: true, force: true }); });
+// Each scenario has its own sampler state; clearing an RPC cache must not bypass the hourly slot.
+afterEach(() => rm(join(dir, "quota-sampling.json"), { force: true }));
 const now = Date.now();
 const cycle = { kind: "unknown" as const };
 const base = { id: "demo-pool", name: "Demo", adapter: "manual" as const, providers: ["demo-provider"], priceUsdMonthly: null, dispatch: true, quotaCycle: cycle, quotaProtection: "pause" as const, stopPct: 80 };

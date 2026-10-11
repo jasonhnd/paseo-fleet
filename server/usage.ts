@@ -32,7 +32,7 @@ import { settleSuperGrokChoice, type SuperGrokChoice } from "./grok-usage";
 import { configuredStopPct, type CursorReadMeta, MANUAL_STOP, oneMonthBefore, poolStatus, type PoolStatus, type SuperGrokReadMeta, writePoolStatus } from "./pools";
 import { textHidden } from "../shared/hidden-plans";
 import { adapterSwitches, readHiddenPlans, readBannedProviders } from "./adapters/config";
-import { judgeAt, planBalance, type PlanBalance, windowsFor } from "./adapters/windows";
+import { judgeAt, knownQuotaFailure, planBalance, type PlanBalance, windowsFor } from "./adapters/windows";
 import { type CouponBoardView, codexCreditsCardText, readCodexCreditsForDispatch, refreshCouponRound } from "./reset-coupons";
 import { cursorLivePct, cursorMeta, cursorReadForPlan, companyCursor, companyWindows, dispatchView, poolView, withCursorLink } from "./usage-view";
 import { type Price, priceFor, pricesFetchedAt } from "./prices";
@@ -42,7 +42,7 @@ import { type Json, readJson, STATE_DIR, writeJson } from "./util";
 import { t } from "../shared/i18n";
 import type { ManualReading, QuotaCycle } from "../shared/quota-cycle";
 import { readSettings, writeSettings } from "./settings";
-import { readProviderQuota } from "./provider-usage";
+import { quotaErrorText, readProviderQuota } from "./provider-usage";
 
 export const PLANS = join(STATE_DIR, "plans.json");
 /** Display cache for the home page. Not read by Kanban. */
@@ -200,6 +200,7 @@ interface ProviderUsage {
   balances: Map<string, Json[]>;
   /** Why listUsage could not be read; null when it was. */
   error: string | null;
+  collectedAt: string | null;
 }
 
 async function providerUsage(paseo: PaseoApi): Promise<ProviderUsage> {
@@ -208,17 +209,18 @@ async function providerUsage(paseo: PaseoApi): Promise<ProviderUsage> {
     const res = sample.value;
     const providers = (res?.providers ?? []) as Json[];
     return {
-      windows: new Map(providers.map((p) => [String(p.providerId), (p.windows ?? []).map((w: Json) => ({
+      windows: new Map(providers.map((p) => [String(p.providerId), ((p.windows?.length ? p.windows : p.error ? [{ label: "Weekly", usedPct: null }] : []) as Json[]).map((w: Json) => ({
         ...w, collectedAt: sample.collectedAt,
         // The legacy host fetchedAt is a batch minimum, not a per-account timestamp.
         batchFetchedAt: res?.fetchedAt ?? null,
-        readError: sample.error ?? (p.error ? String(typeof p.error === "string" ? p.error : p.error.message ?? p.error.code ?? "Provider usage failed") : null),
+        readError: sample.error ?? quotaErrorText(p.error),
       }))])),
       balances: new Map(providers.map((p) => [String(p.providerId), (p.balances ?? []) as Json[]])),
       error: sample.error,
+      collectedAt: sample.collectedAt,
     };
   } catch (e) {
-    return { windows: new Map(), balances: new Map(), error: String(e).slice(0, 200) };
+    return { windows: new Map(), balances: new Map(), error: String(e).slice(0, 200), collectedAt: null };
   }
 }
 
@@ -265,6 +267,7 @@ interface PlanContext {
   sumUsd: (pred: (r: Row) => boolean) => number;
   switches: AdapterSwitches;
   quotaError?: string | null;
+  providerCollectedAt?: string | null;
 }
 
 function planOf(cfg: PlanConfig, planConfigs: PlanConfig[], ctx: PlanContext): UsagePlan {
@@ -389,12 +392,18 @@ export async function assemble(paseo: PaseoApi, period: Period, options?: { capt
   const wantAntigravity = antigravityUsageRequested(planConfigs, switches);
   const [{ rows: all, scannedAt, estimated }, usage, records, profiles, cursorReading, antigravityReading] = await Promise.all([
     allRows(),
-    auto ? providerUsage(paseo) : Promise.resolve({ windows: new Map<string, Json[]>(), balances: new Map<string, Json[]>(), error: null }),
+    auto ? providerUsage(paseo) : Promise.resolve({ windows: new Map<string, Json[]>(), balances: new Map<string, Json[]>(), error: null, collectedAt: null }),
     readAgentRecords(),
     readRoleProfiles(),
     // cursor-api off: no Cursor reading at all; its plans fall back to the hand copy.
     switches[CURSOR_API] && planConfigs.some(p => adapterOf(p, switches) === CURSOR_API)
-      ? captureCursorUsage().then(() => readCursorUsageFile()) : Promise.resolve(null),
+      ? captureCursorUsage().then(async captured => {
+        const local = await readCursorUsageFile();
+        return captured && !captured.ok && captured.error ? { ...(local ?? captured), ok: false, error: captured.error } : local ?? captured;
+      }).catch(error => {
+        console.error("[afc] cursor sampling:", String(error).slice(0, 200));
+        return readCursorUsageFile();
+      }) : Promise.resolve(null),
     // Off, or no plan on this adapter: do not spawn agy. A failed read stays an unknown ACP hold.
     wantAntigravity ? readAntigravityUsage().catch(() => unavailableAntigravityReading()) : Promise.resolve(null),
   ]);
@@ -415,6 +424,7 @@ export async function assemble(paseo: PaseoApi, period: Period, options?: { capt
     sumUsd: (pred) => rows.reduce((s, r) => (pred(r) ? s + usd(r) : s), 0),
     switches,
     quotaError: usage.error,
+    providerCollectedAt: usage.collectedAt,
   };
   const plans = planConfigs.map((cfg) => planOf(cfg, planConfigs, ctx));
   const catalog = poolCatalog(planConfigs, switches);
@@ -468,6 +478,9 @@ async function overlaySuperGrok(plans: UsagePlan[], configs: PlanConfig[], captu
   } else if (choice.providerStuck && choice.usedPct === null) {
     plan.windows = plan.windows.map((w) => stuckWindow(w));
   }
+  const safetyError = choice.safetyError ?? (choice.loginLost ? choice.loginAlarm ?? "Grok authentication failed" : knownQuotaFailure(choice.readError));
+  if (safetyError) plan.windows = plan.windows.map(window => ({ ...window, safetyError }));
+  if (choice.knownQuotaStop) plan.windows = plan.windows.map(window => ({ ...window, knownQuotaStop: choice.knownQuotaStop }));
   return meta;
 }
 
@@ -480,6 +493,8 @@ export function windowFromSuperGrok(choice: SuperGrokChoice, previous: UsageWind
   const daily = priceUsdMonthly !== null ? (priceUsdMonthly * 12) / 365 : null;
   const apiUsd = previous?.apiUsd ?? 0;
   const planUsd = previous?.planUsd ?? (daily !== null ? daily * 7 : null);
+  const sampleMeta = { sampledAt: choice.readAt, readError: choice.readError ?? null,
+    safetyError: choice.safetyError ?? (choice.loginLost ? choice.loginAlarm ?? "Grok authentication failed" : knownQuotaFailure(choice.readError)) };
   const used = choice.usedPct ?? 0;
   const end = choice.resetsAt ? Date.parse(choice.resetsAt) : Number.NaN;
   if (Number.isNaN(end)) {
@@ -497,7 +512,7 @@ export function windowFromSuperGrok(choice: SuperGrokChoice, previous: UsageWind
       planUsd,
       source: choice.source === "screen" ? "screen" : "manual",
       manualAt: choice.manualAt,
-      sampledAt: choice.readAt,
+      ...sampleMeta,
     };
   }
   const len = 7 * DAY;
@@ -514,7 +529,7 @@ export function windowFromSuperGrok(choice: SuperGrokChoice, previous: UsageWind
     planUsd,
     source: choice.source === "screen" ? "screen" : "manual",
     manualAt: choice.manualAt,
-    sampledAt: choice.readAt,
+    ...sampleMeta,
   };
 }
 
@@ -549,6 +564,7 @@ async function companiesOf(
   const creditsLine = await codexCreditsCardText(Date.parse(board.generatedAt) || Date.now()).catch(() => null);
   const codexPlan = board.plans.find((plan) => plan.adapter === CODEX_CLI);
   const companies = buildCompanies({
+    now: Date.parse(board.generatedAt),
     companies: companyCatalog(shown),
     windows: companyWindows(shown, board.generatedAt),
     pools,
@@ -614,7 +630,7 @@ async function buildUsageWithPools(paseo: PaseoApi, period: Period): Promise<Boa
     codexCredits,
     bannedProviders: readBannedProviders(),
   };
-  if (plansError || (usageError && board.plans.every(plan => !plan.quotaProtection))) {
+  if (plansError) {
     logPlansError(plansError);
     const judged = poolStatus(board.plans, poolOptions);
     const companies = await companiesOf(board, judged, cursorReading, cursorRead, false, coupons, grokNotice, supergrokRead?.sourceText ?? null);
@@ -647,10 +663,9 @@ function logPlansError(message: string | null): void {
   console.error(`[afc] pool status: ${message}`);
 }
 
-/** Rewrite pool-status.json. Throws when provider quotas cannot be read, so the caller can try another connection. This is the only path that may open the grok screen. */
+/** Publish local protection from scheduled samples; quota failures must not stop the heartbeat. */
 export async function refreshPoolStatus(paseo: PaseoApi): Promise<void> {
-  const { board, catalog, usageError, plansError, cursorRead, cursorReading, supergrokRead } = await assemble(paseo, "7d", { captureGrok: true });
-  if (usageError && board.plans.every(plan => !plan.quotaProtection)) throw new Error(usageError);
+  const { board, catalog, plansError, cursorRead, cursorReading, supergrokRead } = await assemble(paseo, "7d", { captureGrok: true });
   // Another connection would not help: keep the last snapshot, which goes stale and raises its own alarm.
   if (plansError) {
     logPlansError(plansError);

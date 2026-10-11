@@ -138,6 +138,7 @@ function entry(
   flags?: { deprioritize?: boolean; prefer?: boolean; paceState?: PaceState },
 ): PoolStatus {
   return {
+    ...(w && ("sampledAt" in w || "collectedAt" in w || w.manualAt) ? { observedAt: w.source === "manual" ? w.manualAt : w.sampledAt ?? w.collectedAt ?? null } : {}),
     ...(plan.quotaProtection ? { quotaProtection: plan.quotaProtection, readingExpiresAt: w?.readingExpiresAt ?? null } : {}),
     plan: plan.name,
     window: w?.label ?? null,
@@ -355,14 +356,18 @@ function consider(ctx: StatusCtx, pool: PoolEntry, plan: UsagePlan, w: UsageWind
     ? plan.windows.filter(window => window.source === "provider" && window.startsAt && window.resetsAt
       && Date.parse(window.resetsAt) > ctx.now && Date.parse(window.resetsAt) - Date.parse(window.startsAt) < primaryLength) : [];
   const exhausted = [judged, ...shorter].find(window => window?.usedPct !== null && window?.usedPct !== undefined && window.usedPct >= stop);
-  const modernHard = plan.quotaProtection === "none" ? null : !validPercent(judged?.usedPct)
+  const expired = judged?.readingExpiresAt != null && (!Number.isFinite(Date.parse(judged.readingExpiresAt)) || Date.parse(judged.readingExpiresAt) <= ctx.now);
+  const safetyError = plan.windows.find(window => window.safetyError)?.safetyError ?? null;
+  const knownQuotaStop = plan.quotaProtection === "none" ? null : plan.windows.find(window => window.knownQuotaStop)?.knownQuotaStop ?? null;
+  const modernHard = plan.quotaProtection === "none" ? null : knownQuotaStop ?? (expired || !validPercent(judged?.usedPct)
     ? t(judged?.readingState === "stale" ? "quota.setup.staleHold" : "quota.setup.unknownHold")
-    : exhausted ? t("quota.setup.windowAtStop", { window: exhausted.label, used: exhausted.usedPct!, stop }) : null;
-  const hard = modern ? modernHard : poolHard(pool, plan, judged, sessionUsed, mode, couponLive) ?? unread.unreadStop;
+    : exhausted ? t("quota.setup.windowAtStop", { window: exhausted.label, used: exhausted.usedPct!, stop }) : null);
+  const hard = safetyError ?? knownQuotaStop ?? (modern ? modernHard : poolHard(pool, plan, judged, sessionUsed, mode, couponLive) ?? unread.unreadStop);
   const judgedFlags = judgePace(pool.neverPrefer, judged?.usedPct ?? null, pace, hard, idleReason(pool, judged), pacePauseAllowed(mode, codexBurn, plan), mode.allowPrefer || codexWeek);
   const flags = modern ? plan.quotaProtection === "none"
     ? { ...judgedFlags, dispatchable: true, prefer: false, deprioritize: false, hard: false, paceHold: false, reason: t("quota.setup.unprotected") }
     : judgedFlags : applyCampaignPrefer(judgedFlags, codexWeek ? "front" : mode.campaign);
+  if (safetyError) Object.assign(flags, { dispatchable: false, prefer: false, deprioritize: false, hard: true, paceHold: false, reason: safetyError });
   if (modern && judged?.source === "manual") flags.reason = t("quota.setup.manualReason", { reason: flags.reason, at: judged.manualAt ?? "", error: judged.readError ?? "" });
   const paced = withPace(entry(plan, judged, flags.dispatchable, flags.reason), pace, flags);
   const status = ctx.burnNames && mode.burnOn ? { ...paced, unpauseProfiles: [...ctx.burnNames] } : paced;

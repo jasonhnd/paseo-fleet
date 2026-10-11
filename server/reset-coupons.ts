@@ -77,15 +77,20 @@ function keepPrevious(previous: CompanyLive | undefined): CompanyLive {
   return { count: 0, kind: "unknown", expiresAt: null, excerpt: "", confirmedAt: "", via: "plans", status: "unreadable" };
 }
 
-async function scheduledCodexRead(now: number): Promise<unknown> {
+interface ScheduledCodex { raw: unknown; at: number }
+type SampledCoupon = ProviderCoupon & { sampledAt: number };
+
+async function scheduledCodexRead(now: number): Promise<ScheduledCodex> {
   const sample = await sampleQuota("codex-coupons", () => readCodexRateLimits(), { now });
   if (sample.error) throw new Error(sample.error);
-  return sample.value;
+  const at = Date.parse(sample.collectedAt ?? "");
+  if (!Number.isFinite(at)) throw new Error("Codex source time is unknown");
+  return { raw: sample.value, at };
 }
 
 /** Coupon fields in Paseo's usage payload, by company (CouponPlans.providerCompany maps the provider). */
-async function couponsFromPaseo(paseo: PaseoApi, now: number, providerCompany: Readonly<Record<string, CouponCompany>>): Promise<Partial<Record<CouponCompany, ProviderCoupon>>> {
-  const out: Partial<Record<CouponCompany, ProviderCoupon>> = {};
+async function couponsFromPaseo(paseo: PaseoApi, now: number, providerCompany: Readonly<Record<string, CouponCompany>>): Promise<Partial<Record<CouponCompany, SampledCoupon>>> {
+  const out: Partial<Record<CouponCompany, SampledCoupon>> = {};
   try {
     const sample = await readProviderQuota(paseo, { now });
     if (sample.error) throw new Error(sample.error);
@@ -96,7 +101,8 @@ async function couponsFromPaseo(paseo: PaseoApi, now: number, providerCompany: R
       const company = Object.prototype.hasOwnProperty.call(providerCompany, id) ? providerCompany[id] : undefined;
       if (!company) continue;
       const found = findCouponFields(raw, now);
-      if (found) out[company] = found;
+      const sampledAt = Date.parse(sample.collectedAt ?? "");
+      if (found && Number.isFinite(sampledAt)) out[company] = { ...found, sampledAt };
     }
   } catch (error) {
     console.error("[afc] reset coupons: reading Paseo usage failed", String(error).slice(0, ERROR_TEXT_CHARS));
@@ -105,6 +111,7 @@ async function couponsFromPaseo(paseo: PaseoApi, now: number, providerCompany: R
 }
 
 interface CodexRead {
+  sampledAt: number;
   parsed: PageRead | null;
   raw: unknown;
   failed: boolean;
@@ -115,33 +122,36 @@ async function readCodexForConfirm(now: number): Promise<CodexRead> {
   let raw: unknown = null;
   let parsed: PageRead | null = null;
   let failed = false;
+  let sampledAt = now;
   try {
-    raw = await scheduledCodexRead(now);
+    const sample = await scheduledCodexRead(now);
+    raw = sample.raw;
+    sampledAt = sample.at;
     parsed = parseCodexRateLimits(raw);
   } catch (error) {
     failed = true;
     console.error("[afc] reset coupons: Codex CLI", String(error).slice(0, ERROR_TEXT_CHARS));
   }
-  await storeCodexCredits(failed ? null : raw, now, null);
-  return { parsed, raw, failed };
+  await storeCodexCredits(failed ? null : raw, sampledAt, null);
+  return { parsed, raw, failed, sampledAt };
 }
 
 /** What one company shows after a confirm: Paseo's field, a hand entry, the Codex CLI read, or the previous reading. */
 function companyAfterConfirm(
   company: CouponCompany,
-  fromApi: ProviderCoupon | undefined,
+  fromApi: SampledCoupon | undefined,
   plans: CouponPlans,
   codex: CodexRead | null,
   previous: CompanyLive | undefined,
   now: number,
 ): CompanyLive {
-  if (fromApi) return liveFrom(fromApi, "paseo", now);
+  if (fromApi) return liveFrom(fromApi, "paseo", fromApi.sampledAt);
   if (couponCliKind(company) === "none") return handEntry("manual");
   if (!plans.cliRead[company]) return handEntry("off");
   const parsed = codex?.parsed;
   if (!codex || codex.failed || !parsed || parsed.status === "unreadable") return keepPrevious(previous);
   return {
-    ...liveFrom({ count: parsed.count, kind: parsed.kind, expiresAt: parsed.expiresAt, excerpt: parsed.excerpt }, "cli", now),
+    ...liveFrom({ count: parsed.count, kind: parsed.kind, expiresAt: parsed.expiresAt, excerpt: parsed.excerpt }, "cli", codex.sampledAt),
     items: codexCreditPieces(codex.raw),
   };
 }
@@ -172,6 +182,7 @@ export async function confirmResetCoupons(paseo: PaseoApi | null, options: { for
 }
 
 interface CountPairing {
+  creditsAt?: number;
   state: ResetCouponState;
   codexCountNow: number | null | undefined;
   anchor: boolean;
@@ -190,11 +201,11 @@ async function pairCodexCount(state: ResetCouponState, plans: CouponPlans, nextC
   const dropping = typeof state.lastCodexUsedPct === "number" && typeof nextCodexPct === "number" && state.lastCodexUsedPct - nextCodexPct >= USED_DROP_POINTS;
   if (!needCount || !(dropping || now - codexPairFailAt >= CODEX_PAIR_RETRY_MS)) return unread;
   try {
-    const raw = await scheduledCodexRead(now);
+    const { raw, at } = await scheduledCodexRead(now);
     const patch = codexCompanyPatch(raw);
     if (!patch) {
       if (!dropping) codexPairFailAt = now;
-      return { ...unread, codexCountNow: null, creditsRaw: raw };
+      return { ...unread, codexCountNow: null, creditsRaw: raw, creditsAt: at };
     }
     codexPairFailAt = 0;
     const chatgpt: CompanyLive = {
@@ -202,12 +213,12 @@ async function pairCodexCount(state: ResetCouponState, plans: CouponPlans, nextC
       kind: patch.kind,
       expiresAt: patch.expiresAt,
       excerpt: patch.excerpt,
-      confirmedAt: new Date(now).toISOString(),
+      confirmedAt: new Date(at).toISOString(),
       via: "cli",
       status: "ok",
       items: patch.items,
     };
-    return { state: { ...state, companies: { ...state.companies, chatgpt } }, codexCountNow: patch.count, anchor: true, creditsRaw: raw };
+    return { state: { ...state, companies: { ...state.companies, chatgpt } }, codexCountNow: patch.count, anchor: true, creditsRaw: raw, creditsAt: at };
   } catch (error) {
     if (!dropping) codexPairFailAt = now;
     console.error("[afc] reset coupons: read-only coupon count check failed", String(error).slice(0, ERROR_TEXT_CHARS));
@@ -216,7 +227,7 @@ async function pairCodexCount(state: ResetCouponState, plans: CouponPlans, nextC
 }
 
 /** Credits balance, when the count read did not already carry one and the stored reading is an hour old. */
-async function readCreditsIfDue(plans: CouponPlans, now: number): Promise<unknown | null | undefined> {
+async function readCreditsIfDue(plans: CouponPlans, now: number): Promise<ScheduledCodex | null | undefined> {
   if (plans.cliRead.chatgpt !== true) return undefined;
   const prev = await readCreditsFile();
   if (!creditsReadDue(prev?.readAt, now)) return undefined;
@@ -240,8 +251,8 @@ export async function refreshCouponRound(input: {
     const now = input.now ?? Date.now();
     const plans = await readPlans();
     const paired = await pairCodexCount(await readState(), plans, input.codexUsedPct ?? null, now);
-    const creditsRaw = paired.creditsRaw !== undefined ? paired.creditsRaw : await readCreditsIfDue(plans, now);
-    if (creditsRaw !== undefined) await storeCodexCredits(creditsRaw, now, input.codexResetsAt ?? null);
+    const credits = paired.creditsRaw !== undefined ? { raw: paired.creditsRaw, at: paired.creditsAt ?? now } : await readCreditsIfDue(plans, now);
+    if (credits !== undefined) await storeCodexCredits(credits?.raw ?? null, credits?.at ?? now, input.codexResetsAt ?? null);
     const extra = await signalExtra({ usedPct: input.codexUsedPct ?? null, resetsAt: input.codexResetsAt ?? null }, paired.anchor, paired.codexCountNow);
     const signaled = signals(plans.seeds, paired.state, now, input.weeklyUsedPct, input.weeklyResetsAt, plans.cliRead, extra);
     await saveCouponState(signaled.state, signaled.sends, signaled.pending, now);

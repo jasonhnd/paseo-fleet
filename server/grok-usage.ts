@@ -28,6 +28,7 @@ import { t, tAll } from "../shared/i18n";
 import { readPoolCatalog } from "./adapters/plans";
 import { sampleQuota } from "./quota-sampling";
 import { QUOTA_SAMPLE_MS } from "./quota-timing";
+import { validQuotaTime } from "../shared/quota-time";
 
 export const GROK_USAGE_FILE = join(STATE_DIR, "grok-usage.json");
 /** At most one CLI read per hour, including failed attempts. */
@@ -92,6 +93,7 @@ export interface GrokCliReading {
 }
 
 export interface GrokStored {
+  lastKnown?: { usedPct: number; readAt: string; resetsAt: string | null };
   readAt: string | null;
   ok: boolean;
   usedPct: number | null;
@@ -114,6 +116,9 @@ export interface ProviderSeen {
 }
 
 export interface SuperGrokChoice {
+  readError?: string | null;
+  safetyError?: string | null;
+  knownQuotaStop?: string | null;
   usedPct: number | null;
   resetsAt: string | null;
   source: "provider" | "screen" | "manual" | "none";
@@ -402,6 +407,7 @@ export function chooseSuperGrok(input: {
   loginAlarm?: string | null;
   providerSeen?: ProviderSeen | null;
   providerStuck?: boolean;
+  lastKnown?: GrokStored["lastKnown"];
 }): SuperGrokChoice {
   const seenProvider = providerWeekly(input.providerWindows);
   const stuck = input.providerStuck === true && seenProvider !== null;
@@ -414,7 +420,15 @@ export function chooseSuperGrok(input: {
   const loginLost = input.loginLost === true;
   const alarm = !cli && stuck ? providerStuckAlarm(input.now, input.providerSeen ?? null) : supergrokUnreadAlarm(input.now, unreadSince, live);
   const diff = cli && cli.usedPct !== null && seenProvider ? Math.abs(cli.usedPct - seenProvider.usedPct) : 0;
+  const knownAt = validQuotaTime(input.lastKnown?.readAt, input.now);
+  const providerAt = validQuotaTime(provider?.sampledAt, input.now);
   return {
+    readError: input.cliEnabled ? input.cli?.error ?? null : null,
+    safetyError: input.cliEnabled && (input.cli?.loggedOut || input.cli?.loginLost) ? input.cli.homeAlarm ?? msgLoginLost() : null,
+    knownQuotaStop: input.cliEnabled && input.lastKnown && knownAt && input.lastKnown.usedPct >= 97 && !cli
+      && (!input.lastKnown.resetsAt || !Number.isFinite(Date.parse(input.lastKnown.resetsAt)) || Date.parse(input.lastKnown.resetsAt) > input.now)
+      && (!providerAt || Date.parse(providerAt) < Date.parse(knownAt))
+      ? t("pools.hard.weekSpent") : null,
     usedPct: cli?.usedPct ?? provider?.usedPct ?? manual?.usedPct ?? null,
     resetsAt: cli?.resetsAt ?? provider?.resetsAt ?? null,
     source: cli ? "screen" : provider ? "provider" : manual ? "manual" : "none",
@@ -541,6 +555,8 @@ export async function readGrokUsageFile(): Promise<GrokStored | null> {
   const raw = await readJson<Partial<GrokStored> | null>(GROK_USAGE_FILE, null);
   if (!raw || typeof raw !== "object") return null;
   return {
+    ...(raw.lastKnown && typeof raw.lastKnown.usedPct === "number" && Number.isFinite(raw.lastKnown.usedPct) && typeof raw.lastKnown.readAt === "string"
+      ? { lastKnown: { usedPct: raw.lastKnown.usedPct, readAt: raw.lastKnown.readAt, resetsAt: typeof raw.lastKnown.resetsAt === "string" ? raw.lastKnown.resetsAt : null } } : {}),
     readAt: typeof raw.readAt === "string" ? raw.readAt : null,
     ok: raw.ok === true,
     usedPct: num(raw.usedPct),
@@ -596,6 +612,7 @@ async function readSuperGrokHistory(): Promise<Array<{ at: string; usedPct: numb
 }
 
 export interface SettleHooks {
+  statePath?: string;
   previous?: () => Promise<GrokStored | null>;
   history?: () => Promise<Array<{ at: string; usedPct: number | null }>>;
   capture?: () => Promise<GrokCliReading>;
@@ -615,8 +632,9 @@ async function superGrokRanSince(sinceMs: number): Promise<boolean> {
   return runsInSpan(runs, await profilePools(), pool, sinceMs, Date.now()) > 0;
 }
 
-function storedFrom(reading: GrokCliReading, lastAttemptAt: string | null, unreadSince: string | null, providerSeen: ProviderSeen | null, diffLogged: string | null): GrokStored {
+function storedFrom(reading: GrokCliReading, lastAttemptAt: string | null, unreadSince: string | null, providerSeen: ProviderSeen | null, diffLogged: string | null, lastKnown?: GrokStored["lastKnown"]): GrokStored {
   return {
+    ...(lastKnown ? { lastKnown } : {}),
     readAt: reading.readAt,
     ok: reading.ok,
     usedPct: reading.usedPct,
@@ -665,8 +683,8 @@ export async function settleSuperGrokChoice(input: {
   let lastAttemptAt = previous?.lastAttemptAt ?? null;
   if (enabled && input.capture === true) {
     const sample = await sampleQuota("grok-screen", () => input.hooks?.capture ? input.hooks.capture() : readGrokScreen(),
-      { now, errorOf: reading => reading.error });
-    const captured = sample.value;
+      { now, statePath: input.hooks?.statePath, errorOf: reading => reading.error });
+    const captured = sample.value && sample.error ? { ...sample.value, ok: false, error: sample.error } : sample.value;
     if (captured && sample.attemptedAt !== lastAttemptAt) {
       const prior = storedReading(previous);
       if (!captured.ok && cliCurrent(prior, now) && prior) {
@@ -697,6 +715,8 @@ export async function settleSuperGrokChoice(input: {
     loginAlarm,
     providerSeen,
     providerStuck: stuck,
+    lastKnown: previous?.lastKnown ?? (previous?.ok && previous.usedPct !== null && previous.readAt
+      ? { usedPct: previous.usedPct, readAt: previous.readAt, resetsAt: previous.resetsAt } : undefined),
   });
   let diffLogged = previous?.diffLogged ?? null;
   if (input.capture === true && choice.diffLine) {
@@ -719,7 +739,10 @@ export async function settleSuperGrokChoice(input: {
       homeAlarm: null,
     };
     const persist = input.hooks?.persist ?? ((stored: GrokStored) => writeJson(GROK_USAGE_FILE, stored));
-    await persist(storedFrom(kept, lastAttemptAt, choice.unreadSince, providerSeen, diffLogged)).catch(() => {});
+    const lastKnown = kept.ok && kept.usedPct !== null && kept.readAt ? { usedPct: kept.usedPct, readAt: kept.readAt, resetsAt: kept.resetsAt }
+      : previous?.lastKnown ?? (previous?.ok && previous.usedPct !== null && previous.readAt
+        ? { usedPct: previous.usedPct, readAt: previous.readAt, resetsAt: previous.resetsAt } : undefined);
+    await persist(storedFrom(kept, lastAttemptAt, choice.unreadSince, providerSeen, diffLogged, lastKnown)).catch(() => {});
   }
   return choice;
 }

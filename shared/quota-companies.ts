@@ -2,6 +2,7 @@ import { z } from "zod";
 import { t, tAll } from "./i18n";
 import { ANTIGRAVITY_CLI, ANTIGRAVITY_FIVE_HOUR_WINDOW, ANTIGRAVITY_WEEK_WINDOW, CLAUDE_CLI, CODEX_CLI, type CompanyEntry, CURSOR_API, cardOrder, GROK_CLI, isWeeklyWindow, MUSE_MSP, OPENCODE_GO_API, MANUAL, sessionWindowOf, type QuotaWindowIdentity } from "./quota-adapters";
 import { reasonSaysNoDispatch, reasonWaitsForWindow } from "./quota-reason";
+import { quotaDisplayExpiry, quotaRowStale, validQuotaTime, type SourceTimeKind } from "./quota-time";
 
 const CLAUDE_STOP_PCT = 75;
 const OTHER_STOP_PCT = 97;
@@ -34,6 +35,9 @@ export const companyWindowSchema = z.object({
   resetsAt: z.string().nullable(),
   source: z.enum(["provider", "manual", "screen", "official", "none", "unread"]),
   readAt: z.string().nullable(),
+  sourceTimeKind: z.enum(["source", "batch", "unknown"]).optional(),
+  collectedAt: z.string().nullable().optional(),
+  displayExpiresAt: z.string().nullable().optional(),
   sourceText: z.string(),
   who: z.string(),
   dispatchText: z.string(),
@@ -97,6 +101,9 @@ export interface CompanyProviderWindow extends QuotaWindowIdentity {
   resetsAt: string | null;
   source: "provider" | "manual" | "screen" | "none";
   readAt: string | null;
+  sourceTimeKind?: SourceTimeKind;
+  collectedAt?: string | null;
+  displayExpiresAt?: string | null;
   readError?: string | null;
   readingState?: "live" | "manual" | "stale" | "unknown";
   readingExpiresAt?: string | null;
@@ -114,6 +121,8 @@ export interface CompanyCursorRead {
   ok: boolean;
   loggedOut: boolean;
   readAt: string | null;
+  readingExpiresAt?: string | null;
+  displayExpiresAt?: string | null;
   manualAt: string | null;
   manualUsedPct: number | null;
   /** Billing-cycle end for the Auto block. Not guessed from a bare "Resets Oct 12". */
@@ -183,15 +192,16 @@ function clock(iso: string | null): string {
   return tokyoClock(iso);
 }
 
-function sourceText(kind: "auto" | "manual" | "stale" | "unread" | "official" | "screen" | "off", at: string | null): string {
+function sourceText(kind: "auto" | "manual" | "stale" | "unread" | "official" | "screen" | "off", at: string | null, timeKind?: SourceTimeKind): string {
   if (kind === "off") return t("quota.companies.source.screenOff");
   if (kind === "unread") return t("quota.companies.source.unread");
   const when = clock(at);
   if (kind === "stale") return when ? t("quota.companies.source.staleAt", { when }) : t("quota.companies.source.stale");
+  if (timeKind === "batch" && when) return t("quota.companies.source.batchAt", { when });
   const label = t(kind === "manual" ? "quota.companies.source.manual"
     : kind === "official" ? "quota.companies.source.official"
       : kind === "screen" ? "quota.companies.source.screen" : "quota.companies.source.auto");
-  return when ? t("quota.companies.source.at", { label, when }) : label;
+  return when ? t("quota.companies.source.at", { label, when }) : t("quota.companies.source.unknownTime", { label });
 }
 
 function modelWord(model: string | null | undefined): string {
@@ -272,9 +282,12 @@ function windowBase(input: {
   amountText?: string | null;
   /** Replaces the generic source sentence. Used to label the agy table and the unproven ACP row. */
   sourceTextOverride?: string;
+  sample?: Pick<CompanyProviderWindow, "sourceTimeKind" | "collectedAt" | "readingState" | "readingExpiresAt" | "displayExpiresAt">;
 }): CompanyWindow {
   const unread = input.sourceKind === "unread" || input.sourceKind === "off";
   const stale = input.sourceKind === "stale";
+  const calledAt = input.source === "provider" && input.sample?.collectedAt ? clock(input.sample.collectedAt) : "";
+  const origin = input.sourceTextOverride ?? sourceText(input.sourceKind, input.readAt, input.sample?.sourceTimeKind);
   return {
     id: input.id,
     name: input.name,
@@ -283,7 +296,12 @@ function windowBase(input: {
     resetsAt: input.resetsAt,
     source: input.source,
     readAt: input.readAt,
-    sourceText: input.sourceTextOverride ?? sourceText(input.sourceKind, input.readAt),
+    sourceText: calledAt ? `${origin} · ${t("quota.companies.source.calledAt", { when: calledAt })}` : origin,
+    sourceTimeKind: input.sample?.sourceTimeKind ?? (input.readAt ? "source" : "unknown"),
+    collectedAt: input.sample?.collectedAt ?? null,
+    displayExpiresAt: input.sample?.displayExpiresAt ?? quotaDisplayExpiry(input.readAt, input.resetsAt),
+    readingExpiresAt: input.sample?.readingExpiresAt ?? null,
+    readingState: stale || input.sample?.readingState === "stale" ? "stale" : unread || !input.readAt ? "unknown" : "live",
     who: input.who,
     dispatchText: dispatchText(input.pool, input.mode),
     pacePct: input.showPace ? input.pool?.pacePct ?? null : null,
@@ -326,7 +344,7 @@ function claudeWindows(company: CompanyEntry, rows: CompanyProviderWindow[], poo
       });
     }
     return windowBase({
-      id, name, usedPct: row.usedPct, resetsAt: row.resetsAt, source: row.source === "none" ? "provider" : row.source,
+      id, name, usedPct: row.usedPct, resetsAt: row.resetsAt, source: row.source === "none" ? "provider" : row.source, sample: row,
       readAt: row.readAt, sourceKind: "auto", who, pool: poolKey ? pools[poolKey] : undefined,
       mode: "pool", showPace, stopRule: poolKey === null ? undefined : poolKey === planId ? "leader" : "plain",
       stopPctOverride: poolKey === planId ? claudeStopPct : undefined,
@@ -357,6 +375,7 @@ function cursorWindows(company: CompanyEntry, read: CompanyCursorRead | null, po
   const autoLive = byLabel.get("auto");
   const autoUsed = read?.ok && autoLive?.usedPct != null ? autoLive.usedPct : read?.manualUsedPct ?? null;
   const auto = windowBase({
+    sample: read ? { readingExpiresAt: read.readingExpiresAt, displayExpiresAt: read.displayExpiresAt } : undefined,
     id: `${key}-auto`,
     name: t("quota.companies.cursorAuto"),
     usedPct: autoUsed,
@@ -380,7 +399,7 @@ function cursorWindows(company: CompanyEntry, read: CompanyCursorRead | null, po
   const api = read?.ok && apiLive
     ? windowBase({
       id: `${key}-api`, name: apiName, usedPct: apiLive.usedPct, resetsAt: whenOf(apiLive, false),
-      source: via, readAt: read.readAt, sourceKind: via, who: nobody,
+      source: via, readAt: read.readAt, sourceKind: via, who: nobody, sample: { displayExpiresAt: read.displayExpiresAt },
       pool: undefined, mode: "off", showPace: false,
     })
     : windowBase({
@@ -394,7 +413,7 @@ function cursorWindows(company: CompanyEntry, read: CompanyCursorRead | null, po
   const onDemand = read?.ok && demand
     ? windowBase({
       id: `${key}-ondemand`, name: demandName, usedPct: demand.usedPct, resetsAt: whenOf(demand, false),
-      source: via, readAt: read.readAt, sourceKind: via, who: nobody,
+      source: via, readAt: read.readAt, sourceKind: via, who: nobody, sample: { displayExpiresAt: read.displayExpiresAt },
       pool: undefined, mode: "off", showPace: false, amountText: amount,
     })
     : windowBase({
@@ -413,6 +432,7 @@ function cursorWindows(company: CompanyEntry, read: CompanyCursorRead | null, po
         usedPct: row.usedPct,
         resetsAt: grok ? (row.resetsAt ?? null) : whenOf(row, false),
         source: via,
+        sample: { displayExpiresAt: read.displayExpiresAt },
         readAt: read.readAt,
         sourceKind: via,
         who: unverified,
@@ -461,7 +481,7 @@ function oneWindow(
   }
   const sourceKind = row.source === "manual" ? "manual" : row.source === "screen" ? "screen" : "auto";
   return windowBase({
-    id, name, usedPct: row.usedPct, resetsAt: row.resetsAt, source: row.source === "none" ? "provider" : row.source,
+    id, name, usedPct: row.usedPct, resetsAt: row.resetsAt, source: row.source === "none" ? "provider" : row.source, sample: row,
     readAt: row.readAt, sourceKind, who, pool, mode, showPace, stopRule,
     usingManual: row.source === "manual",
     stopPctOverride,
@@ -469,6 +489,7 @@ function oneWindow(
 }
 
 export interface BuildCompaniesInput {
+  now?: number;
   /** One per plan (shared/quota-adapters.ts companyCatalog); each becomes a card built by its adapter. */
   companies: CompanyEntry[];
   windows: CompanyProviderWindow[];
@@ -613,7 +634,7 @@ function antigravityCard(company: CompanyEntry, input: BuildCompaniesInput): Com
         name: t(bucket === "gemini" ? window === "week" ? "quota.antigravity.geminiWeek" : "quota.antigravity.geminiFiveHour"
           : window === "week" ? "quota.antigravity.claudeWeek" : "quota.antigravity.claudeFiveHour"),
         usedPct: known ? row.usedPct : null, resetsAt: known ? row.resetsAt : null,
-        source: known ? "screen" : "unread", readAt: known ? row.readAt : null,
+        source: known ? "screen" : "unread", readAt: known ? row.readAt : null, sample: row,
         sourceKind: stale ? "stale" : known ? "screen" : "unread",
         sourceTextOverride: stale ? t("quota.antigravity.cliStale", { when: when || row?.readAt || "" })
           : known ? t("quota.antigravity.sampledAt", { when: when || row.readAt || "" })
@@ -653,5 +674,25 @@ export function buildCompanies(input: BuildCompaniesInput): CompanyCard[] {
   // Every Antigravity plan reads the same two CLI buckets. Keep protected pools separate, but show the table once.
   const first = input.companies.find(company => company.adapter === ANTIGRAVITY_CLI);
   return cardOrder(input.companies).filter(company => company.adapter !== ANTIGRAVITY_CLI || company === first)
-    .map((company) => (CARD_BUILDERS[company.adapter] ?? singleWindowCard)(company, input));
+    .map((company) => (CARD_BUILDERS[company.adapter] ?? singleWindowCard)(company, input))
+    .map(card => input.now === undefined ? card : refreshCompanyTime(card, input.now));
+}
+
+/** File caches and newly assembled cards both use the current clock, never the board header's freshness. */
+export function refreshCompanyTime(card: CompanyCard, now: number, generatedAt?: string | null): CompanyCard {
+  const cacheOld = generatedAt !== undefined && (validQuotaTime(generatedAt, now) === null
+    || quotaRowStale({ readAt: generatedAt, resetsAt: null }, now));
+  const windows = card.windows.map(row => {
+    const stale = row.usedPct !== null && (cacheOld || quotaRowStale(row, now, generatedAt));
+    const readAt = validQuotaTime(row.readAt, now);
+    const badTime = row.readAt !== null && readAt === null;
+    const sourceTimeKind: SourceTimeKind = badTime ? "unknown" : row.sourceTimeKind ?? (readAt ? "source" : "unknown");
+    const baseSource = badTime ? sourceText(row.source === "manual" ? "manual" : row.source === "official" ? "official" : row.source === "screen" ? "screen" : "auto", null) : row.sourceText;
+    return { ...row, readAt, sourceTimeKind,
+      ...(stale ? { readingState: "stale" as const, tone: "yellow" as const,
+        sourceText: tAll("quota.companies.source.stale").some(label => baseSource.includes(label)) ? baseSource : `${baseSource} · ${t("quota.companies.source.stale")}` }
+        : badTime ? { readingState: "unknown" as const, sourceText: baseSource } : {}),
+    };
+  });
+  return { ...card, windows, stale: card.stale || windows.some(row => row.readingState === "stale") };
 }
