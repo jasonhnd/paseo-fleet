@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { applyDispatchMatrix, eligibleReviewers, firstDispatchable, legacyReviewerModels, legacyReviewerTiers, profilesFromConfig, reviewerTier, type DispatchMatrix, type DispatchProfile } from "../../shared/dispatch";
+import { applyDispatchMatrix, eligibleReviewers, firstDispatchable, legacyReviewerTiers, profilesFromConfig, reviewerTier, type DispatchMatrix, type DispatchProfile } from "../../shared/dispatch";
 import { DispatchMatrix as ExportMatrix } from "../../shared/contract/schema";
 import { buildDispatchMatrixExport } from "../exports";
 import { buildRolesPageView } from "../roles-page";
@@ -47,70 +47,19 @@ test("candidate switching and stale/invalid profiles are rechecked against live 
   for (const model of [null, undefined, "", " ", "missing-model"]) assert.deepEqual(reviewerTier(matrix, model, "L2"), []);
 });
 
-test("model branches take precedence; legacy consumer merges remain separate from scoped producer migration", () => {
+test("model branches take precedence; legacy families merge tiers without hard exclusions", () => {
   const legacy: DispatchMatrix = { ...fixture.base, roles: { reviewer: { byExecutorFamily: {
     "demo-family-a": { L2: [{ profile: "Demo same model reviewer", effort: "high" }] },
     "demo-family-b": { L2: [{ profile: "Demo same family reviewer", effort: "high" }, { profile: "Demo same model reviewer", effort: "high" }] },
   } } } };
   assert.equal(legacyReviewerTiers(legacy.roles.reviewer).L2.length, 2);
-  assert.deepEqual(reviewerTier(legacy, "demo-alpha", "L2").map(row => row.profile), ["Demo same model reviewer", "Demo same family reviewer"]);
-  // Conflicting legacy origin metadata for one actual model cannot grant a union of scopes.
-  assert.deepEqual(reviewerTier(build(legacy), "demo-alpha", "L2"), []);
+  assert.deepEqual(reviewerTier(build(legacy), "demo-alpha", "L2").map(row => row.profile), ["Demo same family reviewer"]);
   for (const branch of [{}, { "demo-alpha": { L2: [] } }, null, []]) {
     const mixed = { ...legacy, roles: { reviewer: { ...legacy.roles.reviewer as object, byExecutorModel: branch } } };
     assert.deepEqual(reviewerTier(build(mixed), "demo-alpha", "L2"), []);
   }
   const exact = { ...legacy, roles: { reviewer: { byExecutorModel: { "demo-alpha": { L2: [] }, "demo-beta": { L2: [{ profile: "Demo ordinary reviewer", effort: "high" }] } } } } };
   assert.deepEqual(reviewerTier(build(exact), "demo-alpha", "L2"), []);
-});
-
-test("legacy Gemini review scope stays GPT-only in all four tiers through apply, export and Roles", async () => {
-  const live: DispatchProfile[] = [
-    { name: "Demo Gemini executor", role: "executor", model: "gemini-3.8-flash-medium", family: "google", pool: "demo-google" },
-    { name: "Demo GPT reviewer", role: "reviewer", model: "gpt-6.1-sol", family: "openai", pool: "demo-gpt" },
-    { name: "Demo Grok reviewer", role: "candidate", candidateFor: "reviewer", model: "grok-4.7", family: "xai", pool: "demo-grok" },
-    { name: "Demo Sonnet reviewer", role: "candidate", candidateFor: "reviewer", model: "demo-sonnet", family: "anthropic", pool: "demo-claude" },
-    { name: "Demo paused high-risk reviewer", role: "personal", pausedCandidateFor: "reviewer", model: "demo-fable", family: "anthropic", pool: "demo-claude" },
-  ];
-  const tiers = Object.fromEntries(["L1", "L2", "L3", "L4"].map(tier => [tier,
-    [{ profile: "Demo GPT reviewer", effort: tier === "L1" || tier === "L2" ? "xhigh" : "max" }]]));
-  const base: DispatchMatrix = { ...fixture.base, roles: {
-    executor: { L1: [{ profile: live[0].name, effort: null }], L2: [{ profile: live[0].name, effort: null }] },
-    reviewer: { byExecutorFamily: {
-      google: tiers,
-      openai: Object.fromEntries(Object.keys(tiers).map(tier => [tier, [{ profile: live[2].name, effort: "high" }, { profile: live[4].name, effort: "xhigh" }]])),
-      xai: Object.fromEntries(Object.keys(tiers).map(tier => [tier, [{ profile: live[1].name, effort: tiers[tier][0].effort }, { profile: live[4].name, effort: "xhigh" }]])),
-      anthropic: Object.fromEntries(Object.keys(tiers).map(tier => [tier, [{ profile: live[1].name, effort: tiers[tier][0].effort }, { profile: live[2].name, effort: "high" }]])),
-    } },
-  } };
-  const pools = { "demo-google": { dispatchable: true, prefer: false }, "demo-gpt": { dispatchable: true, prefer: true },
-    "demo-grok": { dispatchable: true, prefer: false }, "demo-claude": { dispatchable: false, prefer: false } };
-  const opts = { ...options, profiles: live, knownNames: new Set(live.map(row => row.name)), pools };
-  const migrated = { ...base, roles: { ...base.roles, reviewer: legacyReviewerModels(base.roles.reviewer, live) } };
-  for (const input of [base, migrated]) {
-    const matrix = applyDispatchMatrix(input, opts);
-    const parsed = ExportMatrix.parse(buildDispatchMatrixExport(matrix, "demo", new Date(now)));
-    for (const tier of Object.keys(tiers)) {
-      assert.deepEqual(reviewerTier(parsed, live[0].model, tier), tiers[tier]);
-      assert.equal(firstDispatchable(reviewerTier(parsed, live[0].model, tier))?.profile, live[1].name);
-      // If GPT pauses, the configured Gemini scope has no Grok/Sonnet/Fable fallback.
-      const paused = eligibleReviewers(parsed, live[0].model, tier, live, { ...pools, "demo-gpt": { dispatchable: false, prefer: false } });
-      assert.deepEqual(paused.map(row => row.profile), [live[1].name]);
-      assert.equal(firstDispatchable(paused), null);
-      // The existing paused high-risk substitute stays visible in its configured scopes.
-      for (const executorModel of ["grok-4.7", "gpt-6.1-sol"]) {
-        assert.equal(reviewerTier(parsed, executorModel, tier).find(row => row.profile === live[4].name)?.paused, true);
-      }
-    }
-    const page = await buildRolesPageView({ profiles: async () => live, pools: async () => pools, runsSince: () => [], baseMatrix: async () => input }, now);
-    const line = page.cards.find(card => card.key === "reviewer")!.orderLines.find(row => row.includes(live[0].model!))!;
-    assert.match(line, /Demo GPT reviewer/);
-    assert.ok(!line.includes(live[2].name) && !line.includes(live[3].name) && !line.includes(live[4].name));
-  }
-  // Actual-model branches have no family comparison: an explicitly allowed same-family different model remains valid.
-  const sameFamily = live.map(row => row.name === live[1].name ? { ...row, family: "google" } : row);
-  const explicit = applyDispatchMatrix(migrated, { ...opts, profiles: sameFamily });
-  assert.deepEqual(reviewerTier(explicit, live[0].model, "L1"), tiers.L1);
 });
 
 test("model eligibility preserves pause, quota, roles, provider bans and explicit tier limits", () => {
@@ -130,6 +79,55 @@ test("model eligibility preserves pause, quota, roles, provider bans and explici
   const paused = structuredClone(highRiskBase);
   paused.roles.reviewer.L4[0].paused = true;
   assert.equal(reviewerTier(build(paused), "demo-alpha", "L4")[0].paused, true);
+});
+
+test("Gemini uses all legal different-model reviewers while personal substitutes stay paused", async () => {
+  const live: DispatchProfile[] = [
+    { name: "Demo Gemini executor", role: "executor", model: "gemini-3.8-flash-medium", family: "google", provider: "antigravity", pool: "demo-google" },
+    { name: "Demo GPT reviewer", role: "reviewer", model: "gpt-6.1-sol", family: "openai", provider: "codex", pool: "demo-gpt" },
+    { name: "Demo Grok reviewer", role: "candidate", candidateFor: "reviewer", model: "grok-4.7", family: "xai", provider: "grok", pool: "demo-grok" },
+    { name: "Demo paused high-risk reviewer", role: "personal", pausedCandidateFor: "reviewer", model: "demo-fable", family: "anthropic", pool: "demo-claude" },
+  ];
+  const tiers = ["L1", "L2", "L3", "L4"];
+  const rows = (profile: string) => Object.fromEntries(tiers.map(tier => [tier,
+    [{ profile, effort: tier === "L1" || tier === "L2" ? "xhigh" : "max" },
+      ...(tier === "L4" ? [{ profile: live[3].name, effort: "xhigh" }] : [])]]));
+  const base: DispatchMatrix = { ...fixture.base, roles: {
+    executor: { L1: [{ profile: live[0].name, effort: null }], L2: [{ profile: live[0].name, effort: null }] },
+    // Historical buckets are compatibility candidates, never an executor-family restriction.
+    reviewer: { byExecutorFamily: { google: rows(live[1].name), openai: rows(live[2].name), xai: rows(live[1].name) } },
+  } };
+  const pools = { "demo-google": { dispatchable: true, prefer: false }, "demo-gpt": { dispatchable: true, prefer: true },
+    "demo-grok": { dispatchable: true, prefer: false }, "demo-claude": { dispatchable: true, prefer: false } };
+  const opts = { ...options, profiles: live, knownNames: new Set(live.map(row => row.name)), pools };
+  const matrix = applyDispatchMatrix(base, opts);
+  const parsed = ExportMatrix.parse(buildDispatchMatrixExport(matrix, "demo", new Date(now)));
+  assert.deepEqual(parsed.roles.executor, base.roles.executor);
+  assert.ok(!live.some(row => row.family === "google" && (row.role === "reviewer" || row.candidateFor === "reviewer")));
+  for (const tier of tiers) {
+    const candidates = reviewerTier(parsed, live[0].model, tier);
+    assert.deepEqual(candidates.filter(row => !row.paused).map(row => row.profile), [live[1].name, live[2].name]);
+    assert.equal(firstDispatchable(candidates)?.profile, live[1].name);
+    const gptPaused = eligibleReviewers(parsed, live[0].model, tier, live, { ...pools, "demo-gpt": { dispatchable: false, prefer: true } });
+    assert.equal(firstDispatchable(gptPaused)?.profile, live[2].name);
+    const bothPaused = eligibleReviewers(parsed, live[0].model, tier, live, {
+      ...pools, "demo-gpt": { dispatchable: false, prefer: true }, "demo-grok": { dispatchable: false, prefer: false },
+    });
+    assert.equal(firstDispatchable(bothPaused), null);
+    const changed = live.map(row => row.name === live[2].name ? {
+      ...row, model: live[0].model, family: "xai", provider: "demo-other-provider", thinkingOptionId: "high", modeId: "demo-other-mode",
+    } : row);
+    assert.ok(!eligibleReviewers(parsed, live[0].model, tier, changed, pools).some(row => row.profile === live[2].name));
+    assert.ok(!reviewerTier(applyDispatchMatrix(base, { ...opts, profiles: changed }), live[0].model, tier).some(row => row.profile === live[2].name));
+  }
+  for (const model of [live[0].model, live[1].model, live[2].model]) {
+    const paused = reviewerTier(parsed, model, "L4").find(row => row.profile === live[3].name);
+    assert.equal(paused?.paused, true);
+    assert.ok(firstDispatchable(reviewerTier(parsed, model, "L4"))?.profile !== live[3].name);
+  }
+  const page = await buildRolesPageView({ profiles: async () => live, pools: async () => pools, runsSince: () => [], baseMatrix: async () => base }, now);
+  const line = page.cards.find(card => card.key === "reviewer")!.orderLines.find(row => row.includes(live[0].model!))!;
+  assert.match(line, /Demo GPT reviewer/);
 });
 
 test("doctor and model-swap warnings compare actual models even across companies", async () => {
