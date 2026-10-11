@@ -292,7 +292,8 @@ function windowBase(input: {
   const status = input.sample?.providerStatus;
   const error = input.sample?.readError;
   const report = status && (unread || error) ? t("quota.companies.source.providerStatus", { status }) : "";
-  const problem = error && error !== status ? t("quota.companies.source.readError", { error }) : "";
+  // Specialized displays already provide their own error/source sentence.
+  const problem = !input.sourceTextOverride && error && error !== status ? t("quota.companies.source.readError", { error }) : "";
   const empty = unread && status === "available" && !error ? t("quota.companies.source.availableEmpty") : "";
   return {
     id: input.id,
