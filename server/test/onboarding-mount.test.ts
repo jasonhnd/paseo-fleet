@@ -72,7 +72,7 @@ test("mounted onboarding generates selectable JSON, retries, and rejects stale r
     await click("Generate preview");
     const json = () => mounted.container.querySelector('[data-testid="role-preview-json"]');
     assert.equal(JSON.parse(json().textContent).length, 5);
-    assert.match(mounted.container.textContent, /Self-check cannot automatically approve/);
+    assert.match(mounted.container.textContent, /same model is a self-check/);
     assert.ok(!mounted.container.querySelector('[aria-label="Apply"]'));
     for (const issue of ["timeout", "unknown"] as const) {
       previewIssue = issue;

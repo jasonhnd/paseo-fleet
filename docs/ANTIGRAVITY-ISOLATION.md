@@ -110,7 +110,8 @@ bypasses profile scope rules and matrix membership. An empty L3/L4 slot or a pau
 stand-in role alone is therefore insufficient to enforce a provider's authorized
 tiers on that path. Pool holds and board bans still need independent checks.
 Before enabling a provider, enforce authorized roles/tiers on explicit selection
-as well, and reserve a reviewer from another family for Google execution.
+as well, and reserve a reviewer using a different actual model for Google execution.
+This comparison does not authorize Google reviewer roles or additional tiers.
 
 Pure permission probes can check read/write/shell/mode-switch decisions, but cannot
 prove that a real ACP provider requests approval for every relevant action. Keep

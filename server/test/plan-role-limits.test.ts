@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, mock, test } from "node:test";
 import { EXPORTS } from "../../shared/contract/schema";
-import { profilePaused, type DispatchProfile } from "../../shared/dispatch";
+import { profilePaused, reviewerTier, type DispatchProfile } from "../../shared/dispatch";
 import { boardUsageRpc, type UsagePlan } from "../../shared/usage";
 
 const root = await mkdtemp(join(tmpdir(), "plan-role-limits-"));
@@ -14,8 +14,8 @@ const plugin = join(root, "plugin");
 const now = Date.parse("2030-06-04T12:00:00Z");
 const roles = ["reviewer", "executor", "batch", "reader", "decision", "supervisor", "other"];
 const profiles: DispatchProfile[] = [
-  ...roles.map(role => ({ name: `Demo ${role}`, role, provider: "demo-provider", pool: "demo-pool" })),
-  { name: "Demo review candidate", role: "candidate", candidateFor: "reviewer", provider: "demo-provider", pool: "demo-pool" },
+  ...roles.map(role => ({ name: `Demo ${role}`, role, model: role === "reviewer" ? "demo-review" : "demo-work", provider: "demo-provider", pool: "demo-pool" })),
+  { name: "Demo review candidate", role: "candidate", candidateFor: "reviewer", model: "demo-review-candidate", provider: "demo-provider", pool: "demo-pool" },
   { name: "Demo work candidate", role: "candidate", candidateFor: "executor", provider: "demo-provider", pool: "demo-pool" },
   { name: "Demo without role", provider: "demo-provider", pool: "demo-pool" },
 ];
@@ -73,7 +73,7 @@ test("raw review-only plans survive normalization, RPC, status, contract export 
     normalizedOnlyRoles: (board.plans[0] as UsagePlan & { onlyRoles?: string[] }).onlyRoles ?? null,
     statusOnlyRoles: status[rawPlan.id].onlyRoles ?? null,
     exportedOnlyRoles: exported.pools[rawPlan.id].onlyRoles,
-    paused: matrices.map(matrix => Object.fromEntries(roles.slice(0, 5).map(role => [role, matrix.roles[role].L2.map((row: { paused?: boolean }) => Boolean(row.paused))]))),
+    paused: matrices.map(matrix => Object.fromEntries(roles.slice(0, 5).map(role => [role, (role === "reviewer" ? reviewerTier(matrix, "demo-work", "L2") : matrix.roles[role].L2).map((row: { paused?: boolean }) => Boolean(row.paused))]))),
   }));
   assert.deepEqual((board.plans[0] as UsagePlan & { onlyRoles?: string[] }).onlyRoles, ["reviewer"]);
   assert.deepEqual((boardUsageRpc.output.parse(board).plans[0] as UsagePlan & { onlyRoles?: string[] }).onlyRoles, ["reviewer"]);
@@ -87,7 +87,8 @@ test("raw review-only plans survive normalization, RPC, status, contract export 
   assert.deepEqual(panel.plans[0].onlyRoles, ["reviewer"]);
   assert.equal(panel.pools![rawPlan.id].dispatchable, true);
   for (const matrix of matrices) {
-    assert.deepEqual(matrix.roles.reviewer.L2.map((row: { profile: string; paused?: boolean }) => [row.profile, Boolean(row.paused)]), reviewNames.map(name => [name, false]));
+    assert.deepEqual(reviewerTier(matrix, "demo-work", "L2").map(row => [row.profile, Boolean(row.paused)]), reviewNames.map(name => [name, false]));
+    assert.deepEqual(reviewerTier(matrix, null, "L2"), []);
     for (const role of roles.slice(1, 5)) assert.ok(matrix.roles[role].L2.every((row: { paused?: boolean }) => row.paused === true), role);
   }
 });
