@@ -73,134 +73,62 @@
       ]
     },
     "reviewer": {
-      "byExecutorFamily": {
-        "xai": {
-          "L1": [
-            {
-              "profile": "reviewer",
-              "effort": "low"
-            },
-            {
-              "profile": "reviewer.gpt-6.1-sol",
-              "effort": "medium"
-            }
-          ],
-          "L2": [
-            {
-              "profile": "reviewer",
-              "effort": "medium"
-            },
-            {
-              "profile": "reviewer.gpt-6.1-sol",
-              "effort": "high"
-            }
-          ],
-          "L3": [
-            {
-              "profile": "reviewer",
-              "effort": "high"
-            },
-            {
-              "profile": "reviewer.gpt-6.1-sol",
-              "effort": "xhigh"
-            }
-          ],
-          "L4": [
-            {
-              "profile": "reviewer.fable",
-              "effort": "xhigh"
-            },
-            {
-              "profile": "reviewer.gpt-6.1-sol",
-              "effort": "xhigh"
-            }
-          ]
+      "L1": [
+        {
+          "profile": "reviewer",
+          "effort": "low"
         },
-        "anthropic": {
-          "L1": [
-            {
-              "profile": "reviewer.gpt-6.1-sol",
-              "effort": "medium"
-            },
-            {
-              "profile": "reviewer.grok",
-              "effort": "low"
-            }
-          ],
-          "L2": [
-            {
-              "profile": "reviewer.gpt-6.1-sol",
-              "effort": "high"
-            },
-            {
-              "profile": "reviewer.grok",
-              "effort": "medium"
-            }
-          ],
-          "L3": [
-            {
-              "profile": "reviewer.gpt-6.1-sol",
-              "effort": "xhigh"
-            },
-            {
-              "profile": "reviewer.grok",
-              "effort": "high"
-            }
-          ],
-          "L4": [
-            {
-              "profile": "reviewer.grok",
-              "effort": "xhigh"
-            },
-            {
-              "profile": "reviewer.gpt-6.1-sol",
-              "effort": "xhigh"
-            }
-          ]
+        {
+          "profile": "reviewer.gpt-6.1-sol",
+          "effort": "medium"
         },
-        "openai": {
-          "L1": [
-            {
-              "profile": "reviewer",
-              "effort": "low"
-            },
-            {
-              "profile": "reviewer.grok",
-              "effort": "low"
-            }
-          ],
-          "L2": [
-            {
-              "profile": "reviewer",
-              "effort": "medium"
-            },
-            {
-              "profile": "reviewer.grok",
-              "effort": "medium"
-            }
-          ],
-          "L3": [
-            {
-              "profile": "reviewer",
-              "effort": "high"
-            },
-            {
-              "profile": "reviewer.grok",
-              "effort": "high"
-            }
-          ],
-          "L4": [
-            {
-              "profile": "reviewer.fable",
-              "effort": "xhigh"
-            },
-            {
-              "profile": "reviewer.grok",
-              "effort": "xhigh"
-            }
-          ]
+        {
+          "profile": "reviewer.grok",
+          "effort": "low"
         }
-      }
+      ],
+      "L2": [
+        {
+          "profile": "reviewer",
+          "effort": "medium"
+        },
+        {
+          "profile": "reviewer.gpt-6.1-sol",
+          "effort": "high"
+        },
+        {
+          "profile": "reviewer.grok",
+          "effort": "medium"
+        }
+      ],
+      "L3": [
+        {
+          "profile": "reviewer",
+          "effort": "high"
+        },
+        {
+          "profile": "reviewer.gpt-6.1-sol",
+          "effort": "xhigh"
+        },
+        {
+          "profile": "reviewer.grok",
+          "effort": "high"
+        }
+      ],
+      "L4": [
+        {
+          "profile": "reviewer.fable",
+          "effort": "xhigh"
+        },
+        {
+          "profile": "reviewer.gpt-6.1-sol",
+          "effort": "xhigh"
+        },
+        {
+          "profile": "reviewer.grok",
+          "effort": "xhigh"
+        }
+      ]
     },
     "reader": {
       "*": [

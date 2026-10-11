@@ -50,6 +50,16 @@ test("disabled, unavailable, hidden models, unconfirmed families and stale optio
   assert.equal((await discoverRoles(host(raw as never))).providers[0].models.length, 0);
 });
 
+test("same family different actual models preview independent review; same model across routes cannot", () => {
+  const reviewer = { ...choice, provider: "demo-review", model: "demo-review-model" };
+  assert.equal(buildRolePreview(discovery, choice, reviewer, "en").review, "independent");
+  const withSameModel: Discovery = structuredClone(discovery);
+  withSameModel.providers[1].models.push({ id: choice.model, label: "Demo duplicate route", thinking: [{ id: "other-depth", label: "Other" }] });
+  const same = buildRolePreview(withSameModel, choice, { ...reviewer, model: choice.model, family: "anthropic", thinkingOptionId: "other-depth" }, "en");
+  assert.equal(same.status, "invalid");
+  assert.equal(same.issue, "model");
+});
+
 test("copied role notes retain English followed by Chinese regardless of UI language", () => {
   const reviewer = { ...choice, provider: "demo-review", model: "demo-review-model", family: "anthropic" };
   const english = buildRolePreview(discovery, choice, reviewer, "en").profiles;

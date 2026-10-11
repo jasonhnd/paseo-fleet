@@ -1,6 +1,7 @@
 import { defineRpc } from "@getpaseo/plugin";
 import { z } from "zod";
 import { tIn, type Language } from "./i18n";
+import { differentReviewModels } from "./review-model";
 
 const id = z.string().trim().min(1).max(200);
 const option = z.object({ id, label: z.string() });
@@ -28,7 +29,7 @@ export const generatedProfileSchema = z.object({
 export type GeneratedProfile = z.infer<typeof generatedProfileSchema>;
 export const previewSchema = z.object({
   status: z.enum(["ready", "invalid", "unavailable"]),
-  issue: z.enum(["none", "capability", "family", "options", "timeout", "unknown"]),
+  issue: z.enum(["none", "capability", "family", "model", "options", "timeout", "unknown"]),
   review: z.enum(["independent", "manual"]),
   profiles: z.array(generatedProfileSchema),
 });
@@ -53,7 +54,7 @@ export function buildRolePreview(discovery: Discovery, executor: RoleChoice, rev
     if (choice.modeId && !provider!.modes.some(row => row.id === choice.modeId)) return invalid("options");
     if (choice.thinkingOptionId && !model.thinking.some(row => row.id === choice.thinkingOptionId)) return invalid("options");
   }
-  if (reviewer && reviewer.family.trim().toLowerCase() === executor.family.trim().toLowerCase()) return invalid("family");
+  if (reviewer && !differentReviewModels(executor.model, reviewer.model)) return invalid("model");
   const profile = (role: typeof ROLES[number] | "reviewer", choice: RoleChoice): GeneratedProfile => ({
     id: `fleet-${role}`, name: tIn(language, `onboarding.role.${role}`), role,
     provider: choice.provider, model: choice.model, family: choice.family.trim().toLowerCase(),

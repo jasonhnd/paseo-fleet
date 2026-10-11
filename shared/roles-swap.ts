@@ -2,6 +2,7 @@
 import { t } from "./i18n";
 import { companyName, pickableCompanies, pickableModels, type PickableModel } from "./roles-policy";
 import type { RoleCardView, RoleRowView } from "./roles-page";
+import { actualModel } from "./review-model";
 
 export interface SwapChoice {
   company: string | null;
@@ -65,23 +66,24 @@ export function diffLines(result: { before: string | null; after: string | null 
 const OPPOSITE_ROLE: Record<string, string> = { executor: "reviewer", reviewer: "executor" };
 
 /**
- * Warnings shown before confirming: after the swap, would this profile (main or candidate) share a company with any
+ * Warnings shown before confirming: after the swap, would this profile (main or candidate) share a model with any
  * profile of the opposite role (executor vs reviewer), candidates included? Maker and checker must differ.
  */
-export function familyConflicts(cards: readonly RoleCardView[], roleKey: string, profile: string, newCompany: string): string[] {
+export function modelConflicts(cards: readonly RoleCardView[], roleKey: string, profile: string, newModel: string): string[] {
   const opposite = OPPOSITE_ROLE[roleKey];
   if (!opposite) return [];
   const mine = cards.find((card) => card.key === roleKey)?.rows.find((row) => row.profile === profile);
   if (!mine) return [];
+  const model = actualModel(newModel);
+  if (!model) return [t("roles.swap.modelMissing")];
   const others = cards.find((card) => card.key === opposite)?.rows ?? [];
   return others
-    .filter((row) => row.company === newCompany)
-    .map((row) => t("roles.swap.familyConflict", {
+    .filter((row) => actualModel(row.model) === model)
+    .map((row) => t("roles.swap.modelConflict", {
       name: mine.name,
-      company: newCompany,
+      model,
       opposite: t(opposite === "reviewer" ? "roles.swap.reviewer" : "roles.swap.executor"),
       other: row.name,
-      otherCompany: row.company,
     }));
 }
 

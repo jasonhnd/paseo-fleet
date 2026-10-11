@@ -11,6 +11,7 @@ import { dataDir, kanbanConfigPath, paseoConfigPath } from "./paths";
 import { readBannedProviders, readOpsProject } from "./adapters/config";
 import { providerBanned } from "../shared/provider-policy";
 import { swapRefusal } from "../shared/roles-policy";
+import { actualModel, differentReviewModels } from "../shared/review-model";
 import { t, tIn, type MessageKey } from "../shared/i18n";
 import { commandPath } from "./platform";
 
@@ -225,8 +226,9 @@ function check(cfg: Row, extra?: Row, verbose = true): number {
     report(role, !p ? t("cli.roles.check.noProfile") : providerBanned(p, banned) ? t("roles.policy.refuseBannedProvider", { provider: p.provider }) : validate(p, providers));
   }
   for (const p of profiles.filter(p => !ROLES.includes(p.role) && (p.role === "candidate" || p.candidateFor || p.pausedCandidateFor))) if (providerBanned(p, banned)) report(p.name, t("roles.policy.refuseBannedProvider", { provider: p.provider }));
-  const maker = profiles.find(p => p.role === "executor")?.family, checker = profiles.find(p => p.role === "reviewer")?.family;
-  report("executor+reviewer", maker && maker === checker ? t("cli.roles.check.sameFamily", { family: maker }) : null);
+  const maker = actualModel(profiles.find(p => p.role === "executor")?.model), checker = actualModel(profiles.find(p => p.role === "reviewer")?.model);
+  report("executor+reviewer", !maker || !checker ? t("cli.roles.check.reviewModelMissing") :
+    !differentReviewModels(maker, checker) ? t("cli.roles.check.sameModel", { model: maker }) : null);
   if (extra && !ROLES.includes(extra.role)) report(extra.name, validate(extra, providers));
   return problems;
 }

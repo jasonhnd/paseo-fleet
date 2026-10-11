@@ -5,6 +5,7 @@ import { ROLE_ORDER } from "./board";
 import { PROFILE_SLOTS, resolveProfileToken } from "./dispatch-slots";
 import { mergeDispatchOverrides, validDispatchOverrides, type ThinkingCatalog, type DispatchWarning } from "./dispatch-overrides";
 import { isLeaderTitle } from "./leader-title";
+import { actualModel, differentReviewModels } from "./review-model";
 import { t, tAll, type MessageKey } from "./i18n";
 
 /** Fewer runs than this: show "not enough data", and do not estimate a per-run percent. */
@@ -396,7 +397,7 @@ export function orderMatrixEntries(
     }
     if (knownNames && !knownNames.has(name)) return [];
     if (providerBanned(resolved ?? profiles.find((profile) => profile.name === name) ?? name, bannedProviders)) return [];
-    return [{ profile: name, effort: entry.effort ?? null, ...(entry.order !== undefined ? { order: entry.order } : {}) }];
+    return [{ profile: name, effort: entry.effort ?? null, ...(entry.paused === true ? { paused: true } : {}), ...(entry.order !== undefined ? { order: entry.order } : {}) }];
   });
   if (!pools) return list;
   const byName = new Map(profiles.map((profile) => [profile.name, profile]));
@@ -404,7 +405,7 @@ export function orderMatrixEntries(
     .map((entry, index) => {
       const profile = byName.get(entry.profile);
       const pool = profile?.pool ? pools[profile.pool] : undefined;
-      const paused = profile ? profilePaused(profile, pool) : false;
+      const paused = entry.paused === true || (profile ? profilePaused(profile, pool) : false);
       const rank = profile ? dispatchRank(profile, pool) : 1;
       return { entry, index, rank, paused, priority: priorityKey(rank, pool) };
     })
@@ -432,6 +433,69 @@ function mapLists(node: unknown, fn: (list: MatrixEntry[]) => MatrixEntry[]): un
   return node;
 }
 
+export interface ReviewerModelMatrix {
+  byExecutorModel: Record<string, Record<string, MatrixEntry[]>>;
+}
+
+const recordNode = (node: unknown): Record<string, unknown> | null =>
+  node && typeof node === "object" && !Array.isArray(node) ? node as Record<string, unknown> : null;
+const entryArray = (node: unknown): MatrixEntry[] => Array.isArray(node) && node.every(isEntry) ? node : [];
+
+/** Legacy input only: merge tier candidates, never exclude by family. First occurrence keeps its settings. */
+export function legacyReviewerTiers(node: unknown): Record<string, MatrixEntry[]> {
+  const families = recordNode(recordNode(node)?.byExecutorFamily);
+  const tiers: Record<string, MatrixEntry[]> = {};
+  for (const branch of Object.values(families ?? {})) for (const [tier, value] of Object.entries(recordNode(branch) ?? {})) {
+    const list = tiers[tier] ??= [];
+    for (const entry of entryArray(value)) if (!list.some(row => row.profile === entry.profile)) list.push({ ...entry });
+  }
+  return tiers;
+}
+
+/** A model branch, including an empty/invalid one, is authoritative; it cannot borrow another branch. */
+export function reviewerTier(matrix: Pick<DispatchMatrix, "roles">, executorModel: unknown, tier: string): MatrixEntry[] {
+  const model = actualModel(executorModel);
+  const node = recordNode(matrix.roles.reviewer);
+  if (!model || !node) return [];
+  if (Object.hasOwn(node, "byExecutorModel")) {
+    const branches = recordNode(node.byExecutorModel);
+    const tiers = recordNode(branches && Object.hasOwn(branches, model) ? branches[model] : null);
+    return entryArray(tiers?.[tier] ?? tiers?.["*"]);
+  }
+  const tiers = Object.hasOwn(node, "byExecutorFamily") ? legacyReviewerTiers(node) : node;
+  return entryArray(tiers[tier] ?? tiers["*"]);
+}
+
+/** Recheck live profiles at use time: a candidate may have changed model since matrix publication. */
+export function eligibleReviewers(matrix: Pick<DispatchMatrix, "roles">, executorModel: unknown, tier: string,
+  profiles: readonly DispatchProfile[], pools: Record<string, PoolFlags> | null, bannedProviders: readonly string[] = []): MatrixEntry[] {
+  const byName = new Map(profiles.map(profile => [profile.name, profile]));
+  return reviewerTier(matrix, executorModel, tier).flatMap(entry => {
+    const profile = byName.get(entry.profile);
+    if (!profile || !(profile.role === "reviewer" || (profile.role === "candidate" && profile.candidateFor === "reviewer")) ||
+      !differentReviewModels(executorModel, profile.model) || providerBanned(profile, bannedProviders)) return [];
+    const paused = entry.paused === true || profilePaused(profile, profile.pool ? pools?.[profile.pool] : undefined);
+    return [{ ...entry, ...(paused ? { paused: true } : {}) }];
+  });
+}
+
+function reviewerModelMatrix(matrix: DispatchMatrix, profiles: DispatchProfile[], pools: Record<string, PoolFlags> | null,
+  knownNames: Set<string> | null, bannedProviders: readonly string[]): ReviewerModelMatrix {
+  const models = [...new Set(profiles.filter(profile => !knownNames || knownNames.has(profile.name)).flatMap(profile => {
+    const model = actualModel(profile.model);
+    return model ? [model] : [];
+  }))];
+  const node = recordNode(matrix.roles.reviewer);
+  const byExecutorModel = Object.fromEntries(models.map(model => {
+    const source = node && Object.hasOwn(node, "byExecutorModel")
+      ? recordNode(recordNode(node.byExecutorModel)?.[model]) : node;
+    const tiers = Object.keys(source ?? {}).filter(tier => /^L[1-4]$/.test(tier) || tier === "*");
+    return [model, Object.fromEntries(tiers.map(tier => [tier,
+      eligibleReviewers(matrix, model, tier, profiles.filter(profile => !knownNames || knownNames.has(profile.name)), pools, bannedProviders)]))];
+  }));
+  return { byExecutorModel };
+}
+
 /**
  * Drop unknown profiles, put explicit orders first, then rank the remaining candidates by quota.
  * Unresolved slots are dropped and reported so publishers can preserve the last usable file.
@@ -453,7 +517,11 @@ export function applyDispatchMatrix(
 ): DispatchMatrix {
   const warn = options.onOverrideWarning ?? (() => {});
   const overrides = validDispatchOverrides(options.dispatchOverrides, options.profiles, options.thinkingCatalog ?? {}, warn);
-  const copy = mergeDispatchOverrides(base, overrides, warn);
+  // Convert only legacy reviewer input before applying overrides. Other roles remain byte-for-byte inputs.
+  const reviewer = recordNode(base.roles.reviewer);
+  const normalized = reviewer && !Object.hasOwn(reviewer, "byExecutorModel") && Object.hasOwn(reviewer, "byExecutorFamily")
+    ? { ...base, roles: { ...base.roles, reviewer: legacyReviewerTiers(reviewer) } } : base;
+  const copy = mergeDispatchOverrides(normalized, overrides, warn);
   copy.generatedAt = options.generatedAt;
   delete copy.priority;
   if (options.priority) {
@@ -461,6 +529,7 @@ export function applyDispatchMatrix(
     copy.priority = { order: [...order], until, ...(mode ? { mode } : {}) };
   }
   copy.roles = mapLists(copy.roles, (list) => orderMatrixEntries(list, options.profiles, options.pools, options.knownNames, options.onUnresolvedSlot, options.bannedProviders)) as DispatchMatrix["roles"];
+  if (Object.hasOwn(copy.roles, "reviewer")) copy.roles.reviewer = reviewerModelMatrix(copy, options.profiles, options.pools, options.knownNames, options.bannedProviders ?? []);
   return copy;
 }
 

@@ -127,14 +127,14 @@ function checkOneProfile(profile: DoctorProfile, models: Record<string, string[]
   return finding(key, "green", t("doctor.checks.profiles.modelOk", { label }));
 }
 
-function checkFamilySplit(profiles: DoctorProfile[]): DoctorFinding {
+function checkModelSplit(profiles: DoctorProfile[]): DoctorFinding {
   const main = (role: string) => profiles.find((profile) => profile.role === role && profile.candidateFor === null);
   const executor = main("executor");
   const reviewer = main("reviewer");
-  if (!executor || !reviewer) return finding("profiles:family", "yellow", t("doctor.checks.profiles.familyNoMain"));
-  if (!executor.family || !reviewer.family) return finding("profiles:family", "yellow", t("doctor.checks.profiles.familyMissing", { executor: executor.name, reviewer: reviewer.name }));
-  if (executor.family === reviewer.family) return finding("profiles:family", "red", t("doctor.checks.profiles.familySame", { family: executor.family }));
-  return finding("profiles:family", "green", t("doctor.checks.profiles.familyOk", { executor: executor.family, reviewer: reviewer.family }));
+  if (!executor || !reviewer) return finding("profiles:model", "yellow", t("doctor.checks.profiles.modelNoMain"));
+  if (!executor.model.trim() || !reviewer.model.trim()) return finding("profiles:model", "red", t("doctor.checks.profiles.reviewModelMissing", { executor: executor.name, reviewer: reviewer.name }));
+  if (executor.model.trim() === reviewer.model.trim()) return finding("profiles:model", "red", t("doctor.checks.profiles.modelSame", { model: executor.model }));
+  return finding("profiles:model", "green", t("doctor.checks.profiles.modelDifferent", { executor: executor.model, reviewer: reviewer.model }));
 }
 
 function profilesSummary(count: number, unchecked: boolean, bad: number, idle: number): string {
@@ -157,7 +157,7 @@ export function checkProfiles(input: {
     ...(providers === null
       ? [finding("profiles:providers", "yellow", t("doctor.checks.profiles.providersUnreadable"))]
       : chain.map((profile) => checkOneProfile(profile, input.models, providers, input.disabledPools))),
-    checkFamilySplit(chain),
+    checkModelSplit(chain),
   ];
   const profileRows = findings.filter((row) => row.key.startsWith("profile:"));
   const bad = profileRows.filter((row) => row.status !== "green").length;

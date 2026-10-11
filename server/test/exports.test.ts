@@ -173,7 +173,7 @@ describe("v1.1 decision and pause exports", () => {
       userComments: [{ at: NOW.toISOString(), note: "Demo note" }, { at: "bad", note: "ignored" }],
     }));
     const full = Decisions.parse(buildDecisionsExport(rows, "1.2.3", NOW));
-    assert.equal(full.contractVersion, "1.2.0");
+    assert.equal(full.contractVersion, "1.3.0");
     assert.deepEqual(full.items.map((row) => row.status), rows.map((row) => row.status));
     assert.equal(full.items[1].owner, "demo <leader>");
     assert.deepEqual(full.items[1].userComments, [{ at: NOW.toISOString(), note: "Demo note" }]);
@@ -185,7 +185,7 @@ describe("v1.1 decision and pause exports", () => {
       { project: " demo ", since: NOW.toISOString(), note: "Demo pause", internal: "omitted" },
       { project: "other", since: "unknown" }, { project: "" }, null,
     ], "1.2.3", NOW));
-    assert.equal(out.contractVersion, "1.2.0");
+    assert.equal(out.contractVersion, "1.3.0");
     assert.deepEqual(out.projects, [
       { project: "demo", since: NOW.toISOString(), note: "Demo pause" },
       { project: "other", since: null, note: "" },

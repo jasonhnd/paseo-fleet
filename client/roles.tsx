@@ -6,7 +6,7 @@ import type { BoardModel } from "../shared/board";
 import { t } from "../shared/i18n";
 import { type RoleCardView, type RoleRowView, rolesPageRpc, rolesSetRpc } from "../shared/roles-page";
 import { pickableCompanies, routeSuffix } from "../shared/roles-policy";
-import { chosenModel, choiceReady, confirmText, diffLines, familyConflicts, initialChoice, modelLabel, modelsOf, pickCompany, pickModel, sameAsCurrent, type SwapChoice } from "../shared/roles-swap";
+import { chosenModel, choiceReady, confirmText, diffLines, modelConflicts, initialChoice, modelLabel, modelsOf, pickCompany, pickModel, sameAsCurrent, type SwapChoice } from "../shared/roles-swap";
 import { RoleHistory } from "./roles-history";
 import { Badge, Chip, Empty, ResponsiveGrid, Section, pressed, type Styles } from "./ui";
 
@@ -108,7 +108,7 @@ function SwapForm({ s, roleKey, row, cards, models, onDone }: { s: Styles; roleK
           <Text style={s.buttonText}>{t("roles.tab.next")}</Text>
         </Pressable>
       ) : null}
-      {ready && confirming ? <ConfirmBox s={s} row={row} choice={choice} warnings={familyConflicts(cards, roleKey, row.profile, choice.company ?? "")} pending={swap.isPending} onCancel={() => setConfirming(false)} onConfirm={() => swap.mutate({ profile: row.profile, provider: choice.provider ?? "", model: choice.modelId ?? "", thinking: choice.thinking })} /> : null}
+      {ready && confirming ? <ConfirmBox s={s} row={row} choice={choice} warnings={modelConflicts(cards, roleKey, row.profile, choice.modelId ?? "")} pending={swap.isPending} onCancel={() => setConfirming(false)} onConfirm={() => swap.mutate({ profile: row.profile, provider: choice.provider ?? "", model: choice.modelId ?? "", thinking: choice.thinking })} /> : null}
       {swap.data && !swap.data.ok ? <Text style={s.red}>{t("roles.tab.notSwapped", { message: swap.data.message })}</Text> : null}
       {swap.isError ? <Text style={s.red}>{t("roles.tab.notSwapped", { message: String(swap.error) })}</Text> : null}
     </View>

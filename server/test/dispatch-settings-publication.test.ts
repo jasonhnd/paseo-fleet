@@ -15,10 +15,10 @@ before(async () => {
   Object.assign(process.env, { HOME: home, PASEO_HOME: join(home, "paseo"), AFC_DATA_DIR: data, KANBAN_DATA_DIR: join(home, "kanban"), ROLES_STATE_DIR: join(home, "roles"), AFC_HOME: plugin });
   writeFileSync(join(home, ".local/bin/paseo"), `#!/usr/bin/env node
 if (process.argv[2] !== "provider" || process.argv[3] !== "models" || !process.argv.includes("--thinking")) process.exit(1);
-console.log(JSON.stringify([{id:"demo-model",thinkingOptionIds:["low","medium","high","xhigh"]}]));
+console.log(JSON.stringify(["demo-model","demo-exec-model","demo-review-model"].map(id=>({id,thinkingOptionIds:["low","medium","high","xhigh"]}))));
 `, { mode: 0o700 });
   const { PROFILE_SLOTS } = await import("../../shared/dispatch-slots");
-  writeFileSync(join(home, "paseo/config.json"), JSON.stringify({ daemon: { agentProfiles: Object.keys(PROFILE_SLOTS).map(slot => ({ name: `Demo ${slot}`, dispatchId: slot, provider: "demo", model: "demo-model", pool: slot === "reviewer.fable" ? "demo-secondary" : "demo-primary" })) } }));
+  writeFileSync(join(home, "paseo/config.json"), JSON.stringify({ daemon: { agentProfiles: Object.keys(PROFILE_SLOTS).map(slot => ({ name: `Demo ${slot}`, dispatchId: slot, role: slot.split(".")[0], provider: "demo", model: slot.startsWith("reviewer") ? "demo-review-model" : slot.startsWith("executor") ? "demo-exec-model" : "demo-model", pool: slot === "reviewer.fable" ? "demo-secondary" : "demo-primary" })) } }));
   writeFileSync(join(data, "afc.config.json"), JSON.stringify({ language: "en", extension: { keep: true } }));
   writeFileSync(join(data, "plans.json"), JSON.stringify({ plans: [] }));
   writeFileSync(join(data, "pool-status.json"), JSON.stringify({ pools: {
@@ -38,13 +38,13 @@ test("saving reviewer order publishes it in legacy and contract matrices despite
   if (result.status !== "saved") return;
   const legacy = JSON.parse(readFileSync(dispatch.DISPATCH_MATRIX, "utf8"));
   const contract = JSON.parse(readFileSync(join(data, "exports/dispatch-matrix.json"), "utf8"));
-  for (const family of ["openai", "xai"]) for (const matrix of [legacy, contract]) {
-    assert.equal(matrix.roles.reviewer.byExecutorFamily[family].L4[0].profile, "Demo reviewer.fable");
-    assert.equal(matrix.roles.reviewer.byExecutorFamily[family].L4[0].order, 1);
+  for (const model of ["demo-exec-model", "demo-model"]) for (const matrix of [legacy, contract]) {
+    assert.equal(matrix.roles.reviewer.byExecutorModel[model].L4[0].profile, "Demo reviewer.fable");
+    assert.equal(matrix.roles.reviewer.byExecutorModel[model].L4[0].order, 1);
   }
   assert.deepEqual(contract.roles, legacy.roles);
-  assert.equal(contract.contractVersion, "1.2.0");
-  assert.ok(!legacy.roles.reviewer.byExecutorFamily.anthropic.L4.some((row: { profile: string }) => row.profile === "Demo reviewer.fable"));
+  assert.equal(contract.contractVersion, "1.3.0");
+  assert.deepEqual(legacy.roles.reviewer.byExecutorModel["demo-review-model"].L4, []);
   const cleared = await settings.writeSettingsWithDispatch({ file: "config", revision: result.snapshot.revision,
     document: { ...result.snapshot.document, dispatchOverrides: {} } });
   assert.equal(cleared.status, "saved");

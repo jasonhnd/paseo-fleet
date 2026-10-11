@@ -14,6 +14,7 @@ import {
   type MatrixEntry,
   type PoolFlags,
   statusOf,
+  eligibleReviewers,
 } from "./dispatch";
 import { historyForProfiles, type HistoryView, historyViewSchema } from "./roles-history";
 import { dispatchSlotLabel } from "./dispatch-slots";
@@ -173,8 +174,18 @@ function isTierNode(node: unknown): node is Record<string, unknown> {
 const FAMILY_LABEL: Record<string, string> = { xai: "xAI", anthropic: "Anthropic", openai: "OpenAI" };
 
 /** Lines of small print about dispatch order. Empty roles say so in one line. */
-export function orderLines(roleKey: string, matrix: DispatchMatrix | null, rowCount: number): string[] {
+export function orderLines(roleKey: string, matrix: DispatchMatrix | null, rowCount: number,
+  profiles: readonly DispatchProfile[] = [], pools: Record<string, PoolFlags> | null = null, bannedProviders: readonly string[] = []): string[] {
   const node = matrix?.roles?.[roleKey];
+  if (roleKey === "reviewer" && node && typeof node === "object" && Object.hasOwn(node, "byExecutorModel")) {
+    const byModel = (node as { byExecutorModel?: Record<string, unknown> }).byExecutorModel;
+    if (!byModel || typeof byModel !== "object" || Array.isArray(byModel)) return [t("roles.page.noOrder")];
+    return Object.entries(byModel).map(([model, tiers]) => {
+      const safe = profiles.length && matrix && tiers && typeof tiers === "object" ? Object.fromEntries(Object.keys(tiers).map(tier =>
+        [tier, eligibleReviewers(matrix, model, tier, profiles, pools, bannedProviders)])) : tiers;
+      return t("roles.page.orderModel", { model, list: isTierNode(safe) ? firstPerTier(safe, roleKey) : t("roles.page.allPaused") });
+    });
+  }
   if (isEntries(node) && node.length > 0) return [t("roles.page.orderFlat", { list: node.map((entry) => entryText(entry, roleKey)).join(" → ") })];
   if (isTierNode(node)) return [t("roles.page.orderTier", { list: firstPerTier(node, roleKey) })];
   const byFamily = (node as { byExecutorFamily?: Record<string, unknown> } | undefined)?.byExecutorFamily;
@@ -218,7 +229,7 @@ export function buildRolesPage(input: {
     const ordered = orderProfiles(profilesOnPage(key, input.profiles, input.bannedProviders), input.pools);
     const rows = ordered.map((profile) => rowOf(key, profile, input.pools, counts, input.poolLabels ?? {}));
     const history = historyForProfiles(input.history ?? [], rows.map((row) => row.profile));
-    return { key, label: pageRoleLabel(key), rows, orderLines: orderLines(key, input.matrix, rows.length), history };
+    return { key, label: pageRoleLabel(key), rows, orderLines: orderLines(key, input.matrix, rows.length, input.profiles, input.pools, input.bannedProviders), history };
   });
   const warnings = cards.filter((card) => card.rows.length === 0).map((card) => t("roles.page.noProfilesWarning", { label: card.label }));
   return { generatedAt: input.generatedAt, cards, warnings };

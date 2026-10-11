@@ -59,7 +59,7 @@ export function validDispatchOverrides(raw: unknown, profiles: readonly Dispatch
   return result;
 }
 
-/** Overrides change only existing rows, so reviewer family boundaries cannot be widened. */
+/** Overrides change only existing rows; they cannot add reviewers or widen tier eligibility. */
 export function mergeDispatchOverrides(base: DispatchMatrix, overrides: DispatchOverrides, warn: DispatchWarning): DispatchMatrix {
   const copy = JSON.parse(JSON.stringify(base)) as DispatchMatrix;
   for (const [role, tiers] of Object.entries(overrides)) {
