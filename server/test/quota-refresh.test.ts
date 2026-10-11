@@ -4,7 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
 import { EXPORTS } from "../../shared/contract/schema";
-import { providerSourceTime, QUOTA_DISPLAY_TTL_MS, QUOTA_SAMPLE_MS } from "../../shared/quota-time";
+import { providerSourceTime, quotaRowStale, QUOTA_DISPLAY_TTL_MS, QUOTA_SAMPLE_MS } from "../../shared/quota-time";
+import { companyCatalog } from "../../shared/quota-adapters";
+import { buildCompanies } from "../../shared/quota-companies";
+import { t } from "../../shared/i18n";
 import type { PaseoApi } from "../paseo-api";
 import type { UsagePlan } from "../../shared/usage";
 
@@ -16,7 +19,7 @@ process.env.ROLES_STATE_DIR = join(root, "roles");
 process.env.AFC_TRANSCRIPT_HOME = join(root, "transcripts");
 const { PLANS, QUOTA_COMPANIES, buildUsage, refreshPoolStatus, windowFromSuperGrok } = await import("../usage");
 const { POOL_STATUS, poolStatus } = await import("../pools-status");
-const { companyWindows } = await import("../usage-view");
+const { companyCursor, companyWindows } = await import("../usage-view");
 const { readCompanies } = await import("../home-feed");
 const { claudeReadingFromSnapshot } = await import("../pools-unread");
 const { samplesInPeriod } = await import("../quota-history");
@@ -129,7 +132,77 @@ test("real assembly/publication paths honor hourly slots while plans, priorities
   clearCache();
 });
 
-test("home rejudges a six-hour cache and explicit expiry even when stored stale is false", async () => {
+function sampledCompanies(at: number) {
+  const cursor: import("../cursor-usage").CursorUsageReading = { readAt: iso(now), ok: true, error: null, includedPct: 20,
+    autoPct: 20, apiPct: 20, onDemandUsd: null, onDemandLimitUsd: null, resetsAt: iso(now + 86400000),
+    windows: [{ label: "Auto", usedPct: 20, onDemandUsd: null, onDemandLimitUsd: null, resetsAt: iso(now + 86400000) }], source: "official", loggedOut: false };
+  const plans = (["claude", "codex", "cursor"] as const).map(provider => {
+    const adapter = provider === "cursor" ? "cursor-api" as const : provider === "claude" ? "claude-cli" as const : "codex-cli" as const;
+    const cfg = { id: `demo-${provider}`, priceUsdMonthly: null, providers: [provider], usageProvider: provider,
+      quotaProtection: "pause" as const, quotaCycle: provider === "cursor"
+        ? { kind: "month" as const, day: 1, timeZone: "UTC", hour: 0, minute: 0 }
+        : { kind: "week" as const, weekday: 6, timeZone: "UTC", hour: 0, minute: 0 } };
+    const windows = windowsFor(cfg, adapter, { now: at, windowsBy: new Map([[provider, [{ id: "seven_day", label: "Weekly", usedPct: 20,
+      resetsAt: iso(now + 86400000), sampledAt: iso(now), collectedAt: iso(now) }]]]), providerCollectedAt: iso(now),
+      balances: new Map(), cursorReading: provider === "cursor" ? cursor : null, sumUsd: () => 0 });
+    return { ...cfg, adapter, name: provider, dispatch: true, pacePause: false, windows, note: "", api30dUsd: 0, roi30d: null, coverage: "" };
+  });
+  const pools = poolStatus(plans, { now: at });
+  const cards = buildCompanies({ now: at, companies: companyCatalog(plans), windows: companyWindows(plans, iso(at)),
+    pools, profiles: [], cursor: companyCursor(plans, cursor, null) });
+  return { plans, pools, cards };
+}
+
+for (const minutes of [8, 63]) {
+  test(`new company cards use display expiry at minute ${minutes} while seven-minute safety still pauses`, ctx => {
+    const at = now + minutes * 60_000;
+    ctx.mock.timers.enable({ apis: ["Date"], now: at });
+    const { plans, pools, cards } = sampledCompanies(at);
+    assert.equal(cards.length, 3);
+    for (const plan of plans) {
+      assert.equal(pools[plan.id].dispatchable, false, `${plan.adapter}: safety pause`);
+      assert.equal(plan.windows[0].usedPct, null);
+      assert.equal(plan.windows[0].readingState, "stale");
+    }
+    for (const card of cards) {
+      assert.equal(card.stale, minutes === 63, `${card.adapter}: display stale`);
+      const row = card.windows.find(row => row.usedPct !== null)!;
+      assert.equal(row.usedPct, 20);
+      assert.equal(row.readAt, iso(now));
+      assert.equal(row.displayExpiresAt, iso(now + QUOTA_DISPLAY_TTL_MS));
+      assert.equal(row.readingState, minutes === 63 ? "stale" : "live");
+      assert.equal(row.sourceText.includes(t("quota.companies.source.stale")), minutes === 63);
+    }
+  });
+
+  test(`cached company cards use display expiry at minute ${minutes} even with a fresh panel header`, async ctx => {
+    ctx.mock.timers.enable({ apis: ["Date"], now });
+    await mkdir(process.env.AFC_DATA_DIR!, { recursive: true });
+    const { plans, pools, cards } = sampledCompanies(now);
+    for (const plan of plans) {
+      assert.equal(pools[plan.id].dispatchable, true);
+      assert.equal(plan.windows[0].readingExpiresAt, iso(now + 7 * 60_000));
+    }
+    const at = now + minutes * 60_000;
+    ctx.mock.timers.setTime(at);
+    for (const generatedAt of [iso(now), iso(at)]) {
+      await writeFile(QUOTA_COMPANIES, JSON.stringify({ generatedAt, companies: cards }));
+      const cached = await readCompanies(at);
+      assert.equal(cached.length, 3);
+      for (const card of cached) {
+        assert.equal(card.stale, minutes === 63, `${card.adapter}: cached display stale`);
+        const row = card.windows.find(row => row.usedPct !== null)!;
+        assert.equal(row.readAt, iso(now));
+        assert.equal(row.readingState, minutes === 63 ? "stale" : "live");
+        assert.equal(row.sourceText.includes(t("quota.companies.source.stale")), minutes === 63);
+      }
+    }
+    const row = cards[0].windows.find(row => row.usedPct !== null)!;
+    assert.equal(quotaRowStale(row, at), minutes === 63);
+  });
+}
+
+test("home rejudges a six-hour cache and explicit display expiry even when stored stale is false", async () => {
   const card = { id: "demo", name: "Demo", adapter: "codex-cli", remainingPct: 80, headline: "80%", stale: false, notice: null,
     windows: [{ id: "demo-week", name: "Weekly", usedPct: 20, remainingPct: 80, resetsAt: iso(now + 86400000), source: "provider", readAt: iso(now - 6 * QUOTA_SAMPLE_MS),
       sourceText: "Provider source", who: "", dispatchText: "Open", pacePct: null, stopPct: 97, showPace: true, tone: "green", amountText: null }] };
@@ -139,10 +212,10 @@ test("home rejudges a six-hour cache and explicit expiry even when stored stale 
   assert.equal(old.windows[0].readingState, "stale");
   assert.equal(old.windows[0].readAt, card.windows[0].readAt);
   card.windows[0].readAt = iso(now);
-  Object.assign(card.windows[0], { readingExpiresAt: iso(now - 1) });
+  Object.assign(card.windows[0], { displayExpiresAt: iso(now - 1) });
   await writeFile(QUOTA_COMPANIES, JSON.stringify({ generatedAt: iso(now), companies: [card] }));
   assert.equal((await readCompanies(now))[0].stale, true);
-  Object.assign(card.windows[0], { readingExpiresAt: null, readAt: "bad" });
+  Object.assign(card.windows[0], { displayExpiresAt: null, readAt: "bad" });
   await writeFile(QUOTA_COMPANIES, JSON.stringify({ generatedAt: iso(now), companies: [card] }));
   const invalid = (await readCompanies(now))[0];
   assert.equal(invalid.windows[0].readAt, null);
