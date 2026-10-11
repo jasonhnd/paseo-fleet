@@ -11,7 +11,7 @@ Both manifests declare Paseo `>=0.11.0 <0.12.0`. Check **both daemon and desktop
 | npm | Needed for source development and both plugins' Git preparation on the daemon's PATH. |
 | Git | Needed for coding cards, temporary workspaces and Git-source installations. |
 | Providers | User-installed and user-authenticated local providers. Discovery is not proof of login, quota or a successful request. |
-| Review | Two confirmed model families for the current automatic executor/reviewer cycle. |
+| Review | Different nonempty actual executor/reviewer model ids and compatible model-aware Fleet/Kanban sources. |
 
 | Platform | Current statement |
 |---|---|

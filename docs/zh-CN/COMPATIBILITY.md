@@ -10,7 +10,7 @@
 | Node | Fleet >=22.13.0；Kanban >=22.5 且 node:sqlite 可用；合装建议 >=22.13.0。须核对 daemon 的 Node 环境。 |
 | npm / Git | npm 用于源码开发和两个插件的 Git preparation，须在 daemon PATH；Git 用于代码卡、临时 workspace、Git 安装。 |
 | Provider | 用户自己安装和登录；发现模型不证明登录、请求或额度成功。 |
-| 审查 | 当前自动执行/审查流程需要两个已确认模型家族。 |
+| 审查 | 执行/审查实际 model 非空且不同，Fleet 与 Kanban 均须兼容按模型审查的契约。 |
 
 macOS 有导入/工具链文档里的本机源码、CLI、编译证据，完整干净环境桌面和首卡验证仍为发版闸。Linux 是首发目标，尚无完整原生流程认证记录。WSL2 单独验证；首发不支持原生 Windows，Node 启动器不证明整个流程或 shell helper 可用。本文修改不认证任何平台。发版记录须写 OS、Node、daemon/app、provider/model、来源和伴随提交/tag；可选 macOS 探针不作为核心前置。
 

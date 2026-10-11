@@ -21,12 +21,12 @@
 - daemon 与桌面 app 均 >=0.11.0 <0.12.0，全局及单插件开关启用。
 - 两插件合用 Node >=22.13.0；看板声明 >=22.5 且 node:sqlite 可用，Fleet >=22.13.0。版本下限不认证所有组合。
 - Git 用于代码卡/workspace；npm 用于源码构建、两个插件的 Git preparation，须在 daemon PATH。
-- 通读至少一已安装/登录的本地 provider；当前自动执行/审查卡流要两个已确认模型家族。
+- 通读至少一已安装/登录的本地 provider；当前自动执行/审查卡流要两个实际 model 不同的模型。
 - macOS/Linux 是首发目标，须分别真测；首发不支持原生 Windows，WSL2 单测。见 [兼容证据](COMPATIBILITY.md)。
 
 ## 五分钟上手：安装到第一张卡完成
 
-五分钟是 Paseo 与本地 provider 已准备好时的配置引导；下载、登录、首次加载与执行可能更久。此 experimental 路径仍待干净环境验收；角色目前只预览/手配，同家自动自检未提供。
+五分钟是 Paseo 与本地 provider 已准备好时的配置引导；下载、登录、首次加载与执行可能更久。此 experimental 路径仍待干净环境验收；角色目前只预览/手配，同模型自动自检未提供。
 
 1. 运行 paseo --version、node --version，同时查 app 版本。满足要求，自行在 provider 登录。
 2. 首次发布后安装所需插件：
@@ -38,7 +38,7 @@
    ```
 
    Host Settings -> Plugins 启用全局和单插件，核状态并真实打开面板。发布前源码试用按下方构建说明，不假设 npm 包或 tag 已存在。
-3. Fleet Settings 选英文/简体中文，用可用目录预览角色；确认家族后手动在 Paseo 建档，保留旧项。按预览配置 role/family、模型选项，含 role=supervisor 的 leader、异家执行和审查。预览不保存、不证明登录。只看板则手配这些字段。只有一家先人工评估，补齐独立审查前不称自动审查流完成。可跳过额度但无保护，之后只加自己的池。
+3. Fleet Settings 选英文/简体中文，用可用目录预览角色；确认家族后手动在 Paseo 建档，保留旧项。按预览配置 role/family、模型选项，含 role=supervisor 的 leader、实际 model 不同的执行和审查。预览不保存、不证明登录。只看板则手配这些字段。只有一个实际模型先人工评估，补齐独立审查前不称自动审查流完成。可跳过额度但无保护，之后只加自己的池。
 4. 新建名为 demo 的演示 Git workspace 并有初始提交。Kanban 设置配项目 workspace、简称、保护分支；项目 leader 面板选档案/workspace/语言，预览后启动、核协议。普通会话选同名档案不够。
 5. 新 leader 会话调用 kanban_supervise（项目 demo），或运行：
 
@@ -47,7 +47,7 @@
    ```
 
    BOARD_INSTALL 是 plugin ls --json 的当前安装目录；会话用自身注入身份，不粘贴 token。面板确认登记；原 leader 仍活着要交接。
-6. 让 leader 建 L1 卡：“在 demo 仓加入 hello.md，内容严格为 Hello 加换行；验证、提交、本机审查验收，不 push、不发布。”执行提交后 complete，异家审查核对，leader 核证据 accept。确认卡完成、内容正确、工作区干净、管理的清理完成。
+6. 让 leader 建 L1 卡：“在 demo 仓加入 hello.md，内容严格为 Hello 加换行；验证、提交、本机审查验收，不 push、不发布。”执行提交后 complete，异模型审查核对，leader 核证据 accept。确认卡完成、内容正确、工作区干净、管理的清理完成。
 7. 出错读 [排错](COMPATIBILITY.md)、插件日志、独立 Node doctor。协议/登记缺失不能派卡。只 Fleet 可测阵容/额度/决定，首卡需要 Kanban。
 
 有已发布且验证过的 tag 后才用 `paseo plugin install github:jasonhnd/paseo-fleet --ref vX.Y.Z`；每次 update 也指定 --ref。目录来源先源码构建，再 `paseo plugin install "$PLUGIN_CHECKOUT"`，不用 tag 选择器。换已有来源前读 [RELEASE](RELEASE.md)。

@@ -133,7 +133,7 @@ function checkModelSplit(profiles: DoctorProfile[]): DoctorFinding {
   const reviewer = main("reviewer");
   if (!executor || !reviewer) return finding("profiles:model", "yellow", t("doctor.checks.profiles.modelNoMain"));
   if (!executor.model.trim() || !reviewer.model.trim()) return finding("profiles:model", "red", t("doctor.checks.profiles.reviewModelMissing", { executor: executor.name, reviewer: reviewer.name }));
-  if (executor.model.trim() === reviewer.model.trim()) return finding("profiles:model", "red", t("doctor.checks.profiles.modelSame", { model: executor.model }));
+  if (executor.model.trim().toLowerCase() === reviewer.model.trim().toLowerCase()) return finding("profiles:model", "red", t("doctor.checks.profiles.modelSame", { model: executor.model }));
   return finding("profiles:model", "green", t("doctor.checks.profiles.modelDifferent", { executor: executor.model, reviewer: reviewer.model }));
 }
 

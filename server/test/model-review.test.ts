@@ -35,7 +35,7 @@ test("raw profiles through apply, contract/export parse and server Roles view us
 test("candidate switching and stale/invalid profiles are rechecked against live actual models", () => {
   const matrix = build();
   assert.ok(eligibleReviewers(matrix, "demo-alpha", "L2", profiles, fixture.pools).some(row => row.profile === "Demo same family reviewer"));
-  for (const replacement of [{ model: "demo-alpha" }, { model: "" }, { model: " " }, { model: null }, { role: "reader", candidateFor: null }]) {
+  for (const replacement of [{ model: "demo-alpha" }, { model: " DEMO-ALPHA " }, { model: "" }, { model: " " }, { model: null }, { role: "reader", candidateFor: null }]) {
     const live = profiles.map(profile => profile.name === "Demo same family reviewer" ? { ...profile, ...replacement } : profile);
     assert.ok(!eligibleReviewers(matrix, "demo-alpha", "L2", live, fixture.pools).some(row => row.profile === "Demo same family reviewer"));
     assert.ok(!reviewerTier(build(fixture.base, live), "demo-alpha", "L2").some(row => row.profile === "Demo same family reviewer"));

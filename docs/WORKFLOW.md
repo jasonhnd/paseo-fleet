@@ -13,9 +13,9 @@ This workflow is configurable. Repository instructions and the user's authorized
 | Decision | Compare technical options within the agreed scope. |
 | Batch | Perform authorized operations, such as merging an approved change. |
 
-A role is separate from its provider and model. Configure `role` and `family` on Paseo profiles; candidates also identify `candidateFor`. Confirm the actual model family rather than assuming that different provider names mean different families. Fleet's role setup currently produces a preview for manual configuration; it does not apply profiles. Preserve existing profiles when editing the list.
+A role is separate from its provider and model. Configure `role` and `family` on Paseo profiles; candidates also identify `candidateFor`. The actual `model` field identifies the model for review; `family` remains company metadata. Fleet's role setup currently produces a preview for manual configuration; it does not apply profiles. Preserve existing profiles when editing the list.
 
-The current board requires different executor and reviewer model families. With one family, use a reader/manual assessment and wait for an independent reviewer before claiming the automatic card cycle is complete. Same-family self-check is a planned, explicitly labelled option for ordinary low-risk tasks; it is not independent review and is not currently an automatic completion path. Money, permissions, security, migration and release work require independent or human review.
+Executor and reviewer must use different nonempty actual `model` fields. Different models from the same family can independently review each other. The same model cannot, even through different providers, families, thinking levels or modes. Compare the profiles actually used for this card, including a replacement candidate. Missing models or unresolved profiles stop review. With one model, use manual assessment until a different model is available. Money, permissions, security, migration and release work still require configured high-risk or human review.
 
 | Tier | Scope |
 |---|---|

@@ -25,12 +25,12 @@ Companion repositories: [Fleet](https://github.com/jasonhnd/paseo-fleet), [Kanba
 - Paseo daemon **and desktop app** `>=0.11.0 <0.12.0`; plugins enabled globally and individually.
 - Node >=22.13.0 for both plugins together. Kanban declares >=22.5 and requires working `node:sqlite`; Fleet declares >=22.13.0. These package floors do not certify every Node/OS combination.
 - Git for code cards and workspaces; npm for source builds and both plugins' Git preparation on the daemon's PATH.
-- At least one user-installed/authenticated local provider for investigation; **two confirmed model families** for the current automatic executor/reviewer card flow.
+- At least one user-installed/authenticated local provider for investigation; **two different actual model ids** for the current automatic executor/reviewer card flow.
 - macOS and Linux are initial release targets, subject to separate real-world validation. Native Windows is not initially supported; WSL2 must be checked separately. See the [evidence matrix](docs/COMPATIBILITY.md).
 
 ## Five-minute setup: installation to the first finished card
 
-Five minutes describes configuration guidance when Paseo and authenticated local providers are already ready. Downloads, login, model startup and agent execution can take longer. This is an **experimental walkthrough awaiting clean-host acceptance**, not a promise that every installation works. Roles are currently preview-only/manual; same-family automatic self-check is not yet available.
+Five minutes describes configuration guidance when Paseo and authenticated local providers are already ready. Downloads, login, model startup and agent execution can take longer. This is an **experimental walkthrough awaiting clean-host acceptance**, not a promise that every installation works. Roles are currently preview-only/manual; automatic self-check with the same model is not available.
 
 1. Run `paseo --version` and `node --version`; check the app version too. Meet [Requirements](#requirements). Log in through your provider yourself.
 2. After the first release, install the desired plugins:
@@ -42,7 +42,7 @@ Five minutes describes configuration guidance when Paseo and authenticated local
    ```
 
    In host Settings -> Plugins, enable the global switch and the individual plugins. Check their status **and open the desktop panels**. To evaluate source before publication, use a checkout and the build instructions below; do not assume these npm packages or release tags are already available.
-3. In Fleet Settings, choose English or Simplified Chinese and preview roles from the available provider/model catalog. Confirm model families and manually create the profiles in Paseo, preserving existing profiles. Configure `role`/`family` and model options from the preview, including a leader (`role=supervisor`), executor and reviewer from different families. Preview does not save profiles or verify login. With Kanban alone, manually configure the same role fields. With one family, stop at manual assessment until an independent reviewer is available; do not claim a completed automatic review cycle. Quota setup may be skipped, with no quota protection; add only your own pools when ready.
+3. In Fleet Settings, choose English or Simplified Chinese and preview roles from the available provider/model catalog. Confirm model families and manually create the profiles in Paseo, preserving existing profiles. Configure `role`/`family` and model options from the preview, including a leader (`role=supervisor`), executor and reviewer with different actual `model` fields. Preview does not save profiles or verify login. With Kanban alone, manually configure the same role fields. With one actual model, stop at manual assessment until an independent reviewer is available; do not claim a completed automatic review cycle. Quota setup may be skipped, with no quota protection; add only your own pools when ready.
 4. Create a disposable Git repository/workspace named `demo` with an initial commit. In Kanban project settings, configure its workspace, short code and protected branches. In the project leader panel, choose the leader profile/workspace/language, preview and start the leader. Check protocol delivery. Selecting the same profile in an ordinary conversation is insufficient.
 5. In that leader session, call `kanban_supervise` for project `demo`, or run:
 

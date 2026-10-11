@@ -62,3 +62,33 @@ node scripts/sync-contract.mjs --source <paseo-fleet checkout>              # in
 ```
 
 Change the contract in the source, never in the copy.
+
+## Actual-model reviewer branches (contract 1.3.0)
+
+The raw/default reviewer configuration is a tier map of configured eligible reviewers.
+Fleet resolves the live profiles, applies overrides and quota ordering, then exports
+`roles.reviewer.byExecutorModel[actualModel][tier]` as `MatrixEntry[]`. Entries retain
+`profile`, `effort`, optional `paused` and optional `order`. Model ids come from actual
+profiles (trimmed and lowercased on both sides) rather than provider, family, mode or thinking labels. Empty/unknown actual
+model fields and unresolved reviewer profiles cannot authorize review.
+
+A consumer uses the exact branch for the actual executor model, including a replacement
+candidate, and rechecks the actual reviewer model. The two nonempty model ids must differ;
+the same family with different models is allowed. A present model branch is authoritative:
+an absent model/tier or malformed branch cannot borrow candidates from another model or
+from family metadata. The schema preserves model keys and rejects malformed model branches
+instead of silently stripping them through a legacy union alternative.
+
+Legacy `byExecutorFamily` input is only a candidate migration format: merge each tier's
+lists in stored order, deduplicate by profile (first occurrence keeps its settings), then
+apply the actual model check. Family is never an independent-review exclusion. No migration
+may widen configured tier eligibility or bypass provider bans, role/candidateFor, pause,
+quota, capacity or high-risk review checks. Historical family evidence stays unchanged.
+
+Update Fleet and Kanban together after review. Older consumers do not understand model
+branches; verify the synchronized manifest and the consumer before activating the producer.
+This source change does not itself update an installed plugin, protocol or profile notes.
+The fixed anonymous fixture is `server/contract/test/model-review.fixture.json`; run
+`node --import tsx --test server/contract/test/schema.test.ts server/test/model-review.test.ts`
+after `npm run build` for the producer/schema/Roles service checks. Consumer capacity and
+high-risk cases require the companion's real dispatch entry point as well.

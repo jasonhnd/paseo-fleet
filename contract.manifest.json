@@ -5,7 +5,7 @@
     "server/contract/io.ts": "cd2de75500d8250542bd9c6d7f87ea816ce335cc62f94b815d0b0570c44faf19",
     "server/contract/paths.ts": "0f7359e94204df07c57589a93dfa0adf7344687d7a1890886baf33b38e15a31a",
     "server/contract/test/fixtures.ts": "9f929e855310d2528823e5f16d46b49db3399158d17b32de6202f3b0bd38bb32",
-    "server/contract/test/io.test.ts": "cf88237004e8a3be7132999b8ccf052f876b4635aa5d2c84906df72df86718e2",
+    "server/contract/test/io.test.ts": "dc04d99925d4db88b004ee71a9987f27bd056ab5a954376e802ee5cc0dc2d059",
     "server/contract/test/model-review.fixture.json": "116d4e17b880ede46317cdb0a0411825ee27b4721d562748fda431180a12b392",
     "server/contract/test/paths.test.ts": "0b9bd3569b06b6ada4942313d3233669b1f37f899c21742d94cfdff11b41d0da",
     "server/contract/test/schema.test.ts": "05f917e1bcc7db67c2a6998cd331f91aa3138d7726f77bcd611ba39505d5850a",
