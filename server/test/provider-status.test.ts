@@ -182,6 +182,43 @@ test("a synchronous RPC error is sanitized before entering the durable sample", 
   ctx.mock.timers.reset();
 });
 
+test("explicit auth error codes keep the existing provider safety stop even with protection=none", async ctx => {
+  ctx.mock.timers.enable({ apis: ["Date"], now });
+  await setup();
+  const marker = "demo-sensitive-marker";
+  const paseo = { providers: { listUsage: async () => {
+    throw Object.assign(new Error("authorization: " + marker), { code: "auth_expired" });
+  } } } as unknown as PaseoApi;
+  const board = await buildUsage(paseo, "7d");
+  assert.equal(board.pools!["demo-none"].dispatchable, false);
+  assert.match(board.pools!["demo-none"].reason, /authentication/);
+  assert.equal(board.pools!["demo-manual"].dispatchable, true);
+  assert.doesNotMatch(await readFile(QUOTA_SAMPLING_FILE, "utf8"), new RegExp(marker));
+  assert.equal(quotaErrorText({ code: "AUTH_EXPIRED" }), "authentication");
+  ctx.mock.timers.reset();
+});
+
+test("a fresh manual fallback keeps its own source time and freshness while showing the failed provider status", async ctx => {
+  ctx.mock.timers.enable({ apis: ["Date"], now });
+  await setup();
+  const file = JSON.parse(await readFile(PLANS, "utf8"));
+  file.plans[0].quotaCycle = { kind: "week", weekday: 6, timeZone: "UTC", hour: 0, minute: 0 };
+  file.plans[0].manualOverride = { usedPct: 10, at: iso(now - 120000), ttlSeconds: 7200 };
+  await writeFile(PLANS, JSON.stringify(file));
+  const board = await buildUsage(host({ providerId: "claude", status: "unavailable", windows: [] }), "7d");
+  const primary = board.plans.find(p => p.id === "demo-claude")!.windows[0];
+  assert.equal(primary.source, "manual");
+  assert.equal(primary.usedPct, 10);
+  assert.equal(board.pools!["demo-claude"].dispatchable, true);
+  const card = board.companies!.find(c => c.adapter === "claude-cli")!;
+  assert.equal(card.windows[0].readAt, iso(now - 120000));
+  assert.equal(card.windows[0].readingState, "live");
+  assert.equal(card.stale, false);
+  assert.match(card.windows[0].sourceText, /Copied by hand/);
+  assert.match(card.windows[0].sourceText, /Provider report status: unavailable/);
+  ctx.mock.timers.reset();
+});
+
 test("legacy empty/conflicting reports carry status hints without inventing a quota window", async ctx => {
   ctx.mock.timers.enable({ apis: ["Date"], now });
   for (const status of ["available", "unavailable", "error"]) {

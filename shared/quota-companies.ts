@@ -353,7 +353,7 @@ function claudeWindows(company: CompanyEntry, rows: CompanyProviderWindow[], poo
     }
     return windowBase({
       id, name, usedPct: row.usedPct, resetsAt: row.resetsAt, source: row.source === "none" ? "provider" : row.source, sample: row,
-      readAt: row.readAt, sourceKind: row.readError ? "stale" : "auto", who, pool: poolKey ? pools[poolKey] : undefined,
+      readAt: row.readAt, sourceKind: row.source === "manual" ? "manual" : row.readError ? "stale" : "auto", who, pool: poolKey ? pools[poolKey] : undefined,
       mode: "pool", showPace, stopRule: poolKey === null ? undefined : poolKey === planId ? "leader" : "plain",
       stopPctOverride: poolKey === planId ? claudeStopPct : undefined,
     });

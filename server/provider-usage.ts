@@ -15,7 +15,7 @@ export function quotaErrorText(error: unknown): string | null {
   // Keep only error categories evidenced by the reply, never its arbitrary message or credentials.
   const categories = [
     [/rate[_ -]?limit|\b429\b/i, "rate_limit"],
-    [/\bauth(?:entication)?\b|unauthorized|not.logged|login.*lost|\b40[13]\b/i, "authentication"],
+    [/(?:^|[\s_:-])(?:re-?)?auth(?:entication)?(?:failed|failure|expired|required|error)?(?:$|[\s_:-])|unauthorized|unauthenticated|not.logged|login.*lost|\b40[13]\b/i, "authentication"],
     [/quota/i, "quota"],
     [/timeout|timed.out/i, "timeout"],
     [/transport|connection/i, "transport"],
