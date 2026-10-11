@@ -1,5 +1,5 @@
 /// <reference types="node" />
-// Read Cursor quota. Prefer AFC's own login against Cursor's usage API (every 10 minutes).
+// Read Cursor quota on AFC's fixed hourly schedule, preferring its own Cursor API login.
 // The cursor-agent `/usage` screen remains the fallback when that login is missing or the call fails,
 // unless plans.json `cursor.screenRead` is false (a missing field means on). False skips the screen
 // entirely and the card shows the hand-copied percentage.
@@ -70,6 +70,8 @@ import {
 } from "./screen-read";
 import { STATE_DIR, writeJson } from "./util";
 import { kanbanConfigPath } from "./paths";
+import { sampleQuota } from "./quota-sampling";
+import { QUOTA_SAMPLE_MS } from "./quota-timing";
 
 export { agentLaunchEnv, stripAnsi };
 export {
@@ -82,11 +84,10 @@ export {
 } from "./cursor-parse";
 
 export const CURSOR_USAGE_FILE = join(STATE_DIR, "cursor-usage.json");
-export const CURSOR_USAGE_FIRST_MS = 4 * 60_000;
-/** Official API cadence. The screen fallback keeps a longer gap so cursor-agent is not opened every tick. */
-export const CURSOR_USAGE_EVERY_MS = 10 * 60_000;
-export const CURSOR_SCREEN_EVERY_MS = 2 * 60 * 60_000;
-export const CURSOR_SCREEN_FALLBACK_MS = 30 * 60_000;
+/** Compatibility exports; the shared scheduler now owns all API/screen attempts. */
+export const CURSOR_USAGE_EVERY_MS = QUOTA_SAMPLE_MS;
+export const CURSOR_SCREEN_EVERY_MS = QUOTA_SAMPLE_MS;
+export const CURSOR_SCREEN_FALLBACK_MS = QUOTA_SAMPLE_MS;
 export const CURSOR_USAGE_TIMEOUT_MS = 90_000;
 export const CURSOR_LOGIN_WAIT_MS = 5 * 60_000;
 
@@ -552,11 +553,7 @@ export async function readCursorScreen(cwd = join(STATE_DIR, "tmp"), timeoutMs =
   return readCursorScreenVia(liveScreenIo(cwd), timeoutMs);
 }
 
-let lastScreenAt = 0;
-let screenImmediately = false;
 let sessionEpoch = 0;
-let captureRunning = false;
-let captureQueued = false;
 let loginGeneration = 0;
 let waitingMessage: string | null = null;
 
@@ -572,29 +569,11 @@ export function shouldReadScreen(input: { lastAt: number; now: number; mode: "un
   return input.now - input.lastAt >= gap;
 }
 
-function armImmediateScreen(): void {
-  screenImmediately = true;
-  lastScreenAt = 0;
-}
-
-async function screenIfDue(cwd: string, mode: "unlinked" | "fallback", epoch: number): Promise<CursorUsageReading | null> {
-  const immediate = screenImmediately;
-  if (!shouldReadScreen({ lastAt: lastScreenAt, now: Date.now(), mode, immediate })) {
-    const previous = await readCursorUsageFile();
-    if (mode === "unlinked" && previous && previous.source !== "official") return previous;
-    if (previous?.source === "screen") return previous;
-    return null;
-  }
+async function screenIfDue(cwd: string, _mode: "unlinked" | "fallback", epoch: number): Promise<CursorUsageReading | null> {
+  // The enclosing Cursor reservation owns the cadence, including screen fallback.
   if (epoch !== sessionEpoch) return null;
-  screenImmediately = false;
-  lastScreenAt = Date.now();
   const reading = await readCursorScreen(cwd);
-  if (epoch !== sessionEpoch) {
-    lastScreenAt = 0;
-    screenImmediately = true;
-    return null;
-  }
-  return reading;
+  return epoch === sessionEpoch ? reading : null;
 }
 
 async function persistRefreshed(previous: { accessToken: string; refreshToken: string; authId: string }, next: { accessToken: string; refreshToken: string; authId: string }, store: TokenStore = cursorTokenStore): Promise<"saved" | "unchanged" | "failed"> {
@@ -631,7 +610,7 @@ export interface CaptureCursorHooks {
 }
 
 /** Official API when AFC has its own login; otherwise the screen; the hand copy is applied by usage.ts when this is not ok. */
-export async function captureCursorUsage(cwd = join(STATE_DIR, "tmp"), hooks?: CaptureCursorHooks): Promise<CursorUsageReading> {
+async function captureCursorUsageOnce(cwd: string, hooks?: CaptureCursorHooks): Promise<CursorUsageReading> {
   const epoch = sessionEpoch;
   const readAt = new Date().toISOString();
   const nowMs = Date.now();
@@ -687,23 +666,17 @@ export async function captureCursorUsage(cwd = join(STATE_DIR, "tmp"), hooks?: C
   return reading;
 }
 
-/** Read Cursor's usage now (or after the running read). Nothing runs while the cursor-api adapter is off. */
+/** Login/disconnect requests share the slot; they cannot force an extra quota read. */
+export async function captureCursorUsage(cwd = join(STATE_DIR, "tmp"), hooks?: CaptureCursorHooks): Promise<CursorUsageReading | null> {
+  if (!adapterOn(CURSOR_API)) return null;
+  const sample = await sampleQuota("cursor", () => captureCursorUsageOnce(cwd, hooks), { errorOf: reading => reading.error });
+  return sample.value;
+}
+
 export function requestCursorCapture(cwd = join(STATE_DIR, "tmp")): void {
   if (!adapterOn(CURSOR_API)) return;
-  if (captureRunning) {
-    captureQueued = true;
-    return;
-  }
-  captureRunning = true;
   captureCursorUsage(cwd)
-    .catch((e) => console.error("[afc] cursor usage:", String(e).slice(0, 200)))
-    .finally(() => {
-      captureRunning = false;
-      if (captureQueued) {
-        captureQueued = false;
-        requestCursorCapture(cwd);
-      }
-    });
+    .catch((e) => console.error("[afc] cursor usage:", String(e).slice(0, 200)));
 }
 
 async function openLoginUrl(url: string): Promise<boolean> {
@@ -789,7 +762,6 @@ export async function disconnectCursor(): Promise<{ ok: boolean; message: string
   loginGeneration += 1;
   sessionEpoch += 1;
   waitingMessage = null;
-  armImmediateScreen();
   await cursorTokenStore.delete();
   // Adapter off: only the login file goes. Writing cursor-usage.json would mark the adapter as in use (adapters/config.ts).
   if (!adapterOn(CURSOR_API)) return { ok: true, message: t("cursor.usage.disconnected") };
@@ -797,17 +769,4 @@ export async function disconnectCursor(): Promise<{ ok: boolean; message: string
   await writeJson(CURSOR_USAGE_FILE, emptyReading(readAt, t("cursor.usage.disconnect"), false, { linkState: "unlinked", notice: t("cursor.usage.disconnect") }));
   requestCursorCapture();
   return { ok: true, message: t("cursor.usage.disconnected") };
-}
-
-/** First read about 4 minutes after plugin start, then every 10 minutes. */
-export function startCursorUsage(cwd = join(STATE_DIR, "tmp")): () => void {
-  let timer: ReturnType<typeof setInterval> | null = null;
-  const first = setTimeout(() => {
-    requestCursorCapture(cwd);
-    timer = setInterval(() => requestCursorCapture(cwd), CURSOR_USAGE_EVERY_MS);
-  }, CURSOR_USAGE_FIRST_MS);
-  return () => {
-    clearTimeout(first);
-    if (timer) clearInterval(timer);
-  };
 }

@@ -1,6 +1,9 @@
 // Antigravity CLI display versus the Paseo ACP pool. Synthetic tables only.
 import assert from "node:assert/strict";
-import { afterEach, describe, test } from "node:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { after, afterEach, describe, test } from "node:test";
 import { t } from "../../shared/i18n";
 import { buildCompanies } from "../../shared/quota-companies";
 import {
@@ -19,7 +22,7 @@ import type { UsagePlan, UsageWindow } from "../../shared/usage";
 import { windowsFor, type WindowContext, type WindowPlan } from "../adapters/windows";
 import { poolStatus } from "../pools-status";
 import { companyWindows } from "../usage-view";
-import { LIVE_READING_TTL_MS, POOL_REFRESH_MS } from "../quota-timing";
+import { LIVE_READING_TTL_MS, QUOTA_SAMPLE_MS } from "../quota-timing";
 import {
   AGY_USAGE_COMMAND,
   antigravityDisplayWindows,
@@ -28,7 +31,6 @@ import {
   parseAntigravityUsage,
   readAntigravityUsage,
   readingFromRun,
-  resetAntigravityUsageCache,
   samePoolProven,
   type AntigravityReading,
   type AntigravitySample,
@@ -52,7 +54,10 @@ const PLENTIFUL = [
   `Claude and GPT models\tFive Hour Limit Remaining\t50%\t${FIVE}`,
 ].join("\n");
 
-afterEach(() => resetAntigravityUsageCache());
+const scratch = await mkdtemp(join(tmpdir(), "agy-sampling-"));
+const statePath = join(scratch, "schedule.json");
+afterEach(() => rm(statePath, { force: true }));
+after(() => rm(scratch, { recursive: true, force: true }));
 
 function runOf(stdout: string, extra: Partial<{ stderr: string; code: number | null; timedOut: boolean; missing: boolean }> = {}) {
   return { stdout, stderr: extra.stderr ?? "", code: extra.code === undefined ? 0 : extra.code, timedOut: extra.timedOut === true, missing: extra.missing === true };
@@ -210,7 +215,7 @@ describe("command result", () => {
     assert.equal(partial.samples.length, 1);
   });
 
-  test("parallel calls share one run, a fresh cache skips, and force runs again", async () => {
+  test("parallel calls share one run, a fixed slot skips even force and a clock rollback", async () => {
     let calls = 0;
     const runner: UsageRunner = async () => {
       calls += 1;
@@ -218,21 +223,21 @@ describe("command result", () => {
       return runOf(TABLE);
     };
     const [first, second] = await Promise.all([
-      readAntigravityUsage({ now: NOW, runner }),
-      readAntigravityUsage({ now: NOW, runner }),
+      readAntigravityUsage({ statePath, now: NOW, runner }),
+      readAntigravityUsage({ statePath, now: NOW, runner }),
     ]);
     assert.equal(calls, 1);
     assert.equal(first, second);
-    assert.equal((await readAntigravityUsage({ now: NOW + 1000, runner })).samples.length, 4);
+    assert.equal((await readAntigravityUsage({ statePath, now: NOW + 1000, runner })).samples.length, 4);
     assert.equal(calls, 1);
-    await readAntigravityUsage({ now: NOW + POOL_REFRESH_MS, runner });
+    await readAntigravityUsage({ statePath, now: NOW + QUOTA_SAMPLE_MS, runner });
     assert.equal(calls, 2);
-    await readAntigravityUsage({ now: NOW + 1000, runner, force: true });
-    assert.equal(calls, 3);
+    await readAntigravityUsage({ statePath, now: NOW + 1000, runner, force: true });
+    assert.equal(calls, 2);
   });
 
   test("a runner that throws becomes a failed reading and does not escape", async () => {
-    const parsed = await readAntigravityUsage({ now: NOW, force: true, runner: async () => { throw new Error("boom"); } });
+    const parsed = await readAntigravityUsage({ statePath, now: NOW, force: true, runner: async () => { throw new Error("boom"); } });
     assert.equal(parsed.error, "failed");
     assert.equal(parsed.acp, null);
   });
@@ -332,7 +337,7 @@ describe("same pool", () => {
       return runOf(PLENTIFUL);
     };
     const readIfRequested = async (switches: Partial<AdapterSwitches>) => {
-      if (antigravityUsageRequested([source], switches)) await readAntigravityUsage({ now: NOW, force: true, runner });
+      if (antigravityUsageRequested([source], switches)) await readAntigravityUsage({ statePath, now: NOW, force: true, runner });
     };
     for (const switches of [{ [ANTIGRAVITY_CLI]: false }, {}]) {
       await readIfRequested(switches);

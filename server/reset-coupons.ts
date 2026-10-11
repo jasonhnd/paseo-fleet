@@ -27,6 +27,8 @@ import {
 } from "../shared/reset-coupons";
 import { CONFIG, type Json, readJson } from "./util";
 import { readCodexRateLimits } from "./reset-coupons-codex";
+import { readProviderQuota } from "./provider-usage";
+import { sampleQuota } from "./quota-sampling";
 import { readCreditsFile, storeCodexCredits } from "./reset-coupons-credits";
 import { weeklyFromSnapshot } from "./reset-coupons-home";
 import { saveCouponState, setNotify } from "./reset-coupons-notify";
@@ -47,7 +49,6 @@ export { surplusCardCounts } from "./reset-coupons-surplus";
 
 const DAY_CHECK_MS = 60 * 60_000;
 const FIRST_CHECK_MS = 3 * 60_000;
-const LIST_USAGE_TIMEOUT_MS = 20_000;
 const CODEX_PAIR_RETRY_MS = 30 * 60_000;
 const ERROR_TEXT_CHARS = 160;
 
@@ -76,27 +77,19 @@ function keepPrevious(previous: CompanyLive | undefined): CompanyLive {
   return { count: 0, kind: "unknown", expiresAt: null, excerpt: "", confirmedAt: "", via: "plans", status: "unreadable" };
 }
 
-function listUsageWithTimeout(paseo: PaseoApi): Promise<{ providers?: unknown[] } | null> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("listUsage timed out")), LIST_USAGE_TIMEOUT_MS);
-    paseo.providers.listUsage().then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value as { providers?: unknown[] } | null);
-      },
-      (error: unknown) => {
-        clearTimeout(timer);
-        reject(error);
-      },
-    );
-  });
+async function scheduledCodexRead(now: number): Promise<unknown> {
+  const sample = await sampleQuota("codex-coupons", () => readCodexRateLimits(), { now });
+  if (sample.error) throw new Error(sample.error);
+  return sample.value;
 }
 
 /** Coupon fields in Paseo's usage payload, by company (CouponPlans.providerCompany maps the provider). */
 async function couponsFromPaseo(paseo: PaseoApi, now: number, providerCompany: Readonly<Record<string, CouponCompany>>): Promise<Partial<Record<CouponCompany, ProviderCoupon>>> {
   const out: Partial<Record<CouponCompany, ProviderCoupon>> = {};
   try {
-    const res = await listUsageWithTimeout(paseo);
+    const sample = await readProviderQuota(paseo, { now });
+    if (sample.error) throw new Error(sample.error);
+    const res = sample.value;
     for (const raw of res?.providers ?? []) {
       if (!raw || typeof raw !== "object") continue;
       const id = String((raw as { providerId?: unknown }).providerId ?? "");
@@ -123,7 +116,7 @@ async function readCodexForConfirm(now: number): Promise<CodexRead> {
   let parsed: PageRead | null = null;
   let failed = false;
   try {
-    raw = await readCodexRateLimits();
+    raw = await scheduledCodexRead(now);
     parsed = parseCodexRateLimits(raw);
   } catch (error) {
     failed = true;
@@ -197,7 +190,7 @@ async function pairCodexCount(state: ResetCouponState, plans: CouponPlans, nextC
   const dropping = typeof state.lastCodexUsedPct === "number" && typeof nextCodexPct === "number" && state.lastCodexUsedPct - nextCodexPct >= USED_DROP_POINTS;
   if (!needCount || !(dropping || now - codexPairFailAt >= CODEX_PAIR_RETRY_MS)) return unread;
   try {
-    const raw = await readCodexRateLimits();
+    const raw = await scheduledCodexRead(now);
     const patch = codexCompanyPatch(raw);
     if (!patch) {
       if (!dropping) codexPairFailAt = now;
@@ -228,7 +221,7 @@ async function readCreditsIfDue(plans: CouponPlans, now: number): Promise<unknow
   const prev = await readCreditsFile();
   if (!creditsReadDue(prev?.readAt, now)) return undefined;
   try {
-    return await readCodexRateLimits();
+    return await scheduledCodexRead(now);
   } catch (error) {
     console.error("[afc] reset coupons: read-only credits read failed", String(error).slice(0, ERROR_TEXT_CHARS));
     return null;

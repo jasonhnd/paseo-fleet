@@ -8,7 +8,7 @@ import { recordTurn } from "./server/ledger";
 import { publishFromSnapshotFile } from "./server/dispatch";
 import { setEarlyResetNotify } from "./server/early-reset";
 import { buildUsage, updatePlan } from "./server/usage";
-import { beginCursorConnect, disconnectCursor, startCursorUsage } from "./server/cursor-usage";
+import { beginCursorConnect, disconnectCursor } from "./server/cursor-usage";
 import { requestPoolRefreshNow, startPoolRefresh } from "./server/pool-refresh";
 import type { PaseoApi } from "./server/paseo-api";
 import { changesBoard, readBoardSnapshot, startSnapshotWarm } from "./server/snapshot-cache";
@@ -64,7 +64,6 @@ export default function contribute(server: PluginServerContext) {
   const stopPoolRefresh = startPoolRefresh(() => paseoRef);
   const stopSnapshotWarm = startSnapshotWarm(() => paseoRef);
   void publishFromSnapshotFile().catch((error) => console.error("[afc] dispatch:", String(error).slice(0, 200)));
-  const stopCursorUsage = startCursorUsage();
   const stopSweep = startIdleSweep();
   const stopCompat = startCompatWatch();
   const stopDaemonWatch = startDaemonWatch();
@@ -205,7 +204,6 @@ export default function contribute(server: PluginServerContext) {
     stopContractExports();
     stopPoolRefresh();
     stopSnapshotWarm();
-    stopCursorUsage();
     stopSweep();
     stopCompat();
     stopDaemonWatch();

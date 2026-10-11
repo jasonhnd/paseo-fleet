@@ -23,8 +23,10 @@ still apply. Heartbeat timestamps must not renew a quota sample's age.
 The scheduler claims each source slot on disk before calling it. In-process calls
 share one promise. A short exclusive file lock serializes reservations and writes
 for processes on the same host using the same state directory. It is not a global
-lock across hosts or separate data directories. A dead lock owner can be recovered;
-an unreadable lock or scheduler file refuses sampling instead of risking a duplicate.
+lock across hosts or separate data directories. An abandoned lock or unreadable scheduler file refuses sampling instead of
+risking a duplicate; an owner must check that no reader is running before removing
+an abandoned lock. Reservations survive ordinary process restarts, but no
+power-loss durability or distributed-filesystem lock guarantee is claimed.
 A crash after reservation consumes that slot. A second process can return the
 previous sample while the first is reading; it does not issue another read.
 

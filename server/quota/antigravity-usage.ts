@@ -20,7 +20,8 @@ import {
 } from "../../shared/quota-adapters";
 import { validPercent } from "../../shared/quota-cycle";
 import type { UsageWindow } from "../../shared/usage";
-import { LIVE_READING_TTL_MS, POOL_REFRESH_MS } from "../quota-timing";
+import { LIVE_READING_TTL_MS } from "../quota-timing";
+import { sampleQuota } from "../quota-sampling";
 
 export const AGY_USAGE_COMMAND = { bin: "agy", args: ["-p", "/usage"] as const };
 
@@ -163,14 +164,6 @@ export function unavailableAntigravityReading(now = Date.now()): AntigravityRead
   return readingFromRun({ stdout: "", stderr: "", code: 1, timedOut: false }, now);
 }
 
-let cache: { at: number; reading: AntigravityReading } | null = null;
-let inflight: Promise<AntigravityReading> | null = null;
-
-export function resetAntigravityUsageCache(): void {
-  cache = null;
-  inflight = null;
-}
-
 /** One agy process, in an empty temp directory. Timeout and a missing binary stay inside the result. */
 export async function runAgyUsage(): Promise<UsageRunResult> {
   const cwd = await mkdtemp(join(tmpdir(), "afc-agy-usage-"));
@@ -208,27 +201,15 @@ export async function runAgyUsage(): Promise<UsageRunResult> {
   }
 }
 
-export async function readAntigravityUsage(options: { now?: number; force?: boolean; runner?: UsageRunner } = {}): Promise<AntigravityReading> {
+export async function readAntigravityUsage(options: { now?: number; force?: boolean; runner?: UsageRunner; statePath?: string } = {}): Promise<AntigravityReading> {
   const now = options.now ?? Date.now();
-  if (!options.force && cache && now >= cache.at && now - cache.at < POOL_REFRESH_MS) return cache.reading;
-  if (!options.force && inflight) return inflight;
   const runner = options.runner ?? runAgyUsage;
-  const box: { current: Promise<AntigravityReading> } = { current: Promise.resolve(unavailableAntigravityReading(now)) };
-  box.current = (async () => {
-    try {
-      const reading = readingFromRun(await runner(), now);
-      cache = { at: now, reading };
-      return reading;
-    } catch {
-      const reading = unavailableAntigravityReading(now);
-      cache = { at: now, reading };
-      return reading;
-    } finally {
-      if (inflight === box.current) inflight = null;
-    }
-  })();
-  inflight = box.current;
-  return box.current;
+  // `force` is retained for old callers but never bypasses the fixed schedule.
+  const sample = await sampleQuota("antigravity", async () => {
+    try { return readingFromRun(await runner(), now); }
+    catch { return unavailableAntigravityReading(now); }
+  }, { now, statePath: options.statePath, errorOf: reading => reading.error });
+  return sample.value ?? unavailableAntigravityReading(now);
 }
 
 function fresh(readAt: string, now: number): boolean {

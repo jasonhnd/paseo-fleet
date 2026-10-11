@@ -26,7 +26,7 @@ import type { BoardUsage, Period, Tokens, UsagePlan, UsageWindow } from "../shar
 import { publishDispatch } from "./dispatch";
 import { deliverEarlyResetNotices, readEarlyResetLines } from "./early-reset";
 import { ledgerBuckets } from "./ledger";
-import { readCursorUsageFile, type CursorUsageReading } from "./cursor-usage";
+import { captureCursorUsage, readCursorUsageFile, type CursorUsageReading } from "./cursor-usage";
 import { antigravityDisplayWindows, antigravityUsageRequested, readAntigravityUsage, unavailableAntigravityReading, type AntigravityReading } from "./quota/antigravity-usage";
 import { settleSuperGrokChoice, type SuperGrokChoice } from "./grok-usage";
 import { configuredStopPct, type CursorReadMeta, MANUAL_STOP, oneMonthBefore, poolStatus, type PoolStatus, type SuperGrokReadMeta, writePoolStatus } from "./pools";
@@ -38,11 +38,11 @@ import { cursorLivePct, cursorMeta, cursorReadForPlan, companyCursor, companyWin
 import { type Price, priceFor, pricesFetchedAt } from "./prices";
 import { type AgentRecord, type Profile, readAgentRecords, readPoolProfiles, readRoleProfiles } from "./records";
 import { type Bucket, type Buckets, ensureScan, latestScan, scanInFlight } from "./scan";
-import { cached, type Json, readJson, STATE_DIR, writeJson } from "./util";
+import { type Json, readJson, STATE_DIR, writeJson } from "./util";
 import { t } from "../shared/i18n";
 import type { ManualReading, QuotaCycle } from "../shared/quota-cycle";
 import { readSettings, writeSettings } from "./settings";
-import { USAGE_TIMEOUT_MS } from "./quota-timing";
+import { readProviderQuota } from "./provider-usage";
 
 export const PLANS = join(STATE_DIR, "plans.json");
 /** Display cache for the home page. Not read by Kanban. */
@@ -202,30 +202,20 @@ interface ProviderUsage {
   error: string | null;
 }
 
-function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(t("usage.timeout", { what, seconds: Math.round(ms / 1000) }))), ms);
-    p.then(
-      (v) => {
-        clearTimeout(timer);
-        resolve(v);
-      },
-      (e) => {
-        clearTimeout(timer);
-        reject(e);
-      },
-    );
-  });
-}
-
 async function providerUsage(paseo: PaseoApi): Promise<ProviderUsage> {
   try {
-    const res = (await cached("usage", 5 * 60_000, () => withTimeout(paseo.providers.listUsage(), USAGE_TIMEOUT_MS, "providers.listUsage"))) as Json | null;
+    const sample = await readProviderQuota(paseo);
+    const res = sample.value;
     const providers = (res?.providers ?? []) as Json[];
     return {
-      windows: new Map(providers.map((p) => [String(p.providerId), (p.windows ?? []) as Json[]])),
+      windows: new Map(providers.map((p) => [String(p.providerId), (p.windows ?? []).map((w: Json) => ({
+        ...w, collectedAt: sample.collectedAt,
+        // The legacy host fetchedAt is a batch minimum, not a per-account timestamp.
+        batchFetchedAt: res?.fetchedAt ?? null,
+        readError: sample.error ?? (p.error ? String(typeof p.error === "string" ? p.error : p.error.message ?? p.error.code ?? "Provider usage failed") : null),
+      }))])),
       balances: new Map(providers.map((p) => [String(p.providerId), (p.balances ?? []) as Json[]])),
-      error: null,
+      error: sample.error,
     };
   } catch (e) {
     return { windows: new Map(), balances: new Map(), error: String(e).slice(0, 200) };
@@ -403,7 +393,8 @@ export async function assemble(paseo: PaseoApi, period: Period, options?: { capt
     readAgentRecords(),
     readRoleProfiles(),
     // cursor-api off: no Cursor reading at all; its plans fall back to the hand copy.
-    switches[CURSOR_API] && planConfigs.some(p => adapterOf(p, switches) === CURSOR_API) ? readCursorUsageFile() : Promise.resolve(null),
+    switches[CURSOR_API] && planConfigs.some(p => adapterOf(p, switches) === CURSOR_API)
+      ? captureCursorUsage().then(() => readCursorUsageFile()) : Promise.resolve(null),
     // Off, or no plan on this adapter: do not spawn agy. A failed read stays an unknown ACP hold.
     wantAntigravity ? readAntigravityUsage().catch(() => unavailableAntigravityReading()) : Promise.resolve(null),
   ]);
@@ -485,7 +476,7 @@ export function stuckWindow(w: UsageWindow): UsageWindow {
   return { ...w, usedPct: null, elapsedPct: null, projectedPct: null, runsOutAt: null, verdict: "unknown", fullWindowUsd: null };
 }
 
-function windowFromSuperGrok(choice: SuperGrokChoice, previous: UsageWindow | undefined, priceUsdMonthly: number | null): UsageWindow {
+export function windowFromSuperGrok(choice: SuperGrokChoice, previous: UsageWindow | undefined, priceUsdMonthly: number | null): UsageWindow {
   const daily = priceUsdMonthly !== null ? (priceUsdMonthly * 12) / 365 : null;
   const apiUsd = previous?.apiUsd ?? 0;
   const planUsd = previous?.planUsd ?? (daily !== null ? daily * 7 : null);
@@ -506,6 +497,7 @@ function windowFromSuperGrok(choice: SuperGrokChoice, previous: UsageWindow | un
       planUsd,
       source: choice.source === "screen" ? "screen" : "manual",
       manualAt: choice.manualAt,
+      sampledAt: choice.readAt,
     };
   }
   const len = 7 * DAY;
@@ -522,6 +514,7 @@ function windowFromSuperGrok(choice: SuperGrokChoice, previous: UsageWindow | un
     planUsd,
     source: choice.source === "screen" ? "screen" : "manual",
     manualAt: choice.manualAt,
+    sampledAt: choice.readAt,
   };
 }
 

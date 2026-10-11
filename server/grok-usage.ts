@@ -26,10 +26,12 @@ import { readJson, STATE_DIR, writeJson } from "./util";
 import { GROK_CLI, isWeeklyWindow, poolOfAdapter, type QuotaWindowIdentity } from "../shared/quota-adapters";
 import { t, tAll } from "../shared/i18n";
 import { readPoolCatalog } from "./adapters/plans";
+import { sampleQuota } from "./quota-sampling";
+import { QUOTA_SAMPLE_MS } from "./quota-timing";
 
 export const GROK_USAGE_FILE = join(STATE_DIR, "grok-usage.json");
 /** At most one CLI read per hour, including failed attempts. */
-export const GROK_CLI_EVERY_MS = 60 * 60_000;
+export const GROK_CLI_EVERY_MS = QUOTA_SAMPLE_MS;
 /** A successful CLI reading may be carried through failures for at most two hours. */
 export const GROK_CLI_MAX_AGE_MS = 2 * 60 * 60_000;
 /** Homepage yellow starts once a live percent has been missing this long. */
@@ -75,6 +77,7 @@ export interface GrokWindowInput extends QuotaWindowIdentity {
   label: string;
   usedPct: number | null;
   resetsAt?: string | null;
+  sampledAt?: string | null;
 }
 
 export interface GrokCliReading {
@@ -266,11 +269,11 @@ export function parseGrokUsageScreen(raw: string): { usedPct: number; resetsAt: 
   return { usedPct: used, resetsAt: parseResetsLine(section) ?? parseReset(section) };
 }
 
-export function providerWeekly(windows: GrokWindowInput[]): { usedPct: number; resetsAt: string | null } | null {
+export function providerWeekly(windows: GrokWindowInput[]): { usedPct: number; resetsAt: string | null; sampledAt: string | null } | null {
   const labeled = windows.find((w) => isWeeklyWindow(w) && typeof w.usedPct === "number" && Number.isFinite(w.usedPct));
   const any = labeled ?? windows.find((w) => !tAll("screen.window.quotaHidden").includes(w.label) && typeof w.usedPct === "number" && Number.isFinite(w.usedPct));
   if (!any || any.usedPct === null) return null;
-  return { usedPct: any.usedPct, resetsAt: any.resetsAt ?? null };
+  return { usedPct: any.usedPct, resetsAt: any.resetsAt ?? null, sampledAt: any.sampledAt ?? null };
 }
 
 /**
@@ -416,7 +419,7 @@ export function chooseSuperGrok(input: {
     resetsAt: cli?.resetsAt ?? provider?.resetsAt ?? null,
     source: cli ? "screen" : provider ? "provider" : manual ? "manual" : "none",
     manualAt: manual?.at ?? null,
-    readAt: cli?.readAt ?? null,
+    readAt: cli?.readAt ?? provider?.sampledAt ?? null,
     unreadSince,
     alarm: withCopyTime(alarm, manual),
     loginLost,
@@ -661,9 +664,10 @@ export async function settleSuperGrokChoice(input: {
   let loginAlarm = loginLost ? previous?.homeAlarm ?? msgLoginLost() : null;
   let lastAttemptAt = previous?.lastAttemptAt ?? null;
   if (enabled && input.capture === true) {
-    const last = lastAttemptAt ? Date.parse(lastAttemptAt) : Number.NaN;
-    if (grokCliDue(Number.isNaN(last) ? null : last, now)) {
-      const captured = input.hooks?.capture ? await input.hooks.capture() : await readGrokScreen();
+    const sample = await sampleQuota("grok-screen", () => input.hooks?.capture ? input.hooks.capture() : readGrokScreen(),
+      { now, errorOf: reading => reading.error });
+    const captured = sample.value;
+    if (captured && sample.attemptedAt !== lastAttemptAt) {
       const prior = storedReading(previous);
       if (!captured.ok && cliCurrent(prior, now) && prior) {
         cli = {
@@ -678,7 +682,7 @@ export async function settleSuperGrokChoice(input: {
       }
       loginLost = !providerUsable && cli.loginLost === true;
       loginAlarm = loginLost ? cli.homeAlarm : null;
-      lastAttemptAt = new Date(now).toISOString();
+      lastAttemptAt = sample.attemptedAt;
     }
   }
   const choice = chooseSuperGrok({
