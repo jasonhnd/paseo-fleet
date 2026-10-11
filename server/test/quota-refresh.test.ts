@@ -202,6 +202,33 @@ for (const minutes of [8, 63]) {
   });
 }
 
+test("display separation preserves failed reads and a hand copy's shorter expiry", async ctx => {
+  const at = now + 8 * 60_000;
+  ctx.mock.timers.enable({ apis: ["Date"], now: at });
+  const cfg = { id: "demo", name: "Demo", priceUsdMonthly: null, providers: ["codex"], usageProvider: "codex", dispatch: true,
+    quotaProtection: "pause" as const, quotaCycle: { kind: "unknown" as const } };
+  const context = { now: at, windowsBy: new Map([["codex", [{ label: "Weekly", usedPct: 20, resetsAt: iso(now + 86400000), sampledAt: iso(now), collectedAt: iso(now) }]]]),
+    providerCollectedAt: iso(now), balances: new Map(), cursorReading: null, sumUsd: () => 0 };
+  for (const quotaError of ["rate_limit", "transport interrupted"]) {
+    const plan: UsagePlan = { ...cfg, adapter: "codex-cli", windows: windowsFor(cfg, "codex-cli", { ...context, quotaError }), note: "", api30dUsd: 0, roi30d: null, coverage: "" };
+    const card = buildCompanies({ now: at, companies: companyCatalog([plan]), windows: companyWindows([plan], iso(at)),
+      pools: poolStatus([plan], { now: at }), profiles: [], cursor: null })[0];
+    assert.equal(card.stale, true);
+    assert.equal(card.windows[0].readingState, "stale");
+    assert.equal(card.windows[0].readAt, iso(now));
+  }
+  const manual = { ...cfg, providers: [], manualOverride: { usedPct: 20, at: iso(now), ttlSeconds: 60 } };
+  const plan: UsagePlan = { ...manual, adapter: "manual", windows: windowsFor(manual, "manual", { ...context, now }), note: "", api30dUsd: 0, roi30d: null, coverage: "" };
+  const cards = buildCompanies({ now, companies: companyCatalog([plan]), windows: companyWindows([plan], iso(now)),
+    pools: poolStatus([plan], { now }), profiles: [], cursor: null });
+  assert.equal(cards[0].windows[0].displayExpiresAt, iso(now + 60_000));
+  await mkdir(process.env.AFC_DATA_DIR!, { recursive: true });
+  await writeFile(QUOTA_COMPANIES, JSON.stringify({ generatedAt: iso(at), companies: cards }));
+  assert.equal((await readCompanies(at))[0].stale, true);
+  const expired = { ...plan, windows: windowsFor(manual, "manual", context) };
+  assert.equal(poolStatus([expired], { now: at }).demo.dispatchable, false);
+});
+
 test("home rejudges a six-hour cache and explicit display expiry even when stored stale is false", async () => {
   const card = { id: "demo", name: "Demo", adapter: "codex-cli", remainingPct: 80, headline: "80%", stale: false, notice: null,
     windows: [{ id: "demo-week", name: "Weekly", usedPct: 20, remainingPct: 80, resetsAt: iso(now + 86400000), source: "provider", readAt: iso(now - 6 * QUOTA_SAMPLE_MS),

@@ -346,7 +346,9 @@ function configuredWindows(cfg: WindowPlan, adapter: AdapterId, ctx: WindowConte
     sampledAt,
     collectedAt,
     sourceTimeKind: !liveValid && manual.state === "manual" ? "source" : cursor !== null ? sampledAt ? "source" : "unknown" : main?.sourceTimeKind ?? "unknown",
-    displayExpiresAt: liveValid ? quotaDisplayExpiry(sampledAt ?? collectedAt, reset ?? null) : null,
+    // Safety expiry alone does not invalidate a successful sample's display. Failures and expired hand copies still do.
+    displayExpiresAt: liveValid || (manual.state === "unknown" && validPercent(live) && !providerError && !main?.readError)
+      ? quotaDisplayExpiry(sampledAt ?? collectedAt, reset ?? null) : null,
     safetyError: main?.safetyError ?? (adapter === CURSOR_API ? cursorSafetyError(ctx.cursorReading) : null) ?? knownQuotaFailure(providerError),
     knownQuotaStop: knownStop ?? (adapter === CURSOR_API ? cursorKnownStop(cfg, ctx.cursorReading, now) : null),
     readingState: liveValid ? "live" : manual.state === "unknown" && live !== null ? "stale" : manual.state,

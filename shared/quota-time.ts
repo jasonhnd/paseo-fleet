@@ -26,13 +26,13 @@ export function quotaDisplayExpiry(at: string | null, reset: string | null): str
   return Number.isFinite(expires) ? new Date(expires).toISOString() : null;
 }
 
-/** Rejudge old presentation caches at read time, even when their stored stale flag is false. */
+/** Rejudge presentation caches at read time. readingExpiresAt is a dispatch deadline, not display expiry. */
 export function quotaRowStale(row: {
   readAt: string | null; collectedAt?: string | null; readingState?: string;
   readingExpiresAt?: string | null; displayExpiresAt?: string | null; resetsAt: string | null;
 }, now: number, cacheGeneratedAt?: string | null): boolean {
   if (row.readingState === "stale") return true;
-  for (const deadline of [row.readingExpiresAt, row.displayExpiresAt, row.resetsAt]) {
+  for (const deadline of [row.displayExpiresAt, row.resetsAt]) {
     if (deadline !== undefined && deadline !== null && (!Number.isFinite(Date.parse(deadline)) || Date.parse(deadline) <= now)) return true;
   }
   if (row.readAt && !validQuotaTime(row.readAt, now)) return true;

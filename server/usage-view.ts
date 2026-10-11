@@ -110,6 +110,8 @@ export function companyWindows(plans: UsagePlan[], panelAt?: string): CompanyPro
   const now = panelAt && Number.isFinite(Date.parse(panelAt)) ? Date.parse(panelAt) : Date.now();
   return plans.filter((p) => p.adapter !== CURSOR_API).flatMap((p) => (p.adapter === ANTIGRAVITY_CLI ? p.antigravityDisplay ?? p.windows : p.windows).map((w) => {
     const readAt = validQuotaTime(w.source === "manual" ? w.manualAt : w.sampledAt, now);
+    // An explicit display deadline preserves a successful automatic sample after its dispatch safety pause.
+    const displayOnly = w.readingState === "stale" && w.source === "none" && !w.manualAt && w.displayExpiresAt != null;
     return {
       planId: p.id,
       label: w.label,
@@ -122,9 +124,10 @@ export function companyWindows(plans: UsagePlan[], panelAt?: string): CompanyPro
       readAt,
       sourceTimeKind: readAt ? w.source === "manual" ? "source" : w.sourceTimeKind ?? "source" : "unknown",
       collectedAt: validQuotaTime(w.collectedAt, now),
-      displayExpiresAt: w.displayExpiresAt ?? quotaDisplayExpiry(validQuotaTime(w.sampledAt ?? w.manualAt ?? w.collectedAt, now), w.resetsAt),
+      displayExpiresAt: w.displayExpiresAt ?? quotaDisplayExpiry(validQuotaTime(w.source === "manual" ? w.manualAt : w.sampledAt ?? w.collectedAt, now),
+        w.source === "manual" ? w.readingExpiresAt ?? w.resetsAt : w.resetsAt),
       readError: w.readError ?? null,
-      readingState: w.readingState ?? (w.readError ? "stale" : readAt ? "live" : "unknown"),
+      readingState: displayOnly ? readAt ? "live" : "unknown" : w.readingState ?? (w.readError ? "stale" : readAt ? "live" : "unknown"),
       readingExpiresAt: w.readingExpiresAt,
     };
   }));
