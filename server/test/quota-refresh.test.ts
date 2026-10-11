@@ -159,6 +159,9 @@ test("safety expiry stays short and known failures stop even a quota-unprotected
   assert.equal(later[0].usedPct, null);
   assert.equal(later[0].staleUsedPct, 10);
   assert.equal(later[0].readingState, "stale");
+  const reset = windowsFor(cfg, "codex-cli", { ...context, now: now + 86400000 });
+  assert.equal(reset[0].usedPct, null);
+  assert.equal(reset[0].knownQuotaStop, null);
   const capped = windowsFor({ ...cfg, manualOverride: { usedPct: 1, at: iso(now), ttlSeconds: 7200 } }, "codex-cli", {
     ...context, now: now + 8 * 60_000, windowsBy: new Map([["codex", [{ label: "Weekly", usedPct: 99, resetsAt: iso(now + 86400000), collectedAt: iso(now) }]]]),
   });

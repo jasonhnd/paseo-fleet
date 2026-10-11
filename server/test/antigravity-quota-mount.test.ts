@@ -13,6 +13,7 @@ import { companyCatalog } from "../../shared/quota-adapters";
 import { buildCompanies } from "../../shared/quota-companies";
 import { companyWindows } from "../usage-view";
 import type { UsagePlan } from "../../shared/usage";
+import { QUOTA_DISPLAY_TTL_MS } from "../quota-timing";
 const { JSDOM } = createRequire(import.meta.url)("jsdom");
 
 test("phone and desktop mount one four-row card, keep 0/100 bar direction, and expose unknown/stale readings", async () => {
@@ -54,7 +55,7 @@ test("phone and desktop mount one four-row card, keep 0/100 bar direction, and e
       assert.ok(text.includes("Shared with GPT") && text.includes("dispatch paused"));
       assert.equal(text.includes("ACP dispatch quota"), false);
     }
-    mounted.render({ theme: LIGHT_THEME, compact: true, companies, now: now + 8 * 60_000 }); await tick();
+    mounted.render({ theme: LIGHT_THEME, compact: true, companies, now: now + QUOTA_DISPLAY_TTL_MS + 1 }); await tick();
     assert.ok(dom.window.document.body.textContent.includes("Expired"));
     assert.ok(dom.window.document.body.textContent.includes(reading.readAt));
     const unknown = companies.map(company => ({ ...company, windows: company.windows.map(row => ({ ...row, remainingPct: null, usedPct: null, readAt: null,
