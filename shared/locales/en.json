@@ -1944,7 +1944,7 @@
   "onboarding.role.batch": "Operations",
   "onboarding.notes.batch": "Perform only the authorized operational task. Report verification and risks.",
   "settings.dispatch.title": "Dispatch depth",
-  "settings.dispatch.hint": "Override thinking depth and order for each role, difficulty and profile slot. Explicit orders come first, in ascending order; empty orders use quota priority. Quota pauses and review family restrictions still apply. Save these changes with General settings.",
+  "settings.dispatch.hint": "Override thinking depth and order for each role, difficulty and profile slot. Explicit orders come first, in ascending order; empty orders use quota priority. Quota pauses still apply. Review compares this work's nonempty actual model ids: the same model is rejected; family is no longer an exclusion. Save these changes with General settings.",
   "settings.dispatch.tier": "{tier}",
   "settings.dispatch.target": "{slot} / {tier}",
   "settings.dispatch.profile": "{slot} — {profile}",

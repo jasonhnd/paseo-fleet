@@ -452,6 +452,31 @@ export function legacyReviewerTiers(node: unknown): Record<string, MatrixEntry[]
   return tiers;
 }
 
+/**
+ * Migrate configured legacy scopes before publication, without widening them.
+ * Family labels locate the existing allowlist only; reviewer independence is still
+ * checked exclusively against the actual model. An ambiguous/missing origin has
+ * no configured model scope. Direct legacy consumers keep their tier-merge reader.
+ */
+export function legacyReviewerModels(node: unknown, profiles: readonly DispatchProfile[]): ReviewerModelMatrix {
+  const families = recordNode(recordNode(node)?.byExecutorFamily);
+  const origins = new Map<string, Set<string>>();
+  for (const profile of profiles) {
+    const model = actualModel(profile.model);
+    if (!model) continue;
+    const labels = origins.get(model) ?? new Set<string>();
+    labels.add(profile.family?.trim().toLowerCase() ?? "");
+    origins.set(model, labels);
+  }
+  return { byExecutorModel: Object.fromEntries([...origins].map(([model, labels]) => {
+    const family = labels.size === 1 ? [...labels][0] : "";
+    const branch = family && families && Object.hasOwn(families, family) ? recordNode(families[family]) : null;
+    return [model, Object.fromEntries(Object.entries(branch ?? {})
+      .filter(([tier]) => /^L[1-4]$/.test(tier) || tier === "*")
+      .map(([tier, rows]) => [tier, entryArray(rows).map(row => ({ ...row }))]))];
+  })) };
+}
+
 /** A model branch, including an empty/invalid one, is authoritative; it cannot borrow another branch. */
 export function reviewerTier(matrix: Pick<DispatchMatrix, "roles">, executorModel: unknown, tier: string): MatrixEntry[] {
   const model = actualModel(executorModel);
@@ -472,7 +497,8 @@ export function eligibleReviewers(matrix: Pick<DispatchMatrix, "roles">, executo
   const byName = new Map(profiles.map(profile => [profile.name, profile]));
   return reviewerTier(matrix, executorModel, tier).flatMap(entry => {
     const profile = byName.get(entry.profile);
-    if (!profile || !(profile.role === "reviewer" || (profile.role === "candidate" && profile.candidateFor === "reviewer")) ||
+    if (!profile || !(profile.role === "reviewer" || (profile.role === "candidate" && profile.candidateFor === "reviewer") ||
+      (profile.role === "personal" && profile.pausedCandidateFor === "reviewer")) ||
       !differentReviewModels(executorModel, profile.model) || providerBanned(profile, bannedProviders)) return [];
     const paused = entry.paused === true || profilePaused(profile, profile.pool ? pools?.[profile.pool] : undefined);
     return [{ ...entry, ...(paused ? { paused: true } : {}) }];
@@ -517,10 +543,12 @@ export function applyDispatchMatrix(
 ): DispatchMatrix {
   const warn = options.onOverrideWarning ?? (() => {});
   const overrides = validDispatchOverrides(options.dispatchOverrides, options.profiles, options.thinkingCatalog ?? {}, warn);
-  // Convert only legacy reviewer input before applying overrides. Other roles remain byte-for-byte inputs.
+  // Preserve each legacy configured scope as an exact model branch before overrides.
+  // Never union scopes here: a restricted executor must not gain another branch's fallbacks.
   const reviewer = recordNode(base.roles.reviewer);
   const normalized = reviewer && !Object.hasOwn(reviewer, "byExecutorModel") && Object.hasOwn(reviewer, "byExecutorFamily")
-    ? { ...base, roles: { ...base.roles, reviewer: legacyReviewerTiers(reviewer) } } : base;
+    ? { ...base, roles: { ...base.roles, reviewer: legacyReviewerModels(reviewer,
+      options.profiles.filter(profile => !options.knownNames || options.knownNames.has(profile.name))) } } : base;
   const copy = mergeDispatchOverrides(normalized, overrides, warn);
   copy.generatedAt = options.generatedAt;
   delete copy.priority;

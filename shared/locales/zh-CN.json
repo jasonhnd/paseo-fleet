@@ -1944,7 +1944,7 @@
   "onboarding.role.batch": "杂活",
   "onboarding.notes.batch": "只执行已授权的操作任务，报告验证和风险。",
   "settings.dispatch.title": "派活深度",
-  "settings.dispatch.hint": "按角色、难度和档案槽位覆盖思考深度与顺序。显式顺序按数字从小到大排在前面，顺序留空的候选按额度优先级排在后面。额度暂停和审查异家限制继续生效。修改后点击通用设置的保存。",
+  "settings.dispatch.hint": "按角色、难度和档案槽位覆盖思考深度与顺序。显式顺序按数字从小到大排在前面，顺序留空的候选按额度优先级排在后面。额度暂停继续生效；审查只比较本件非空的实际 model，同模型拒绝，family 不再作为硬拒条件。修改后点击通用设置的保存。",
   "settings.dispatch.tier": "{tier}",
   "settings.dispatch.target": "{slot} / {tier}",
   "settings.dispatch.profile": "{slot} — {profile}",

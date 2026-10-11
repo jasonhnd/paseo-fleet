@@ -65,7 +65,7 @@ Change the contract in the source, never in the copy.
 
 ## Actual-model reviewer branches (contract 1.3.0)
 
-The raw/default reviewer configuration is a tier map of configured eligible reviewers.
+The raw reviewer configuration is a tier map or explicit model branches of configured eligible reviewers.
 Fleet resolves the live profiles, applies overrides and quota ordering, then exports
 `roles.reviewer.byExecutorModel[actualModel][tier]` as `MatrixEntry[]`. Entries retain
 `profile`, `effort`, optional `paused` and optional `order`. Model ids come from actual
@@ -79,9 +79,17 @@ an absent model/tier or malformed branch cannot borrow candidates from another m
 from family metadata. The schema preserves model keys and rejects malformed model branches
 instead of silently stripping them through a legacy union alternative.
 
-Legacy `byExecutorFamily` input is only a candidate migration format: merge each tier's
-lists in stored order, deduplicate by profile (first occurrence keeps its settings), then
-apply the actual model check. Family is never an independent-review exclusion. No migration
+When publishing an existing `byExecutorFamily` configuration, Fleet migrates each actual
+model's configured origin branch into an exact `byExecutorModel` allowlist before applying
+overrides. It does not union other branches or expand a restricted executor's fallback
+reviewers. Missing or conflicting origin metadata leaves that model's migrated scope empty.
+The old labels locate configuration only; they never compare reviewer and executor families.
+
+The consumer's legacy compatibility reader merges each tier's lists in stored order and
+deduplicates by profile (first occurrence keeps its settings), then applies the actual
+model check. New publications use the precise model branches above. Family is never an
+independent-review exclusion. Paused personal substitutes with `pausedCandidateFor=reviewer`
+remain visible and paused in their configured scopes. No migration
 may widen configured tier eligibility or bypass provider bans, role/candidateFor, pause,
 quota, capacity or high-risk review checks. Historical family evidence stays unchanged.
 
