@@ -1,66 +1,49 @@
 # paseo-fleet
 
-本地编码 agent 的阵容、额度节奏和待决定收件箱，用于 [Paseo](https://github.com/getpaseo/paseo)。[English](../../README.md)
+本仓库保留独立 Fleet 插件的历史。Fleet 的角色、额度节奏、派活策略、待拍板和设置已合入 [Paseo Kanban](https://github.com/jasonhnd/paseo-kanban)，与编码 agent 看板一起提供。[English](../../README.md)
 
-包 `@jasonhnd/paseo-fleet-cockpit`；插件 id `agent-fleet-cockpit`。
+历史独立包：`@jasonhnd/paseo-fleet-cockpit`；插件 id：`agent-fleet-cockpit`。
 
-> Experimental、未发布。已有源码和独立命令；干净环境安装、桌面挂载、首卡验证仍是发布闸。不承诺稳定或响应时间。
+## 安装 Paseo Kanban
 
-## 选择组合
+新安装使用单个 `paseo-kanban` 插件。按[统一上手指南](https://github.com/jasonhnd/paseo-kanban/blob/v0.1.0-rc.4/docs/zh-CN/README.md)和 [Git 安装指南（英文）](https://github.com/jasonhnd/paseo-kanban/blob/v0.1.0-rc.4/docs/GIT-INSTALL.md)操作，无须在 Kanban 旁再安装独立 Fleet 插件。
 
-| 安装 | 能力 |
-|---|---|
-| Fleet + Kanban | 阵容、额度节奏、决定、角色任务与审查流。 |
-| 只 Kanban | 看板、自配角色、基础顺序、本地决定；无 Fleet 额度保护。 |
-| 只 Fleet | 阵容、额度、决定；无派卡。 |
+当前公开 Git 来源是 `github:jasonhnd/paseo-kanban`，分支为 `integration/single-plugin-reviewed`。以下新安装示例固定到 GitHub 预发布 [v0.1.0-rc.4](https://github.com/jasonhnd/paseo-kanban/releases/tag/v0.1.0-rc.4)，发布及复核日期为 **2026-10-13**：
 
-伴随仓库：[Fleet](https://github.com/jasonhnd/paseo-fleet)、[Kanban](https://github.com/jasonhnd/paseo-kanban)。以 [fleet-quota/v1](../CONTRACT.md) 文件集成，包版本独立。
+```sh
+paseo plugin install github:jasonhnd/paseo-kanban --ref v0.1.0-rc.4
+paseo plugin ls paseo-kanban --json
+```
 
-## Requirements
+这是官方 Paseo CLI 的直接 Git 获取入口，不代表已收录官方 registry 或已发布 npm 包。rc.4 是实验性 Git 预发布。安装及升级仍须完成该 Release 列出的检查。实体手机、原生 app、已认证 provider／首卡／审查／验收／清理闭环、Linux 和 WSL2 仍未验证；保留限制及发布后的验证状态以 Release 记录为准。
 
-- daemon 与桌面 app 均 >=0.11.0 <0.12.0，全局及单插件开关启用。
-- 两插件合用 Node >=22.13.0；看板声明 >=22.5 且 node:sqlite 可用，Fleet >=22.13.0。版本下限不认证所有组合。
-- Git 用于代码卡/workspace；npm 用于源码构建、两个插件的 Git preparation，须在 daemon PATH。
-- 通读至少一已安装/登录的本地 provider；当前自动执行/审查卡流要两个实际 model 不同的模型。
-- macOS/Linux 是首发目标，须分别真测；首发不支持原生 Windows，WSL2 单测。见 [兼容证据](COMPATIBILITY.md)。
+安装前核对统一插件的 daemon/app 与 Node 要求，在目标宿主启用全局和单插件开关，并核实安装 revision 和实际面板。[兼容证据](https://github.com/jasonhnd/paseo-kanban/blob/v0.1.0-rc.4/docs/zh-CN/COMPATIBILITY.md)说明平台、客户端和 provider 限制；安装命令不认证未测试环境。若已安装 `paseo-kanban`，按指南显式指定 ref 更新，或走[换源与恢复流程](https://github.com/jasonhnd/paseo-kanban/blob/v0.1.0-rc.4/docs/zh-CN/RELEASE.md)，不要再次安装相同 id。
 
-## 五分钟上手：安装到第一张卡完成
+## 从独立 Fleet 转向统一插件
 
-五分钟是 Paseo 与本地 provider 已准备好时的配置引导；下载、登录、首次加载与执行可能更久。此 experimental 路径仍待干净环境验收；角色目前只预览/手配，同模型自动自检未提供。
+旧数据**不会自动导入**。复用旧状态前先读[手动转移指南（英文）](https://github.com/jasonhnd/paseo-kanban/blob/v0.1.0-rc.4/docs/MANUAL-MIGRATION.md)：
 
-1. 运行 paseo --version、node --version，同时查 app 版本。满足要求，自行在 provider 登录。
-2. 首次发布后安装所需插件：
+1. 停止派活及旧插件、定时任务和命令写入者。制作一致的数据备份，另行记录插件设置、安装 revision 和启用状态。
+2. 选择新的空统一根目录：`KANBAN_DATA_DIR`，或 `PASEO_HOME/plugin-data/paseo-kanban`；Fleet 状态放在 `fleet/` 子目录。取消旧的 `AFC_DATA_DIR`、`ROLES_STATE_DIR`、`AFC_LEGACY_DATA_DIR` 覆盖。
+3. 只转移指南列出的逐项批准文件；验证 schema 和路径，明确解决冲突，重新生成额度/策略状态。不整目录覆盖，不复制凭证或 supervisor token。
+4. 启用统一 `paseo-kanban` 前，禁用旧 `agent-fleet-cockpit` 插件及其写入者。核对实际根目录、设置、角色、额度策略、待拍板和看板后才恢复派活。代码回退不恢复数据；数据恢复按文档的一致备份流程另行操作。
 
-   ```sh
-   paseo plugin install npm:@jasonhnd/paseo-fleet-cockpit
-   paseo plugin install npm:@jasonhnd/paseo-kanban
-   paseo plugin ls
-   ```
+统一插件的问题及迁移疑问提交到 [Paseo Kanban issues](https://github.com/jasonhnd/paseo-kanban/issues)。已有 Fleet issue 保留原讨论历史，并交叉链接新报告。
 
-   Host Settings -> Plugins 启用全局和单插件，核状态并真实打开面板。发布前源码试用按下方构建说明，不假设 npm 包或 tag 已存在。
-3. Fleet Settings 选英文/简体中文，用可用目录预览角色；确认家族后手动在 Paseo 建档，保留旧项。按预览配置 role/family、模型选项，含 role=supervisor 的 leader、实际 model 不同的执行和审查。预览不保存、不证明登录。只看板则手配这些字段。只有一个实际模型先人工评估，补齐独立审查前不称自动审查流完成。可跳过额度但无保护，之后只加自己的池。
-4. 新建名为 demo 的演示 Git workspace 并有初始提交。Kanban 设置配项目 workspace、简称、保护分支；项目 leader 面板选档案/workspace/语言，预览后启动、核协议。普通会话选同名档案不够。
-5. 新 leader 会话调用 kanban_supervise（项目 demo），或运行：
+## 独立版历史与支持状态
 
-   ```sh
-   node "$BOARD_INSTALL/bin/paseo-kanban.mjs" supervise --project demo
-   ```
+**最后受支持的独立版本：未确认。** 截至 **2026-10-13**，最新公开独立 tag 为 [v0.1.0-rc.7](https://github.com/jasonhnd/paseo-fleet/tree/v0.1.0-rc.7)，指向 `9ca083f6561a6062f028cac85f7a26437de2abf0`。公开 [GitHub Release 列表](https://github.com/jasonhnd/paseo-fleet/releases)为空，独立版 changelog 未声明已发行基线。该 tag 只代表历史快照，不能据此认定最后受支持的独立发行；包元数据 `0.1.0` 也不能证明。
 
-   BOARD_INSTALL 是 plugin ls --json 的当前安装目录；会话用自身注入身份，不粘贴 token。面板确认登记；原 leader 仍活着要交接。
-6. 让 leader 建 L1 卡：“在 demo 仓加入 hello.md，内容严格为 Hello 加换行；验证、提交、本机审查验收，不 push、不发布。”执行提交后 complete，异模型审查核对，leader 核证据 accept。确认卡完成、内容正确、工作区干净、管理的清理完成。
-7. 出错读 [排错](COMPATIBILITY.md)、插件日志、独立 Node doctor。协议/登记缺失不能派卡。只 Fleet 可测阵容/额度/决定，首卡需要 Kanban。
+公开历史和 [tags](https://github.com/jasonhnd/paseo-fleet/tags)继续保留。本仓库尚未归档。下方文档与命令描述旧独立源码；新安装及迁移请用上方统一插件指南。
 
-有已发布且验证过的 tag 后才用 `paseo plugin install github:jasonhnd/paseo-fleet --ref vX.Y.Z`；每次 update 也指定 --ref。目录来源先源码构建，再 `paseo plugin install "$PLUGIN_CHECKOUT"`，不用 tag 选择器。换已有来源前读 [RELEASE](RELEASE.md)。
-
-## 文档与命令
+## 旧独立版文档与命令
 
 [工作流](WORKFLOW.md) · [数据](DATA.md) · [兼容](COMPATIBILITY.md) · [发布/更新](RELEASE.md) · [贡献](CONTRIBUTING.md) · [安全](SECURITY.md) · [变更](CHANGELOG.md)
 
-两仓源码先 `npm run build`（Fleet 的 build:cli 是别名）。两插件的 manifest build 均运行各自的 server/prepare.mjs；Fleet Git 准备先 npm ci --include=dev --ignore-scripts --no-audit --no-fund，再 npm run build。生成的 bin/*.bundle.mjs 和 Fleet server/paseo-client.bundle.mjs 不提交 Git，npm 产物含预打包 bundle。见 [Fleet Git 安装与切换](GIT-INSTALL.md)、[Kanban Git 安装](https://github.com/jasonhnd/paseo-kanban/blob/main/docs/GIT-INSTALL.md)。已打包命令使用 Node，不要求 Python/tsx；干净环境验收仍是发版前提，不能以看板安装结果代替 Fleet 验证。独立 doctor：
+本仓库的旧独立源码先 `npm run build`（Fleet 的 build:cli 是别名）。其 manifest build 运行 server/prepare.mjs；Git 准备先 npm ci --include=dev --ignore-scripts --no-audit --no-fund，再 npm run build。生成的 bin/*.bundle.mjs 和 server/paseo-client.bundle.mjs 不提交 Git，npm 产物含预打包 bundle。旧实现的准备与恢复流程见 [Fleet Git 安装文档](GIT-INSTALL.md)，此链接不是新的推荐安装入口。已打包命令使用 Node，不要求 Python/tsx；离线构建不证明干净环境安装。旧独立 doctor：
 
 ```sh
 node "$FLEET_INSTALL/bin/afc.mjs" doctor --json
-node "$BOARD_INSTALL/bin/paseo-kanban.mjs" doctor
 ```
 
 Fleet 的 shared/default-dispatch.example.json 是安装模板，不是生成的状态。模型与可选集成可配；见 [导入证据](../IMPORT.md)。
@@ -71,7 +54,7 @@ Fleet 的 shared/default-dispatch.example.json 是安装模板，不是生成的
 
 Fleet 设置页的「AFC 运行通知项目」把可选字符串 `opsProject` 保存到 `afc.config.json`，例如 `{ "opsProject": "demo-operations" }`。这个看板项目登记的 `<leader>` 接收 AFC 提前重置、每日体检和用券通知，以及 daemon 崩溃、Cursor 登录／用量和钥匙串探测告警；新建 `afc decide add`／`afc decide decided` 未指定 `--project` 时，也归属这个项目，显式指定仍优先。缺省或非法值回退 `paseo-fleet`；名称会去除两端空白，不能为空或包含控制字符。非法设置写入会被拒绝，原文件不变；清空字段恢复默认。已有 `decisions.json` 记录保留原 `project`，回复、提醒、推翻仍查原项目登记，不迁移或重新归类历史记录。接收通知前，先在看板登记所选项目的 `<leader>`。
 
-## Leader 上下文提醒与换会话
+## 旧独立版 leader 上下文提醒与换会话
 
 已安装且在所选本地 daemon 上运行的 Fleet 插件提供这些命令：
 
@@ -88,7 +71,7 @@ usage 是只读报告，不恢复挂起的换会话；unknown 不等于 0。Sett
 
 swap 需要先获得会话中的确认；等旧会话空闲、交接、新会话接手回复和 Kanban 登记后才归档旧会话。失败保留两个会话；重跑同一 `afc leader swap demo` 继续未完成步骤，完成后再次主动换用 --again。连接中断时先 `afc leader status demo --json`，插件可能仍在执行；--json 把进度发 stderr、最终结果发 stdout。cancel 拒绝运行中的 swap，停止后仅清除跟踪，不动会话或登记。人工回退先在旧会话运行 `kanban supervise --project demo` 并核登记，再归档孤立新会话。--dry-run 只读，不启动或恢复换会话。
 
-命令默认使用 $PASEO_HOME/config.json 的 daemon listener，可用 --host 127.0.0.1:PORT 指本地 TCP；IPv6 用 `--host '[::1]:PORT'`，daemon 地址也须同样括号。受保护 endpoint 可拒绝握手，命令不读登录凭证。Access map 的插件检查使用显式 pluginId，未指定则报 unknown。完整行为见[英文 README](../../README.md#leader-context-reminders-and-swaps)。
+命令默认使用 $PASEO_HOME/config.json 的 daemon listener，可用 --host 127.0.0.1:PORT 指本地 TCP；IPv6 用 `--host '[::1]:PORT'`，daemon 地址也须同样括号。受保护 endpoint 可拒绝握手，命令不读登录凭证。Access map 的插件检查使用显式 pluginId，未指定则报 unknown。完整行为见[英文 README](../../README.md#legacy-leader-context-reminders-and-swaps)。
 
 ## 隐私闸与贡献者设置
 
@@ -119,6 +102,6 @@ npm run contract:check
 npm run shared:check
 ```
 
-PASEO_FLEET_SIBLING 指伴随 checkout，核 scripts/.githooks/.github/workflows 逐字节一致。FLEET_CONTRACT_SOURCE 指 Fleet，核看板副本相同；契约只在源仓改，带 --check 或只设变量不复制。Fleet 另有 npm run compat；看板当前未定义该 script，本机 verify 提供编译、类型、插件回归。离线绿不证明真桌面、认证、迁移或其它 OS。
+旧独立版的 PASEO_FLEET_SIBLING 指伴随 checkout，核 scripts/.githooks/.github/workflows 逐字节一致；不适用于已合并的统一源码。FLEET_CONTRACT_SOURCE 核旧看板副本相同；契约只在源仓改，带 --check 或只设变量不复制。Fleet 另有 npm run compat；本机 verify 提供编译、类型、插件回归。离线绿不证明真桌面、认证、迁移或其它 OS。
 
 [MIT](../../LICENSE)
